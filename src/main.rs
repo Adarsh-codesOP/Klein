@@ -8,6 +8,9 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use anyhow::Result;
 
 mod app;
+mod sidebar;
+mod editor;
+mod terminal;
 
 use crate::app::App;
 
