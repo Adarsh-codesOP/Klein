@@ -1,0 +1,19 @@
+[package]
+name = "klein"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ratatui = "0.26"
+crossterm = { version = "0.27", features = ["event-stream"] }
+syntect = "5.1"
+portable-pty = "0.8"
+ropey = "1.6"
+arboard = "3.3"
+walkdir = "2.4"
+anyhow = "1.0"
+tokio = { version = "1.35", features = ["full"] }
+futures = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+directories = "5.0"
