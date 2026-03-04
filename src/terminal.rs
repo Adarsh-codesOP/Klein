@@ -21,7 +21,7 @@ impl Terminal {
             })
             .unwrap();
 
-        let cmd = CommandBuilder::new("powershell.exe"); // Default for Windows
+        let cmd = CommandBuilder::new("cmd.exe"); // Default for Windows
         let _child = pty_pair.slave.spawn_command(cmd).unwrap();
 
         let writer = pty_pair.master.take_writer().unwrap();
