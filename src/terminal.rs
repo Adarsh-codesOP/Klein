@@ -37,6 +37,11 @@ impl Terminal {
                 }
                 let mut out = output_clone.lock().unwrap();
                 out.push_str(&String::from_utf8_lossy(&buf[..n]));
+                // Limit output buffer size
+                if out.len() > 10000 {
+                    let split_idx = out.len() - 5000;
+                    *out = out[split_idx..].to_string();
+                }
             }
         });
 

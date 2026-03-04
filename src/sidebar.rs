@@ -102,7 +102,7 @@ impl Sidebar {
 
     pub fn next(&mut self) {
         if !self.flat_list.is_empty() {
-            self.selected_index = (self.selected_index + 1) % self.flat_list.size();
+            self.selected_index = (self.selected_index + 1) % self.flat_list.len();
         }
     }
 
@@ -111,7 +111,7 @@ impl Sidebar {
             if self.selected_index > 0 {
                 self.selected_index -= 1;
             } else {
-                self.selected_index = self.flat_list.size() - 1;
+                self.selected_index = self.flat_list.len() - 1;
             }
         }
     }

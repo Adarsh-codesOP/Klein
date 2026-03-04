@@ -28,6 +28,7 @@ pub struct App {
     pub sidebar: Sidebar,
     pub editor: Editor,
     pub terminal: Terminal,
+    pub last_editor_height: usize,
 }
 
 impl App {
@@ -41,6 +42,7 @@ impl App {
             sidebar: Sidebar::new(&current_dir),
             editor: Editor::new(),
             terminal: Terminal::new(),
+            last_editor_height: 20,
         }
     }
 
@@ -109,7 +111,7 @@ impl App {
             KeyCode::Down | KeyCode::Char('j') => {
                 match self.active_panel {
                     Panel::Sidebar => self.sidebar.next(),
-                    Panel::Editor => self.editor.move_cursor_down(10), // Placeholder height
+                    Panel::Editor => self.editor.move_cursor_down(self.last_editor_height),
                     _ => {}
                 }
             }
@@ -223,6 +225,7 @@ impl App {
         // Editor
         let editor_rect = top_chunks[1];
         let inner_rect = editor_block.inner(editor_rect);
+        self.last_editor_height = inner_rect.height as usize;
         let highlighted_lines = self.editor.get_highlighted_lines(
             inner_rect.width as usize,
             inner_rect.height as usize,
