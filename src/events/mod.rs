@@ -1,12 +1,35 @@
 use std::io;
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind};
 use crate::app::{App, Panel};
 
 pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
-    if let Event::Key(key) = event {
-        if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat {
-            handle_key_event(app, key)?;
+    match event {
+        Event::Key(key) => {
+            if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat {
+                handle_key_event(app, key)?;
+            }
         }
+        Event::Mouse(mouse) => {
+            handle_mouse_event(app, mouse)?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
+    match mouse.kind {
+        MouseEventKind::ScrollUp => {
+            if matches!(app.active_panel, Panel::Terminal) {
+                app.terminal_scroll = app.terminal_scroll.saturating_add(3);
+            }
+        }
+        MouseEventKind::ScrollDown => {
+            if matches!(app.active_panel, Panel::Terminal) {
+                app.terminal_scroll = app.terminal_scroll.saturating_sub(3);
+            }
+        }
+        _ => {}
     }
     Ok(())
 }
@@ -110,15 +133,29 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.terminal.write("\t");
             }
             KeyCode::Delete => app.terminal.write("\x1b[3~"),
-            KeyCode::Up => app.terminal.write("\x1b[A"),
-            KeyCode::Down => app.terminal.write("\x1b[B"),
+            KeyCode::Up => {
+                app.terminal_scroll = app.terminal_scroll.saturating_add(1);
+            }
+            KeyCode::Down => {
+                app.terminal_scroll = app.terminal_scroll.saturating_sub(1);
+            }
             KeyCode::Right => app.terminal.write("\x1b[C"),
             KeyCode::Left => app.terminal.write("\x1b[D"),
             KeyCode::PageUp => {
-                app.terminal_scroll = app.terminal_scroll.saturating_add(5);
+                if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    app.terminal_scroll = app.terminal_scroll.saturating_add(5);
+                } else {
+                    app.terminal_scroll = 0;
+                    app.terminal.write("\x1b[5~");
+                }
             }
             KeyCode::PageDown => {
-                app.terminal_scroll = app.terminal_scroll.saturating_sub(5);
+                if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    app.terminal_scroll = app.terminal_scroll.saturating_sub(5);
+                } else {
+                    app.terminal_scroll = 0;
+                    app.terminal.write("\x1b[6~");
+                }
             }
             _ => {}
         }
