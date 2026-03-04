@@ -114,16 +114,24 @@ impl App {
 
         if matches!(self.active_panel, Panel::Terminal) {
             match key.code {
+                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.terminal.write("\x03"); // Ctrl+C
+                }
                 KeyCode::Char(c) => self.terminal.write(&c.to_string()),
                 KeyCode::Enter => self.terminal.write("\r\n"),
-                KeyCode::Backspace => self.terminal.write("\x7f"), // Backspace for PTY
+                KeyCode::Backspace => self.terminal.write("\x08"), // Standard backspace for many PTYs
+                KeyCode::Up => self.terminal.write("\x1b[A"),
+                KeyCode::Down => self.terminal.write("\x1b[B"),
+                KeyCode::Right => self.terminal.write("\x1b[C"),
+                KeyCode::Left => self.terminal.write("\x1b[D"),
                 KeyCode::Tab => {
-                    // Still allow switching panels with Tab?
-                    // Maybe use Ctrl+Tab for panel switching if terminal eats Tab
+                     // We use Tab for panel switching, but what if terminal needs it?
+                     // Let's keep Tab for panel switching but maybe Ctrl+Tab for terminal Tab?
+                     // For now, let's allow Esc to switch panel or just stay as is.
                 }
                 _ => {}
             }
-            // Switch away from terminal with Tab if not captured
+            // Switch away from terminal with Tab
             if key.code == KeyCode::Tab {
                 self.active_panel = if self.show_sidebar { Panel::Sidebar } else { Panel::Editor };
             }
@@ -337,8 +345,11 @@ impl App {
 
         // Terminal
         if self.show_terminal {
-            let output = self.terminal.output.lock().unwrap();
-            let terminal_lines: Vec<ratatui::text::Line> = output
+            let output_raw = self.terminal.output.lock().unwrap();
+            let stripped = strip_ansi_escapes::strip(&*output_raw).unwrap_or_else(|_| output_raw.as_bytes().to_vec());
+            let output = String::from_utf8_lossy(&stripped);
+            
+            let terminal_lines: Vec<ratatui::text::Line<'_>> = output
                 .lines()
                 .rev() // Show last lines
                 .take(chunks[1].height.saturating_sub(2) as usize)

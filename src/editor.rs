@@ -64,13 +64,15 @@ impl Editor {
         let char_idx = line_idx + self.cursor_x;
 
         if char_idx > 0 {
-            self.buffer.remove(char_idx - 1..char_idx);
             if self.cursor_x > 0 {
+                self.buffer.remove(char_idx - 1..char_idx);
                 self.cursor_x -= 1;
             } else if self.cursor_y > 0 {
+                // Join lines
+                let prev_line_len = self.buffer.line(self.cursor_y - 1).len_chars();
+                self.buffer.remove(char_idx - 1..char_idx); // Remove newline
                 self.cursor_y -= 1;
-                // Move to end of previous line
-                self.cursor_x = self.buffer.line(self.cursor_y).len_chars().saturating_sub(1);
+                self.cursor_x = prev_line_len.saturating_sub(1);
             }
         }
     }
@@ -122,7 +124,7 @@ impl Editor {
     pub fn move_cursor_down(&mut self, height: usize) {
         if self.cursor_y + 1 < self.buffer.len_lines() {
             self.cursor_y += 1;
-            if self.cursor_y >= self.scroll_y + height {
+            if self.cursor_y >= self.scroll_y + height && height > 0 {
                 self.scroll_y = self.cursor_y - height + 1;
             }
             self.clamp_cursor_x();
@@ -170,18 +172,25 @@ impl Editor {
         if query.is_empty() {
             return;
         }
-        // Simple search: find first occurrence after current cursor
         let content = self.buffer.to_string();
-        let start_pos = self.buffer.line_to_char(self.cursor_y) + self.cursor_x;
+        let current_pos = self.buffer.line_to_char(self.cursor_y) + self.cursor_x;
         
-        if let Some(found_pos) = content[start_pos..].find(query) {
-            let absolute_pos = start_pos + found_pos;
-            self.cursor_y = self.buffer.char_to_line(absolute_pos);
-            self.cursor_x = absolute_pos - self.buffer.line_to_char(self.cursor_y);
-        } else if let Some(found_pos) = content[..start_pos].find(query) {
+        // Find next occurrence
+        if let Some(found_pos) = content[current_pos + 1..].find(query) {
+            let absolute_pos = current_pos + 1 + found_pos;
+            self.move_to_pos(absolute_pos);
+        } else if let Some(found_pos) = content[..current_pos].find(query) {
             // Wrap around
-            self.cursor_y = self.buffer.char_to_line(found_pos);
-            self.cursor_x = found_pos - self.buffer.line_to_char(self.cursor_y);
+            self.move_to_pos(found_pos);
+        }
+    }
+
+    fn move_to_pos(&mut self, pos: usize) {
+        self.cursor_y = self.buffer.char_to_line(pos);
+        self.cursor_x = pos - self.buffer.line_to_char(self.cursor_y);
+        // Update scroll if needed
+        if self.cursor_y < self.scroll_y {
+            self.scroll_y = self.cursor_y;
         }
     }
 
