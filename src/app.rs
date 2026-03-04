@@ -120,17 +120,16 @@ impl App {
                     self.terminal.write("\x03"); // Ctrl+C
                 }
                 KeyCode::Char(c) => self.terminal.write(&c.to_string()),
-                KeyCode::Enter => self.terminal.write("\r"),
-                KeyCode::Backspace => self.terminal.write("\x08"), // Standard backspace for many PTYs
+                KeyCode::Enter => self.terminal.write("\r\n"), // CMD prefers CRLF
+                KeyCode::Backspace => self.terminal.write("\x08"), // BS
                 KeyCode::Delete => self.terminal.write("\x1b[3~"),
                 KeyCode::Up => self.terminal.write("\x1b[A"),
                 KeyCode::Down => self.terminal.write("\x1b[B"),
                 KeyCode::Right => self.terminal.write("\x1b[C"),
                 KeyCode::Left => self.terminal.write("\x1b[D"),
                 KeyCode::Tab => {
-                     // We use Tab for panel switching, but what if terminal needs it?
-                     // Let's keep Tab for panel switching but maybe Ctrl+Tab for terminal Tab?
-                     // For now, let's allow Esc to switch panel or just stay as is.
+                     // Terminal Tab support? 
+                     // self.terminal.write("\t");
                 }
                 _ => {}
             }
@@ -235,13 +234,13 @@ impl App {
             .constraints(
                 if self.show_terminal {
                     [
-                        Constraint::Min(3),
+                        Constraint::Fill(1),
                         Constraint::Length(10),
                         Constraint::Length(1), // Status Bar
                     ]
                 } else {
                     [
-                        Constraint::Min(3),
+                        Constraint::Fill(1),
                         Constraint::Length(0),
                         Constraint::Length(1), // Status Bar
                     ]
@@ -403,31 +402,28 @@ impl App {
 
 fn strip_ansi(s: &str) -> String {
     let mut result = String::new();
-    let mut in_escape = false;
-    let mut in_csi = false; // Control Sequence Introducer: ESC [
-    
     let chars: Vec<char> = s.chars().collect();
     let mut i = 0;
     while i < chars.len() {
-        let c = chars[i];
-        if c == '\x1b' {
-            in_escape = true;
-            if i + 1 < chars.len() && chars[i+1] == '[' {
-                in_csi = true;
+        if chars[i] == '\x1b' {
+            i += 1;
+            if i < chars.len() && chars[i] == '[' {
+                i += 1;
+                while i < chars.len() {
+                    let c = chars[i];
+                    i += 1;
+                    if (c as u32) >= 0x40 && (c as u32) <= 0x7E {
+                        break;
+                    }
+                }
+            } else if i < chars.len() {
+                // Secondary escape char
                 i += 1;
             }
-        } else if in_csi {
-            if (c as u32) >= 0x40 && (c as u32) <= 0x7E {
-                in_csi = false;
-                in_escape = false;
-            }
-        } else if in_escape {
-             // Handle single char escapes like ESC c
-             in_escape = false;
         } else {
-            result.push(c);
+            result.push(chars[i]);
+            i += 1;
         }
-        i += 1;
     }
     result
 }
