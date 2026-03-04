@@ -135,7 +135,7 @@ impl Sidebar {
         let path_clone = path.clone();
 
         if *is_dir {
-            self.toggle_node(&mut self.root, &path_clone)?;
+            Self::toggle_node(&mut self.root, &path_clone)?;
             self.update_flat_list();
             Ok(None)
         } else {
@@ -143,7 +143,7 @@ impl Sidebar {
         }
     }
 
-    fn toggle_node(&mut self, node: &mut FileNode, target_path: &Path) -> Result<bool> {
+    fn toggle_node(node: &mut FileNode, target_path: &Path) -> Result<bool> {
         if node.path == target_path {
             if node.is_expanded {
                 node.collapse();
@@ -155,7 +155,7 @@ impl Sidebar {
 
         if let Some(children) = &mut node.children {
             for child in children {
-                if self.toggle_node(child, target_path)? {
+                if Self::toggle_node(child, target_path)? {
                     return Ok(true);
                 }
             }
