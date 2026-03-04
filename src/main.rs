@@ -11,6 +11,9 @@ mod app;
 mod sidebar;
 mod editor;
 mod terminal;
+mod ui;
+mod events;
+mod config;
 
 use crate::app::App;
 
@@ -48,12 +51,11 @@ async fn run_app<B: io::Write + ratatui::backend::Backend>(
     app: &mut App,
 ) -> io::Result<()> {
     loop {
-        terminal.draw(|f| app.render(f))?;
+        terminal.draw(|f| ui::render(f, app))?;
 
         if event::poll(std::time::Duration::from_millis(16))? {
-            if let event::Event::Key(key) = event::read()? {
-                app.handle_event(event::Event::Key(key))?;
-            }
+            let ev = event::read()?;
+            events::handle_event(app, ev)?;
         }
 
         if app.should_quit {

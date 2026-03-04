@@ -3,6 +3,8 @@ use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+use crate::config;
+
 pub struct Terminal {
     pub _pty_pair: PtyPair,
     pub writer: Box<dyn Write + Send>,
@@ -21,7 +23,7 @@ impl Terminal {
             })
             .unwrap();
 
-        let mut cmd = CommandBuilder::new("C:\\Program Files\\Git\\bin\\bash.exe"); 
+        let mut cmd = CommandBuilder::new(config::TERMINAL_BASH_PATH); 
         cmd.args(&["--login", "-i"]);
         cmd.env("TERM", "xterm-256color");
         cmd.cwd(cwd);
