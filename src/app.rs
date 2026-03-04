@@ -145,7 +145,7 @@ impl App {
                 }
                 KeyCode::Backspace => {
                     self.terminal_scroll = 0;
-                    self.terminal.write("\x7f"); // DEL (\x7f) preferred by Bash
+                    self.terminal.write("clear\r"); // User requested clear command on backspace
                 }
                 KeyCode::Tab => {
                     self.terminal.write("\t");
