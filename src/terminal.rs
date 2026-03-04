@@ -10,7 +10,7 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    pub fn new() -> Self {
+    pub fn new(cwd: std::path::PathBuf) -> Self {
         let pty_system = native_pty_system();
         let pty_pair = pty_system
             .openpty(PtySize {
@@ -21,7 +21,9 @@ impl Terminal {
             })
             .unwrap();
 
-        let cmd = CommandBuilder::new("cmd.exe"); // Default for Windows
+        let mut cmd = CommandBuilder::new("C:\\Program Files\\Git\\bin\\bash.exe"); 
+        cmd.args(&["--login", "-i"]);
+        cmd.cwd(cwd);
         let _child = pty_pair.slave.spawn_command(cmd).unwrap();
 
         let writer = pty_pair.master.take_writer().unwrap();
@@ -36,7 +38,11 @@ impl Terminal {
                     break;
                 }
                 let mut out = output_clone.lock().unwrap();
-                out.push_str(&String::from_utf8_lossy(&buf[..n]));
+                let text = String::from_utf8_lossy(&buf[..n]);
+                if text.contains("\x1b[2J") || text.contains("\x1b[H") {
+                    out.clear();
+                }
+                out.push_str(&text);
                 // Limit output buffer size
                 if out.len() > 10000 {
                     let split_idx = out.len() - 5000;

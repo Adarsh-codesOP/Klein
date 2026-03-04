@@ -39,7 +39,7 @@ impl App {
             should_quit: false,
             sidebar: Sidebar::new(&current_dir),
             editor: Editor::new(),
-            terminal: Terminal::new(),
+            terminal: Terminal::new(current_dir),
             last_editor_height: Cell::new(20),
             show_help: true,
         }
@@ -134,8 +134,8 @@ impl App {
                     self.terminal.write("\x03"); // Ctrl+C
                 }
                 KeyCode::Char(c) => self.terminal.write(&c.to_string()),
-                KeyCode::Enter => self.terminal.write("\r\n"), // CMD prefers CRLF
-                KeyCode::Backspace => self.terminal.write("\x08"), // BS
+                KeyCode::Enter => self.terminal.write("\n"), // Bash prefers LF
+                KeyCode::Backspace => self.terminal.write("\x08"), // Try BS (\x08) for Git Bash on Windows
                 KeyCode::Delete => self.terminal.write("\x1b[3~"),
                 KeyCode::Up => self.terminal.write("\x1b[A"),
                 KeyCode::Down => self.terminal.write("\x1b[B"),
@@ -222,8 +222,8 @@ impl App {
     }
 
     pub fn render(&self, f: &mut Frame<'_>) {
-        let mut constraints = vec![
-            if self.show_help { Constraint::Length(3) } else { Constraint::Length(0) }, // Help
+        let constraints = vec![
+            if self.show_help { Constraint::Length(4) } else { Constraint::Length(0) }, // Help (Height 4 for 2 lines + borders)
             Constraint::Fill(1), // Main
             if self.show_terminal { Constraint::Length(10) } else { Constraint::Length(0) }, // Terminal
             Constraint::Length(1), // Status Bar
@@ -236,12 +236,14 @@ impl App {
 
         // Help Section
         if self.show_help {
-            let help_text = " [Ctrl+B] Sidebar | [Ctrl+`] Term | [Ctrl+H] Toggle Help | [Ctrl+Arrows] Move Tab | [Ctrl+S] Save | [Ctrl+R] Run | [Ctrl+Q] Quit ";
+            let help_text = "Navigation: [Ctrl+Arrows] Panels | [Arrows/hjkl] Move | [Enter] Select/Open | [Esc] Term Out | [Ctrl+H] Toggle Help\nShortcuts: [Ctrl+B] Sidebar | [Ctrl+`] Term | [Ctrl+S] Save | [Ctrl+R] Run | [Ctrl+Q] Quit";
             let help_block = Block::default()
-                .title(" Help / Shortcuts ")
+                .title(" Klein IDE Help ")
                 .borders(Borders::ALL)
                 .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Cyan));
-            let help_widget = Paragraph::new(help_text).block(help_block);
+            let help_widget = Paragraph::new(help_text)
+                .block(help_block)
+                .wrap(ratatui::widgets::Wrap { trim: true });
             f.render_widget(help_widget, chunks[0]);
         }
 
@@ -346,14 +348,18 @@ impl App {
             let output_raw = self.terminal.output.lock().unwrap();
             let output = strip_ansi(&output_raw);
             
-            let terminal_lines: Vec<ratatui::text::Line<'_>> = output
-                .lines()
-                .rev() // Show last lines
-                .take(chunks[1].height.saturating_sub(2) as usize)
-                .map(|l: &str| ratatui::text::Line::from(l.to_string()))
-                .collect::<Vec<_>>()
-                .into_iter()
-                .rev()
+            let mut lines: Vec<&str> = output.lines().collect();
+            // If the buffer ends with a newline, lines() won't include an empty trailing line.
+            // But we want to see the prompt even if it's the very last thing.
+            let height = chunks[2].height.saturating_sub(2) as usize;
+            if lines.len() > height {
+                let start = lines.len() - height;
+                lines = lines[start..].to_vec();
+            }
+            
+            let terminal_lines: Vec<ratatui::text::Line<'_>> = lines
+                .iter()
+                .map(|l| ratatui::text::Line::from(l.to_string()))
                 .collect();
 
             let terminal_block = Block::default()
@@ -367,6 +373,16 @@ impl App {
             
             let terminal_widget = Paragraph::new(terminal_lines).block(terminal_block);
             f.render_widget(terminal_widget, chunks[2]);
+
+            // Show cursor in terminal if active
+            if matches!(self.active_panel, Panel::Terminal) {
+                let last_line = lines.last().copied().unwrap_or("");
+                let inner = Block::default().borders(Borders::ALL).inner(chunks[2]);
+                f.set_cursor(
+                    inner.x + last_line.len() as u16,
+                    inner.y + lines.len().min(height).saturating_sub(1) as u16,
+                );
+            }
         }
 
         // Status Bar
@@ -402,45 +418,53 @@ fn strip_ansi(s: &str) -> String {
     let mut i = 0;
     while i < chars.len() {
         if chars[i] == '\x1b' {
+            let _start = i;
             i += 1;
-            if i < chars.len() {
-                match chars[i] {
-                    '[' => { // CSI
+            if i >= chars.len() { break; } 
+            match chars[i] {
+                '[' => { // CSI
+                    i += 1;
+                    let mut found = false;
+                    while i < chars.len() {
+                        let c = chars[i];
                         i += 1;
-                        while i < chars.len() {
-                            let c = chars[i];
-                            i += 1;
-                            if (c as u32) >= 0x40 && (c as u32) <= 0x7E {
-                                break;
-                            }
+                        if (c as u32) >= 0x40 && (c as u32) <= 0x7E {
+                            found = true;
+                            break;
                         }
                     }
-                    ']' => { // OSC
-                        i += 1;
-                        while i < chars.len() {
-                            if chars[i] == '\x07' {
-                                i += 1;
-                                break;
-                            }
-                            if chars[i] == '\x1b' && i + 1 < chars.len() && chars[i+1] == '\\' {
-                                i += 2;
-                                break;
-                            }
+                    if !found { break; } // Truncate partial
+                }
+                ']' => { // OSC (Window title etc)
+                    i += 1;
+                    let mut found = false;
+                    while i < chars.len() {
+                        if chars[i] == '\x07' {
                             i += 1;
+                            found = true;
+                            break;
                         }
-                    }
-                    '(' | ')' | '*' | '+' | '-' | '.' | '/' => { // Character sets
-                        i += 2;
-                    }
-                    _ => {
+                        if chars[i] == '\x1b' && i + 1 < chars.len() && chars[i+1] == '\\' {
+                            found = true;
+                            i += 2;
+                            break;
+                        }
                         i += 1;
                     }
+                    if !found { break; }
+                }
+                '(' | ')' | '*' | '+' | '-' | '.' | '/' => { // Charset
+                    if i + 1 >= chars.len() { break; }
+                    i += 2;
+                }
+                _ => {
+                    i += 1;
                 }
             }
         } else {
             let c = chars[i];
-            // Only push printable characters or common whitespace
-            if (c as u32) >= 32 || c == '\n' || c == '\r' || c == '\t' {
+            if c == '\r' { i += 1; continue; } // Skip \r for clean display in TUI
+            if (c as u32) >= 32 || c == '\n' || c == '\t' {
                 result.push(c);
             }
             i += 1;
