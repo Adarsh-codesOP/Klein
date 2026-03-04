@@ -1,6 +1,6 @@
 pub const APP_TITLE: &str = " Klein IDE ";
 pub const HELP_TITLE: &str = " Klein IDE Help ";
-pub const HELP_TEXT: &str = "Navigation: [Ctrl+Arrows] Panels | [Arrows/hjkl] Move | [Enter] Select/Open | [Esc] Term Out | [Ctrl+H] Toggle Help\nShortcuts: [Ctrl+B] Sidebar | [Ctrl+`] Term | [Ctrl+S] Save | [Ctrl+R] Run | [Ctrl+Q] Quit";
+pub const HELP_TEXT: &str = "Navigation: [Ctrl+Arrows] Panels | [Arrows/hjkl] Move | [Enter] Select/Open | [Ctrl+H] Toggle Help\nShortcuts: [Ctrl+E/R/T] Editor/Explorer/Terminal | [Ctrl+B] Sidebar | [Ctrl+`] Term | [Ctrl+S] Save | [Ctrl+Q] Quit";
 
 pub const TERMINAL_BASH_PATH: &str = "C:\\Program Files\\Git\\bin\\bash.exe";
 
