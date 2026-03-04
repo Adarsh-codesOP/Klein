@@ -132,22 +132,28 @@ impl App {
 
         if matches!(self.active_panel, Panel::Terminal) {
             match key.code {
-                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    self.terminal.write("\x03"); // Ctrl+C
+                KeyCode::Char(c) => {
+                    self.terminal_scroll = 0;
+                    self.terminal.write(&c.to_string());
                 }
-                KeyCode::Char(c) => self.terminal.write(&c.to_string()),
-                KeyCode::Enter => self.terminal.write("\r"), // CRLF or CR is safer for shell
-                KeyCode::Backspace => self.terminal.write("\x08"), // Try BS (\x08)
+                KeyCode::Enter => {
+                    self.terminal_scroll = 0;
+                    self.terminal.write("\r");
+                }
+                KeyCode::Backspace => {
+                    self.terminal_scroll = 0;
+                    self.terminal.write("\x08");
+                }
                 KeyCode::Delete => self.terminal.write("\x1b[3~"),
                 KeyCode::Up => self.terminal.write("\x1b[A"),
                 KeyCode::Down => self.terminal.write("\x1b[B"),
                 KeyCode::Right => self.terminal.write("\x1b[C"),
                 KeyCode::Left => self.terminal.write("\x1b[D"),
                 KeyCode::PageUp => {
-                    self.terminal_scroll = self.terminal_scroll.saturating_add(1);
+                    self.terminal_scroll = self.terminal_scroll.saturating_add(5);
                 }
                 KeyCode::PageDown => {
-                    self.terminal_scroll = self.terminal_scroll.saturating_sub(1);
+                    self.terminal_scroll = self.terminal_scroll.saturating_sub(5);
                 }
                 KeyCode::Tab => {
                      // Terminal Tab support? 
