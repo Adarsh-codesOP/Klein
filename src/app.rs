@@ -161,10 +161,6 @@ impl App {
                 KeyCode::PageDown => {
                     self.terminal_scroll = self.terminal_scroll.saturating_sub(5);
                 }
-                KeyCode::Tab => {
-                     // Terminal Tab support? 
-                     // self.terminal.write("\t");
-                }
                 _ => {}
             }
             // Switch away from terminal with Esc? Or just Ctrl+Arrows
