@@ -5,7 +5,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use crate::sidebar::Sidebar;
 use crate::editor::Editor;
@@ -45,7 +45,9 @@ impl App {
 
     pub fn handle_event(&mut self, event: Event) -> io::Result<()> {
         if let Event::Key(key) = event {
-            self.handle_key_event(key)?;
+            if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat {
+                self.handle_key_event(key)?;
+            }
         }
         Ok(())
     }
@@ -118,8 +120,9 @@ impl App {
                     self.terminal.write("\x03"); // Ctrl+C
                 }
                 KeyCode::Char(c) => self.terminal.write(&c.to_string()),
-                KeyCode::Enter => self.terminal.write("\r\n"),
+                KeyCode::Enter => self.terminal.write("\r"),
                 KeyCode::Backspace => self.terminal.write("\x08"), // Standard backspace for many PTYs
+                KeyCode::Delete => self.terminal.write("\x1b[3~"),
                 KeyCode::Up => self.terminal.write("\x1b[A"),
                 KeyCode::Down => self.terminal.write("\x1b[B"),
                 KeyCode::Right => self.terminal.write("\x1b[C"),
@@ -263,7 +266,7 @@ impl App {
         if self.show_sidebar {
             let mut list_items = Vec::new();
             for (i, (path, depth, is_dir)) in self.sidebar.flat_list.iter().enumerate() {
-                let prefix = "  ".repeat(*depth - 1);
+                let prefix = "  ".repeat(*depth);
                 let icon = if *is_dir { "📁 " } else { "📄 " };
                 let name = path.file_name().unwrap_or_default().to_string_lossy();
                 let mut style = ratatui::style::Style::default();
@@ -346,8 +349,7 @@ impl App {
         // Terminal
         if self.show_terminal {
             let output_raw = self.terminal.output.lock().unwrap();
-            let stripped = strip_ansi_escapes::strip(&*output_raw).unwrap_or_else(|_| output_raw.as_bytes().to_vec());
-            let output = String::from_utf8_lossy(&stripped);
+            let output = strip_ansi(&output_raw);
             
             let terminal_lines: Vec<ratatui::text::Line<'_>> = output
                 .lines()
@@ -397,4 +399,35 @@ impl App {
         
         f.render_widget(status_paragraph, chunks[2]);
     }
+}
+
+fn strip_ansi(s: &str) -> String {
+    let mut result = String::new();
+    let mut in_escape = false;
+    let mut in_csi = false; // Control Sequence Introducer: ESC [
+    
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '\x1b' {
+            in_escape = true;
+            if i + 1 < chars.len() && chars[i+1] == '[' {
+                in_csi = true;
+                i += 1;
+            }
+        } else if in_csi {
+            if (c as u32) >= 0x40 && (c as u32) <= 0x7E {
+                in_csi = false;
+                in_escape = false;
+            }
+        } else if in_escape {
+             // Handle single char escapes like ESC c
+             in_escape = false;
+        } else {
+            result.push(c);
+        }
+        i += 1;
+    }
+    result
 }

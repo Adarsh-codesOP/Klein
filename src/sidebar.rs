@@ -80,9 +80,7 @@ impl Sidebar {
     fn flatten(&self, node: &FileNode, depth: usize, list: &mut Vec<(PathBuf, usize, bool)>) {
         // Skip root itself if it's the current project dir? No, let's show it or its children.
         // Usually we show children of root.
-        if depth > 0 {
-            list.push((node.path.clone(), depth, node.is_dir));
-        }
+        list.push((node.path.clone(), depth, node.is_dir));
 
         if node.is_expanded {
             if let Some(children) = &node.children {

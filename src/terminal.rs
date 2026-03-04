@@ -40,7 +40,13 @@ impl Terminal {
                 // Limit output buffer size
                 if out.len() > 10000 {
                     let split_idx = out.len() - 5000;
-                    *out = out[split_idx..].to_string();
+                    // Find a safe UTF-8 boundary
+                    let safe_idx = out.char_indices()
+                        .map(|(i, _)| i)
+                        .filter(|&i| i >= split_idx)
+                        .next()
+                        .unwrap_or(out.len());
+                    *out = out[safe_idx..].to_string();
                 }
             }
         });

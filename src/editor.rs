@@ -195,9 +195,21 @@ impl Editor {
     }
 
     fn clamp_cursor_x(&mut self) {
-        let line_len = self.buffer.line(self.cursor_y).len_chars().saturating_sub(1);
-        if self.cursor_x > line_len {
-            self.cursor_x = line_len;
+        if self.buffer.len_lines() == 0 {
+            self.cursor_x = 0;
+            return;
+        }
+        let line = self.buffer.line(self.cursor_y);
+        let line_len = line.len_chars();
+        let mut max_x = line_len.saturating_sub(1);
+        
+        let line_str = line.to_string();
+        if !line_str.ends_with('\n') && !line_str.ends_with('\r') {
+            max_x = line_len;
+        }
+
+        if self.cursor_x > max_x {
+            self.cursor_x = max_x;
         }
     }
 }
