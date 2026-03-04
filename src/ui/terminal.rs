@@ -96,6 +96,9 @@ pub fn strip_ansi(s: &str) -> String {
                     i += 1;
                 }
             }
+        } else if chars[i] == '\x08' {
+            result.pop();
+            i += 1;
         } else {
             let c = chars[i];
             if c == '\r' { i += 1; continue; } // Skip \r for clean display in TUI
