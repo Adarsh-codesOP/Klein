@@ -26,6 +26,7 @@ pub struct App {
     pub editor: Editor,
     pub terminal: Terminal,
     pub last_editor_height: Cell<usize>,
+    pub show_help: bool,
 }
 
 impl App {
@@ -40,6 +41,7 @@ impl App {
             editor: Editor::new(),
             terminal: Terminal::new(),
             last_editor_height: Cell::new(20),
+            show_help: true,
         }
     }
 
@@ -88,8 +90,20 @@ impl App {
                 KeyCode::Char('c') => {
                     self.editor.copy();
                 }
-                KeyCode::Char('v') => {
-                    self.editor.paste();
+                KeyCode::Char('h') => self.show_help = !self.show_help,
+                KeyCode::Right => {
+                    self.active_panel = match self.active_panel {
+                        Panel::Sidebar => Panel::Editor,
+                        Panel::Editor => if self.show_terminal { Panel::Terminal } else { Panel::Sidebar },
+                        Panel::Terminal => if self.show_sidebar { Panel::Sidebar } else { Panel::Editor },
+                    };
+                }
+                KeyCode::Left => {
+                    self.active_panel = match self.active_panel {
+                        Panel::Sidebar => if self.show_terminal { Panel::Terminal } else { Panel::Editor },
+                        Panel::Editor => if self.show_sidebar { Panel::Sidebar } else { Panel::Terminal },
+                        Panel::Terminal => Panel::Editor,
+                    };
                 }
                 _ => {}
             }
@@ -133,35 +147,14 @@ impl App {
                 }
                 _ => {}
             }
-            // Switch away from terminal with Tab
-            if key.code == KeyCode::Tab {
-                self.active_panel = if self.show_sidebar { Panel::Sidebar } else { Panel::Editor };
+            // Switch away from terminal with Esc? Or just Ctrl+Arrows
+            if key.code == KeyCode::Esc {
+                self.active_panel = Panel::Editor;
             }
             return Ok(());
         }
 
         match key.code {
-            KeyCode::Tab => {
-                self.active_panel = match self.active_panel {
-                    Panel::Sidebar => Panel::Editor,
-                    Panel::Editor => {
-                        if self.show_terminal {
-                            Panel::Terminal
-                        } else if self.show_sidebar {
-                            Panel::Sidebar
-                        } else {
-                            Panel::Editor
-                        }
-                    }
-                    Panel::Terminal => {
-                        if self.show_sidebar {
-                            Panel::Sidebar
-                        } else {
-                            Panel::Editor
-                        }
-                    }
-                };
-            }
             KeyCode::Down | KeyCode::Char('j') => {
                 match self.active_panel {
                     Panel::Sidebar => {
@@ -229,27 +222,30 @@ impl App {
     }
 
     pub fn render(&self, f: &mut Frame<'_>) {
+        let mut constraints = vec![
+            if self.show_help { Constraint::Length(3) } else { Constraint::Length(0) }, // Help
+            Constraint::Fill(1), // Main
+            if self.show_terminal { Constraint::Length(10) } else { Constraint::Length(0) }, // Terminal
+            Constraint::Length(1), // Status Bar
+        ];
+        
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(
-                if self.show_terminal {
-                    [
-                        Constraint::Fill(1),
-                        Constraint::Length(10),
-                        Constraint::Length(1), // Status Bar
-                    ]
-                } else {
-                    [
-                        Constraint::Fill(1),
-                        Constraint::Length(0),
-                        Constraint::Length(1), // Status Bar
-                    ]
-                }
-                .as_ref(),
-            )
+            .constraints(constraints)
             .split(f.size());
 
-        let top_chunks = Layout::default()
+        // Help Section
+        if self.show_help {
+            let help_text = " [Ctrl+B] Sidebar | [Ctrl+`] Term | [Ctrl+H] Toggle Help | [Ctrl+Arrows] Move Tab | [Ctrl+S] Save | [Ctrl+R] Run | [Ctrl+Q] Quit ";
+            let help_block = Block::default()
+                .title(" Help / Shortcuts ")
+                .borders(Borders::ALL)
+                .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Cyan));
+            let help_widget = Paragraph::new(help_text).block(help_block);
+            f.render_widget(help_widget, chunks[0]);
+        }
+
+        let main_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(
                 if self.show_sidebar {
@@ -259,7 +255,7 @@ impl App {
                 }
                 .as_ref(),
             )
-            .split(chunks[0]);
+            .split(chunks[1]);
 
         // Sidebar
         if self.show_sidebar {
@@ -289,11 +285,11 @@ impl App {
                 });
             
             let sidebar_widget = Paragraph::new(list_items).block(sidebar_block);
-            f.render_widget(sidebar_widget, top_chunks[0]);
+            f.render_widget(sidebar_widget, main_chunks[0]);
         }
 
         // Editor
-        let editor_rect = top_chunks[1];
+        let editor_rect = main_chunks[1];
         let editor_block = Block::default()
             .title(format!(
                 " Editor - {} ",
@@ -370,7 +366,7 @@ impl App {
                 });
             
             let terminal_widget = Paragraph::new(terminal_lines).block(terminal_block);
-            f.render_widget(terminal_widget, chunks[1]);
+            f.render_widget(terminal_widget, chunks[2]);
         }
 
         // Status Bar
@@ -379,7 +375,7 @@ impl App {
             .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray));
         
         let status_text = format!(
-            " {} | {} | Ln {}, Col {} | Ctrl+S: Save | Ctrl+R: Run | Ctrl+F: Search ",
+            " {} | {} | Ln {}, Col {} | Ctrl+H: Help | Ctrl+Arrows: Panel ",
             if let Some(path) = &self.editor.path {
                 path.file_name().unwrap_or_default().to_string_lossy().into_owned()
             } else {
@@ -396,7 +392,7 @@ impl App {
             .block(status_bar)
             .style(ratatui::style::Style::default().fg(ratatui::style::Color::Gray));
         
-        f.render_widget(status_paragraph, chunks[2]);
+        f.render_widget(status_paragraph, chunks[3]);
     }
 }
 
@@ -407,21 +403,46 @@ fn strip_ansi(s: &str) -> String {
     while i < chars.len() {
         if chars[i] == '\x1b' {
             i += 1;
-            if i < chars.len() && chars[i] == '[' {
-                i += 1;
-                while i < chars.len() {
-                    let c = chars[i];
-                    i += 1;
-                    if (c as u32) >= 0x40 && (c as u32) <= 0x7E {
-                        break;
+            if i < chars.len() {
+                match chars[i] {
+                    '[' => { // CSI
+                        i += 1;
+                        while i < chars.len() {
+                            let c = chars[i];
+                            i += 1;
+                            if (c as u32) >= 0x40 && (c as u32) <= 0x7E {
+                                break;
+                            }
+                        }
+                    }
+                    ']' => { // OSC
+                        i += 1;
+                        while i < chars.len() {
+                            if chars[i] == '\x07' {
+                                i += 1;
+                                break;
+                            }
+                            if chars[i] == '\x1b' && i + 1 < chars.len() && chars[i+1] == '\\' {
+                                i += 2;
+                                break;
+                            }
+                            i += 1;
+                        }
+                    }
+                    '(' | ')' | '*' | '+' | '-' | '.' | '/' => { // Character sets
+                        i += 2;
+                    }
+                    _ => {
+                        i += 1;
                     }
                 }
-            } else if i < chars.len() {
-                // Secondary escape char
-                i += 1;
             }
         } else {
-            result.push(chars[i]);
+            let c = chars[i];
+            // Only push printable characters or common whitespace
+            if (c as u32) >= 32 || c == '\n' || c == '\r' || c == '\t' {
+                result.push(c);
+            }
             i += 1;
         }
     }
