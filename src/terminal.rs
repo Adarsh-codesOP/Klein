@@ -66,5 +66,6 @@ impl Terminal {
 
     pub fn write(&mut self, data: &str) {
         let _ = self.writer.write_all(data.as_bytes());
+        let _ = self.writer.flush(); // Crucial for PTY responsiveness
     }
 }

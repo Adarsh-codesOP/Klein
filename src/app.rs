@@ -27,6 +27,7 @@ pub struct App {
     pub terminal: Terminal,
     pub last_editor_height: Cell<usize>,
     pub show_help: bool,
+    pub terminal_scroll: usize,
 }
 
 impl App {
@@ -42,6 +43,7 @@ impl App {
             terminal: Terminal::new(current_dir),
             last_editor_height: Cell::new(20),
             show_help: true,
+            terminal_scroll: 0,
         }
     }
 
@@ -134,13 +136,19 @@ impl App {
                     self.terminal.write("\x03"); // Ctrl+C
                 }
                 KeyCode::Char(c) => self.terminal.write(&c.to_string()),
-                KeyCode::Enter => self.terminal.write("\n"), // Bash prefers LF
-                KeyCode::Backspace => self.terminal.write("\x08"), // Try BS (\x08) for Git Bash on Windows
+                KeyCode::Enter => self.terminal.write("\r"), // CRLF or CR is safer for shell
+                KeyCode::Backspace => self.terminal.write("\x08"), // Try BS (\x08)
                 KeyCode::Delete => self.terminal.write("\x1b[3~"),
                 KeyCode::Up => self.terminal.write("\x1b[A"),
                 KeyCode::Down => self.terminal.write("\x1b[B"),
                 KeyCode::Right => self.terminal.write("\x1b[C"),
                 KeyCode::Left => self.terminal.write("\x1b[D"),
+                KeyCode::PageUp => {
+                    self.terminal_scroll = self.terminal_scroll.saturating_add(1);
+                }
+                KeyCode::PageDown => {
+                    self.terminal_scroll = self.terminal_scroll.saturating_sub(1);
+                }
                 KeyCode::Tab => {
                      // Terminal Tab support? 
                      // self.terminal.write("\t");
@@ -348,16 +356,16 @@ impl App {
             let output_raw = self.terminal.output.lock().unwrap();
             let output = strip_ansi(&output_raw);
             
-            let mut lines: Vec<&str> = output.lines().collect();
-            // If the buffer ends with a newline, lines() won't include an empty trailing line.
-            // But we want to see the prompt even if it's the very last thing.
+            let lines: Vec<&str> = output.lines().collect();
             let height = chunks[2].height.saturating_sub(2) as usize;
-            if lines.len() > height {
-                let start = lines.len() - height;
-                lines = lines[start..].to_vec();
-            }
             
-            let terminal_lines: Vec<ratatui::text::Line<'_>> = lines
+            let max_scroll = lines.len().saturating_sub(height);
+            let scroll = self.terminal_scroll.min(max_scroll);
+
+            let start = lines.len().saturating_sub(height).saturating_sub(scroll);
+            let end = lines.len().saturating_sub(scroll);
+            
+            let terminal_lines: Vec<ratatui::text::Line<'_>> = lines[start..end]
                 .iter()
                 .map(|l| ratatui::text::Line::from(l.to_string()))
                 .collect();
@@ -374,8 +382,8 @@ impl App {
             let terminal_widget = Paragraph::new(terminal_lines).block(terminal_block);
             f.render_widget(terminal_widget, chunks[2]);
 
-            // Show cursor in terminal if active
-            if matches!(self.active_panel, Panel::Terminal) {
+            // Show cursor in terminal if active and not scrolled back
+            if matches!(self.active_panel, Panel::Terminal) && scroll == 0 {
                 let last_line = lines.last().copied().unwrap_or("");
                 let inner = Block::default().borders(Borders::ALL).inner(chunks[2]);
                 f.set_cursor(
