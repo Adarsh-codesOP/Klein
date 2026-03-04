@@ -132,6 +132,9 @@ impl App {
 
         if matches!(self.active_panel, Panel::Terminal) {
             match key.code {
+                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.terminal.write("\x03"); // Ctrl+C
+                }
                 KeyCode::Char(c) => {
                     self.terminal_scroll = 0;
                     self.terminal.write(&c.to_string());
