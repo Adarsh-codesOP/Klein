@@ -9,7 +9,8 @@ use crate::config;
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let editor_block = Block::default()
         .title(format!(
-            " Editor - {} ",
+            " {} - {} ",
+            config::APP_TITLE,
             app.editor
                 .path
                 .as_ref()

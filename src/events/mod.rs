@@ -90,6 +90,10 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 app.terminal.write("\x03"); // Ctrl+C
             }
+            KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.terminal_scroll = 0;
+                app.terminal.write("\x08"); // Ctrl+H is often \x08
+            }
             KeyCode::Char(c) => {
                 app.terminal_scroll = 0;
                 app.terminal.write(&c.to_string());
@@ -100,7 +104,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Backspace => {
                 app.terminal_scroll = 0;
-                app.terminal.write("clear\r");
+                app.terminal.write("\x7f"); // Git Bash usually expects \x7f
             }
             KeyCode::Tab => {
                 app.terminal.write("\t");
