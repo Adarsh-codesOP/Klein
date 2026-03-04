@@ -145,7 +145,10 @@ impl App {
                 }
                 KeyCode::Backspace => {
                     self.terminal_scroll = 0;
-                    self.terminal.write("\x08");
+                    self.terminal.write("\x7f"); // DEL (\x7f) preferred by Bash
+                }
+                KeyCode::Tab => {
+                    self.terminal.write("\t");
                 }
                 KeyCode::Delete => self.terminal.write("\x1b[3~"),
                 KeyCode::Up => self.terminal.write("\x1b[A"),

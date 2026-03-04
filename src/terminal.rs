@@ -23,6 +23,7 @@ impl Terminal {
 
         let mut cmd = CommandBuilder::new("C:\\Program Files\\Git\\bin\\bash.exe"); 
         cmd.args(&["--login", "-i"]);
+        cmd.env("TERM", "xterm-256color");
         cmd.cwd(cwd);
         let _child = pty_pair.slave.spawn_command(cmd).unwrap();
 
