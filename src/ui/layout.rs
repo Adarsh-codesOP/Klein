@@ -1,9 +1,9 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
-pub fn get_main_layout(area: Rect, show_help: bool, show_terminal: bool) -> Vec<Rect> {
+pub fn get_main_layout(area: Rect, show_terminal: bool) -> Vec<Rect> {
     let constraints = vec![
-        if show_help { Constraint::Length(4) } else { Constraint::Length(0) }, // Help section
-        Constraint::Fill(1), // Main workspace
+        Constraint::Length(1), // Help Hint Tab
+        Constraint::Fill(1),   // Main workspace
         if show_terminal { Constraint::Length(10) } else { Constraint::Length(0) }, // Terminal
         Constraint::Length(1), // Status Bar
     ];

@@ -1,6 +1,31 @@
 pub const APP_TITLE: &str = " Klein IDE ";
-pub const HELP_TITLE: &str = " Klein IDE Help ";
-pub const HELP_TEXT: &str = "Navigation: [Ctrl+Arrows] Panels | [Arrows/hjkl] Move | [Enter] Select/Open | [Ctrl+H] Toggle Help\nShortcuts: [Ctrl+E/R/T] Editor/Explorer/Terminal | [Ctrl+B] Sidebar | [Ctrl+`] Term | [Ctrl+S] Save | [Ctrl+Q] Quit";
+pub const HELP_TITLE: &str = " HELP COMMANDS ";
+pub const HELP_TEXT: &str = r#"
+--- GENERAL NAVIGATION ---
+[Ctrl + Arrows] Switch Panels
+[Up/Down/Left/Right] Move Cursor (Editor)
+[Up/Down] Scroll Viewport (Terminal)
+[Enter] Selection (Sidebar) / New Line (Editor)
+
+--- FOCUS CONTROL ---
+[Ctrl + R] Focus Explorer (Sidebar)
+[Ctrl + E] Focus Editor
+[Ctrl + T] Focus Terminal
+[Ctrl + B] Toggle Sidebar Visibility
+[Ctrl + `] Toggle Terminal Visibility
+
+--- FILE OPERATIONS ---
+[Ctrl + S] Save Current File
+[Ctrl + Q] Quit Application
+
+--- EDITOR FEATURES ---
+[Ctrl + F] Start Search
+[Ctrl + C] Copy Selection
+[Backspace] Delete Character
+
+--- HELP ---
+[Ctrl + H] Toggle this help overlay
+"#;
 
 pub const TERMINAL_BASH_PATH: &str = "C:\\Program Files\\Git\\bin\\bash.exe";
 
