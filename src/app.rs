@@ -1,4 +1,5 @@
 use std::io;
+use std::cell::Cell;
 use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -25,7 +26,7 @@ pub struct App {
     pub sidebar: Sidebar,
     pub editor: Editor,
     pub terminal: Terminal,
-    pub last_editor_height: usize,
+    pub last_editor_height: Cell<usize>,
 }
 
 impl App {
@@ -39,7 +40,7 @@ impl App {
             sidebar: Sidebar::new(&current_dir),
             editor: Editor::new(),
             terminal: Terminal::new(),
-            last_editor_height: 20,
+            last_editor_height: Cell::new(20),
         }
     }
 
@@ -159,7 +160,7 @@ impl App {
                             let _ = self.editor.open(path);
                         }
                     }
-                    Panel::Editor => self.editor.move_cursor_down(self.last_editor_height),
+                    Panel::Editor => self.editor.move_cursor_down(self.last_editor_height.get()),
                     _ => {}
                 }
             }
@@ -302,7 +303,7 @@ impl App {
             });
 
         let inner_rect = editor_block.inner(editor_rect);
-        self.last_editor_height = inner_rect.height as usize;
+        self.last_editor_height.set(inner_rect.height as usize);
         let highlighted_lines = self.editor.get_highlighted_lines(
             inner_rect.width as usize,
             inner_rect.height as usize,
