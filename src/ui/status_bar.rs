@@ -12,7 +12,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         .border_style(ratatui::style::Style::default().fg(config::colors::STATUS_BG));
     
     let status_text = format!(
-        " {} | {} | Ln {}, Col {} | Ctrl+H: Help | Ctrl+Arrows: Panel ",
+        " {} | {} | Ln {}, Col {} ",
         if let Some(path) = &app.editor.path {
             path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "".to_string())
         } else {
