@@ -31,7 +31,9 @@ pub const TERMINAL_BASH_PATH: &str = "C:\\Program Files\\Git\\bin\\bash.exe";
 
 pub mod colors {
     use ratatui::style::Color;
-    pub const FOCUS_BORDER: Color = Color::Yellow;
+    pub const EXPLORER_FOCUS: Color = Color::Green;
+    pub const EDITOR_FOCUS: Color = Color::Yellow;
+    pub const TERMINAL_FOCUS: Color = Color::Cyan;
     pub const HELP_BORDER: Color = Color::Cyan;
     pub const STATUS_BG: Color = Color::DarkGray;
     pub const STATUS_FG: Color = Color::Gray;

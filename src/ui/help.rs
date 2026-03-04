@@ -9,9 +9,8 @@ pub fn render_hint(f: &mut Frame, area: Rect) {
     let hint_text = " [Ctrl+H] Help Overlay ";
     let hint = Paragraph::new(hint_text)
         .style(ratatui::style::Style::default()
-            .fg(ratatui::style::Color::Black)
-            .bg(ratatui::style::Color::Cyan)
-            .add_modifier(ratatui::style::Modifier::BOLD))
+            .fg(ratatui::style::Color::DarkGray)
+            .bg(ratatui::style::Color::Reset)) // Very subtle gray on black
         .alignment(ratatui::layout::Alignment::Center);
     
     f.render_widget(hint, area);

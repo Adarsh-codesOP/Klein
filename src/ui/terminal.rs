@@ -28,7 +28,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         .title(" Terminal ")
         .borders(Borders::ALL)
         .border_style(if matches!(app.active_panel, Panel::Terminal) {
-            ratatui::style::Style::default().fg(config::colors::FOCUS_BORDER)
+            ratatui::style::Style::default().fg(config::colors::TERMINAL_FOCUS)
         } else {
             ratatui::style::Style::default()
         });

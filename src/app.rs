@@ -34,7 +34,7 @@ impl App {
             editor: Editor::new(),
             terminal: Terminal::new(current_dir),
             last_editor_height: Cell::new(20),
-            show_help: true,
+            show_help: false,
             terminal_scroll: 0,
         }
     }

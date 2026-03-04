@@ -20,7 +20,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         ))
         .borders(Borders::ALL)
         .border_style(if matches!(app.active_panel, Panel::Editor) {
-            ratatui::style::Style::default().fg(config::colors::FOCUS_BORDER)
+            ratatui::style::Style::default().fg(config::colors::EDITOR_FOCUS)
         } else {
             ratatui::style::Style::default()
         });
