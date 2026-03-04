@@ -63,6 +63,53 @@ impl App {
                 KeyCode::Char('s') => {
                     let _ = self.editor.save();
                 }
+                KeyCode::Char('r') => {
+                    if let Some(path) = &self.editor.path {
+                        let path_str = path.to_string_lossy();
+                        let cmd = if path_str.ends_with(".rs") {
+                            "cargo run\r\n"
+                        } else if path_str.ends_with(".py") {
+                            format!("python {}\r\n", path_str)
+                        } else if path_str.ends_with(".js") {
+                            format!("node {}\r\n", path_str)
+                        } else {
+                            ""
+                        };
+                        if !cmd.is_empty() {
+                            self.terminal.write(cmd);
+                            self.show_terminal = true;
+                            self.active_panel = Panel::Terminal;
+                        }
+                    }
+                }
+                KeyCode::Char('f') => {
+                    self.editor.is_searching = true;
+                    self.editor.search_query.clear();
+                }
+                KeyCode::Char('c') => {
+                    self.editor.copy();
+                }
+                KeyCode::Char('v') => {
+                    self.editor.paste();
+                }
+                _ => {}
+            }
+            return Ok(());
+        }
+
+        if self.editor.is_searching {
+            match key.code {
+                KeyCode::Char(c) => self.editor.search_query.push(c),
+                KeyCode::Backspace => {
+                    self.editor.search_query.pop();
+                }
+                KeyCode::Enter => {
+                    self.editor.search(&self.editor.search_query.clone());
+                    self.editor.is_searching = false;
+                }
+                KeyCode::Esc => {
+                    self.editor.is_searching = false;
+                }
                 _ => {}
             }
             return Ok(());
@@ -110,14 +157,22 @@ impl App {
             }
             KeyCode::Down | KeyCode::Char('j') => {
                 match self.active_panel {
-                    Panel::Sidebar => self.sidebar.next(),
+                    Panel::Sidebar => {
+                        if let Some(path) = self.sidebar.next() {
+                            let _ = self.editor.open(path);
+                        }
+                    }
                     Panel::Editor => self.editor.move_cursor_down(self.last_editor_height),
                     _ => {}
                 }
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 match self.active_panel {
-                    Panel::Sidebar => self.sidebar.previous(),
+                    Panel::Sidebar => {
+                        if let Some(path) = self.sidebar.previous() {
+                            let _ = self.editor.open(path);
+                        }
+                    }
                     Panel::Editor => self.editor.move_cursor_up(),
                     _ => {}
                 }
@@ -171,9 +226,17 @@ impl App {
             .direction(Direction::Vertical)
             .constraints(
                 if self.show_terminal {
-                    [Constraint::Min(3), Constraint::Length(10)]
+                    [
+                        Constraint::Min(3),
+                        Constraint::Length(10),
+                        Constraint::Length(1), // Status Bar
+                    ]
                 } else {
-                    [Constraint::Min(3), Constraint::Length(0)]
+                    [
+                        Constraint::Min(3),
+                        Constraint::Length(0),
+                        Constraint::Length(1), // Status Bar
+                    ]
                 }
                 .as_ref(),
             )
@@ -234,6 +297,22 @@ impl App {
         let editor_widget = Paragraph::new(highlighted_lines).block(editor_block);
         f.render_widget(editor_widget, editor_rect);
 
+        // Render search box
+        if self.editor.is_searching {
+            let search_area = Rect::new(
+                inner_rect.x + 2,
+                inner_rect.y + inner_rect.height.saturating_sub(2),
+                inner_rect.width.saturating_sub(4),
+                1,
+            );
+            let search_block = Block::default()
+                .title(" Search ")
+                .borders(Borders::ALL)
+                .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Cyan));
+            let search_text = format!("Find: {}", self.editor.search_query);
+            f.render_widget(Paragraph::new(search_text).block(search_block), search_area);
+        }
+
         // Show cursor in editor
         if matches!(self.active_panel, Panel::Editor) {
             f.set_cursor(
@@ -248,7 +327,7 @@ impl App {
             let terminal_lines: Vec<ratatui::text::Line> = output
                 .lines()
                 .rev() // Show last lines
-                .take(chunks[1].height as usize - 2)
+                .take(chunks[1].height.saturating_sub(2) as usize)
                 .map(|l| ratatui::text::Line::from(l.to_string()))
                 .collect::<Vec<_>>()
                 .into_iter()
@@ -267,5 +346,30 @@ impl App {
             let terminal_widget = Paragraph::new(terminal_lines).block(terminal_block);
             f.render_widget(terminal_widget, chunks[1]);
         }
+
+        // Status Bar
+        let status_bar = Block::default()
+            .borders(Borders::TOP)
+            .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray));
+        
+        let status_text = format!(
+            " {} | {} | Ln {}, Col {} | Ctrl+S: Save | Ctrl+R: Run | Ctrl+F: Search ",
+            if let Some(path) = &self.editor.path {
+                path.file_name().unwrap_or_default().to_string_lossy()
+            } else {
+                "No file".to_string().into()
+            },
+            if matches!(self.active_panel, Panel::Editor) { "Mode: EDIT" } 
+            else if matches!(self.active_panel, Panel::Sidebar) { "Mode: EXPLORE" }
+            else { "Mode: TERM" },
+            self.editor.cursor_y + 1,
+            self.editor.cursor_x + 1,
+        );
+        
+        let status_paragraph = Paragraph::new(status_text)
+            .block(status_bar)
+            .style(ratatui::style::Style::default().fg(ratatui::style::Color::Gray));
+        
+        f.render_widget(status_paragraph, chunks[2]);
     }
 }

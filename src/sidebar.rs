@@ -100,20 +100,30 @@ impl Sidebar {
         }
     }
 
-    pub fn next(&mut self) {
+    pub fn next(&mut self) -> Option<PathBuf> {
         if !self.flat_list.is_empty() {
             self.selected_index = (self.selected_index + 1) % self.flat_list.len();
+            let (path, _, is_dir) = &self.flat_list[self.selected_index];
+            if !*is_dir {
+                return Some(path.clone());
+            }
         }
+        None
     }
 
-    pub fn previous(&mut self) {
+    pub fn previous(&mut self) -> Option<PathBuf> {
         if !self.flat_list.is_empty() {
             if self.selected_index > 0 {
                 self.selected_index -= 1;
             } else {
                 self.selected_index = self.flat_list.len() - 1;
             }
+            let (path, _, is_dir) = &self.flat_list[self.selected_index];
+            if !*is_dir {
+                return Some(path.clone());
+            }
         }
+        None
     }
 
     pub fn toggle_selected(&mut self) -> Result<Option<PathBuf>> {
