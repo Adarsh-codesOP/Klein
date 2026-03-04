@@ -69,16 +69,56 @@ impl Editor {
         }
     }
 
+    pub fn get_highlighted_lines(&self, width: usize, height: usize) -> Vec<ratatui::text::Line> {
+        let syntax = if let Some(path) = &self.path {
+            self.syntax_set
+                .find_syntax_for_file(path)
+                .unwrap_or(None)
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+        } else {
+            self.syntax_set.find_syntax_plain_text()
+        };
+
+        let mut h = HighlightLines::new(syntax, &self.theme_set.themes["base16-ocean.dark"]);
+        let mut lines = Vec::new();
+
+        let start_line = self.scroll_y;
+        let end_line = (start_line + height).min(self.buffer.len_lines());
+
+        for i in start_line..end_line {
+            let line = self.buffer.line(i).to_string();
+            let highlights = h.highlight_line(&line, &self.syntax_set).unwrap_or_default();
+            
+            let spans: Vec<ratatui::text::Span> = highlights
+                .into_iter()
+                .map(|(style, text)| {
+                    let color = ratatui::style::Color::Rgb(style.foreground.r, style.foreground.g, style.foreground.b);
+                    ratatui::text::Span::styled(text.to_string(), ratatui::style::Style::default().fg(color))
+                })
+                .collect();
+            
+            lines.push(ratatui::text::Line::from(spans));
+        }
+
+        lines
+    }
+
     pub fn move_cursor_up(&mut self) {
         if self.cursor_y > 0 {
             self.cursor_y -= 1;
+            if self.cursor_y < self.scroll_y {
+                self.scroll_y = self.cursor_y;
+            }
             self.clamp_cursor_x();
         }
     }
 
-    pub fn move_cursor_down(&mut self) {
+    pub fn move_cursor_down(&mut self, height: usize) {
         if self.cursor_y + 1 < self.buffer.len_lines() {
             self.cursor_y += 1;
+            if self.cursor_y >= self.scroll_y + height {
+                self.scroll_y = self.cursor_y - height + 1;
+            }
             self.clamp_cursor_x();
         }
     }

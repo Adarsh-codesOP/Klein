@@ -9,8 +9,10 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 
 mod sidebar;
 mod editor;
+mod terminal;
 use sidebar::Sidebar;
 use editor::Editor;
+use terminal::Terminal;
 
 pub enum Panel {
     Sidebar,
@@ -25,6 +27,7 @@ pub struct App {
     pub should_quit: bool,
     pub sidebar: Sidebar,
     pub editor: Editor,
+    pub terminal: Terminal,
 }
 
 impl App {
@@ -37,6 +40,7 @@ impl App {
             should_quit: false,
             sidebar: Sidebar::new(&current_dir),
             editor: Editor::new(),
+            terminal: Terminal::new(),
         }
     }
 
@@ -54,7 +58,28 @@ impl App {
                 KeyCode::Char('q') => self.should_quit = true,
                 KeyCode::Char('b') => self.show_sidebar = !self.show_sidebar,
                 KeyCode::Char('`') => self.show_terminal = !self.show_terminal,
+                KeyCode::Char('s') => {
+                    let _ = self.editor.save();
+                }
                 _ => {}
+            }
+            return Ok(());
+        }
+
+        if matches!(self.active_panel, Panel::Terminal) {
+            match key.code {
+                KeyCode::Char(c) => self.terminal.write(&c.to_string()),
+                KeyCode::Enter => self.terminal.write("\r\n"),
+                KeyCode::Backspace => self.terminal.write("\x7f"), // Backspace for PTY
+                KeyCode::Tab => {
+                    // Still allow switching panels with Tab?
+                    // Maybe use Ctrl+Tab for panel switching if terminal eats Tab
+                }
+                _ => {}
+            }
+            // Switch away from terminal with Tab if not captured
+            if key.code == KeyCode::Tab {
+                self.active_panel = if self.show_sidebar { Panel::Sidebar } else { Panel::Editor };
             }
             return Ok(());
         }
@@ -84,7 +109,7 @@ impl App {
             KeyCode::Down | KeyCode::Char('j') => {
                 match self.active_panel {
                     Panel::Sidebar => self.sidebar.next(),
-                    Panel::Editor => self.editor.move_cursor_down(),
+                    Panel::Editor => self.editor.move_cursor_down(10), // Placeholder height
                     _ => {}
                 }
             }
@@ -196,44 +221,38 @@ impl App {
         }
 
         // Editor
-        let mut editor_content = Vec::new();
-        for (i, line) in self.editor.buffer.lines().enumerate() {
-            let line_str = line.to_string();
-            // Simple coloring for now (syntax highlighting will come next)
-            editor_content.push(ratatui::text::Line::from(line_str));
-        }
+        let editor_rect = top_chunks[1];
+        let inner_rect = editor_block.inner(editor_rect);
+        let highlighted_lines = self.editor.get_highlighted_lines(
+            inner_rect.width as usize,
+            inner_rect.height as usize,
+        );
 
-        let editor_block = Block::default()
-            .title(format!(
-                " Editor - {} ",
-                self.editor
-                    .path
-                    .as_ref()
-                    .and_then(|p| p.file_name())
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_else(|| "No file".to_string())
-            ))
-            .borders(Borders::ALL)
-            .border_style(if matches!(self.active_panel, Panel::Editor) {
-                ratatui::style::Style::default().fg(ratatui::style::Color::Yellow)
-            } else {
-                ratatui::style::Style::default()
-            });
-
-        let editor_widget = Paragraph::new(editor_content).block(editor_block);
-        f.render_widget(editor_widget, top_chunks[1]);
+        let editor_widget = Paragraph::new(highlighted_lines).block(editor_block);
+        f.render_widget(editor_widget, editor_rect);
 
         // Show cursor in editor
         if matches!(self.active_panel, Panel::Editor) {
             f.set_cursor(
-                top_chunks[1].x + self.editor.cursor_x as u16 + 1,
-                top_chunks[1].y + self.editor.cursor_y as u16 + 1,
+                inner_rect.x + self.editor.cursor_x as u16,
+                inner_rect.y + (self.editor.cursor_y - self.editor.scroll_y) as u16,
             );
         }
 
         // Terminal
         if self.show_terminal {
-            let terminal = Block::default()
+            let output = self.terminal.output.lock().unwrap();
+            let terminal_lines: Vec<ratatui::text::Line> = output
+                .lines()
+                .rev() // Show last lines
+                .take(chunks[1].height as usize - 2)
+                .map(|l| ratatui::text::Line::from(l.to_string()))
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+
+            let terminal_block = Block::default()
                 .title(" Terminal ")
                 .borders(Borders::ALL)
                 .border_style(if matches!(self.active_panel, Panel::Terminal) {
@@ -241,7 +260,9 @@ impl App {
                 } else {
                     ratatui::style::Style::default()
                 });
-            f.render_widget(terminal, chunks[1]);
+            
+            let terminal_widget = Paragraph::new(terminal_lines).block(terminal_block);
+            f.render_widget(terminal_widget, chunks[1]);
         }
     }
 }
