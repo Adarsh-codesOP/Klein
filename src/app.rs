@@ -7,12 +7,9 @@ use ratatui::{
 };
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 
-mod sidebar;
-mod editor;
-mod terminal;
-use sidebar::Sidebar;
-use editor::Editor;
-use terminal::Terminal;
+use crate::sidebar::Sidebar;
+use crate::editor::Editor;
+use crate::terminal::Terminal;
 
 pub enum Panel {
     Sidebar,
@@ -65,18 +62,18 @@ impl App {
                 }
                 KeyCode::Char('r') => {
                     if let Some(path) = &self.editor.path {
-                        let path_str = path.to_string_lossy();
+                        let path_str: String = path.to_string_lossy().into_owned();
                         let cmd = if path_str.ends_with(".rs") {
-                            "cargo run\r\n"
+                            "cargo run\r\n".to_string()
                         } else if path_str.ends_with(".py") {
                             format!("python {}\r\n", path_str)
                         } else if path_str.ends_with(".js") {
                             format!("node {}\r\n", path_str)
                         } else {
-                            ""
+                            "".to_string()
                         };
                         if !cmd.is_empty() {
-                            self.terminal.write(cmd);
+                            self.terminal.write(&cmd);
                             self.show_terminal = true;
                             self.active_panel = Panel::Terminal;
                         }
@@ -221,7 +218,7 @@ impl App {
         Ok(())
     }
 
-    pub fn render<B: Backend>(&self, f: &mut Frame<B>) {
+    pub fn render(&self, f: &mut Frame<'_>) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints(
@@ -287,6 +284,23 @@ impl App {
 
         // Editor
         let editor_rect = top_chunks[1];
+        let editor_block = Block::default()
+            .title(format!(
+                " Editor - {} ",
+                self.editor
+                    .path
+                    .as_ref()
+                    .and_then(|p| p.file_name())
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "No file".to_string())
+            ))
+            .borders(Borders::ALL)
+            .border_style(if matches!(self.active_panel, Panel::Editor) {
+                ratatui::style::Style::default().fg(ratatui::style::Color::Yellow)
+            } else {
+                ratatui::style::Style::default()
+            });
+
         let inner_rect = editor_block.inner(editor_rect);
         self.last_editor_height = inner_rect.height as usize;
         let highlighted_lines = self.editor.get_highlighted_lines(
@@ -328,7 +342,7 @@ impl App {
                 .lines()
                 .rev() // Show last lines
                 .take(chunks[1].height.saturating_sub(2) as usize)
-                .map(|l| ratatui::text::Line::from(l.to_string()))
+                .map(|l: &str| ratatui::text::Line::from(l.to_string()))
                 .collect::<Vec<_>>()
                 .into_iter()
                 .rev()
@@ -355,9 +369,9 @@ impl App {
         let status_text = format!(
             " {} | {} | Ln {}, Col {} | Ctrl+S: Save | Ctrl+R: Run | Ctrl+F: Search ",
             if let Some(path) = &self.editor.path {
-                path.file_name().unwrap_or_default().to_string_lossy()
+                path.file_name().unwrap_or_default().to_string_lossy().into_owned()
             } else {
-                "No file".to_string().into()
+                "No file".to_string()
             },
             if matches!(self.active_panel, Panel::Editor) { "Mode: EDIT" } 
             else if matches!(self.active_panel, Panel::Sidebar) { "Mode: EXPLORE" }
