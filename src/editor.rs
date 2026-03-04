@@ -1,6 +1,6 @@
 use ropey::Rope;
 use syntect::easy::HighlightLines;
-use syntect::highlighting::{Style, ThemeSet};
+use syntect::highlighting::ThemeSet;
 use syntect::parsing::SyntaxSet;
 use std::path::PathBuf;
 use std::fs;
@@ -75,7 +75,7 @@ impl Editor {
         }
     }
 
-    pub fn get_highlighted_lines(&self, width: usize, height: usize) -> Vec<ratatui::text::Line> {
+    pub fn get_highlighted_lines(&self, _width: usize, height: usize) -> Vec<ratatui::text::Line<'_>> {
         let syntax = if let Some(path) = &self.path {
             self.syntax_set
                 .find_syntax_for_file(path)

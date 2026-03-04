@@ -1,12 +1,11 @@
 use std::io;
 use std::cell::Cell;
 use ratatui::{
-    backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 use crate::sidebar::Sidebar;
 use crate::editor::Editor;

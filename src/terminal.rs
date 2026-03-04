@@ -13,7 +13,7 @@ impl Terminal {
     pub fn new() -> Self {
         let pty_system = native_pty_system();
         let pty_pair = pty_system
-            .open_pty(PtySize {
+            .openpty(PtySize {
                 rows: 24,
                 cols: 80,
                 pixel_width: 0,
@@ -22,7 +22,7 @@ impl Terminal {
             .unwrap();
 
         let cmd = CommandBuilder::new("powershell.exe"); // Default for Windows
-        let mut child = pty_pair.slave.spawn_command(cmd).unwrap();
+        let child = pty_pair.slave.spawn_command(cmd).unwrap();
 
         let writer = pty_pair.master.take_writer().unwrap();
         let mut reader = pty_pair.master.try_clone_reader().unwrap();
