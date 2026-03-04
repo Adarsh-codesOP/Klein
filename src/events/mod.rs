@@ -44,24 +44,16 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             KeyCode::Char('s') => {
                 let _ = app.editor.save();
             }
+            KeyCode::Char('e') => {
+                app.active_panel = Panel::Editor;
+            }
             KeyCode::Char('r') => {
-                if let Some(path) = &app.editor.path {
-                    let path_str: String = path.to_string_lossy().into_owned();
-                    let cmd = if path_str.ends_with(".rs") {
-                        "cargo run\r\n".to_string()
-                    } else if path_str.ends_with(".py") {
-                        format!("python {}\r\n", path_str)
-                    } else if path_str.ends_with(".js") {
-                        format!("node {}\r\n", path_str)
-                    } else {
-                        "".to_string()
-                    };
-                    if !cmd.is_empty() {
-                        app.terminal.write(&cmd);
-                        app.show_terminal = true;
-                        app.active_panel = Panel::Terminal;
-                    }
-                }
+                app.active_panel = Panel::Sidebar;
+                app.show_sidebar = true;
+            }
+            KeyCode::Char('t') => {
+                app.active_panel = Panel::Terminal;
+                app.show_terminal = true;
             }
             KeyCode::Char('f') => {
                 app.editor.is_searching = true;
@@ -71,19 +63,19 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.editor.copy();
             }
             KeyCode::Char('h') => app.show_help = !app.show_help,
-            KeyCode::Right => {
+            KeyCode::Right | KeyCode::Left => {
                 app.active_panel = match app.active_panel {
                     Panel::Sidebar => Panel::Editor,
-                    Panel::Editor => if app.show_terminal { Panel::Terminal } else { Panel::Sidebar },
-                    Panel::Terminal => if app.show_sidebar { Panel::Sidebar } else { Panel::Editor },
-                };
-            }
-            KeyCode::Left => {
-                app.active_panel = match app.active_panel {
-                    Panel::Sidebar => if app.show_terminal { Panel::Terminal } else { Panel::Editor },
-                    Panel::Editor => if app.show_sidebar { Panel::Sidebar } else { Panel::Terminal },
+                    Panel::Editor => Panel::Sidebar,
                     Panel::Terminal => Panel::Editor,
                 };
+            }
+            KeyCode::Down => {
+                app.active_panel = Panel::Terminal;
+                app.show_terminal = true;
+            }
+            KeyCode::Up => {
+                app.active_panel = Panel::Editor;
             }
             _ => {}
         }
@@ -166,7 +158,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     }
 
     match key.code {
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down => {
             match app.active_panel {
                 Panel::Sidebar => {
                     if let Some(path) = app.sidebar.next() {
@@ -177,7 +169,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 _ => {}
             }
         }
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up => {
             match app.active_panel {
                 Panel::Sidebar => {
                     if let Some(path) = app.sidebar.previous() {
@@ -188,12 +180,12 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 _ => {}
             }
         }
-        KeyCode::Left | KeyCode::Char('h') => {
+        KeyCode::Left => {
             if matches!(app.active_panel, Panel::Editor) {
                 app.editor.move_cursor_left();
             }
         }
-        KeyCode::Right | KeyCode::Char('l') => {
+        KeyCode::Right => {
             if matches!(app.active_panel, Panel::Editor) {
                 app.editor.move_cursor_right();
             }
