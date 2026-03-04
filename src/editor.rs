@@ -14,6 +14,9 @@ pub struct Editor {
     pub scroll_y: usize,
     pub syntax_set: SyntaxSet,
     pub theme_set: ThemeSet,
+    pub search_query: String,
+    pub is_searching: bool,
+    pub clipboard: Option<arboard::Clipboard>,
 }
 
 impl Editor {
@@ -26,6 +29,9 @@ impl Editor {
             scroll_y: 0,
             syntax_set: SyntaxSet::load_defaults_newlines(),
             theme_set: ThemeSet::load_defaults(),
+            search_query: String::new(),
+            is_searching: false,
+            clipboard: arboard::Clipboard::new().ok(),
         }
     }
 
@@ -139,6 +145,43 @@ impl Editor {
         } else if self.cursor_y + 1 < self.buffer.len_lines() {
             self.cursor_y += 1;
             self.cursor_x = 0;
+        }
+    }
+
+    pub fn copy(&mut self) {
+        if let Some(clipboard) = &mut self.clipboard {
+            let line = self.buffer.line(self.cursor_y).to_string();
+            let _ = clipboard.set_text(line);
+        }
+    }
+
+    pub fn paste(&mut self) {
+        if let Some(clipboard) = &mut self.clipboard {
+            if let Ok(text) = clipboard.get_text() {
+                let line_idx = self.buffer.line_to_char(self.cursor_y);
+                let char_idx = line_idx + self.cursor_x;
+                self.buffer.insert(char_idx, &text);
+                self.cursor_x += text.len();
+            }
+        }
+    }
+
+    pub fn search(&mut self, query: &str) {
+        if query.is_empty() {
+            return;
+        }
+        // Simple search: find first occurrence after current cursor
+        let content = self.buffer.to_string();
+        let start_pos = self.buffer.line_to_char(self.cursor_y) + self.cursor_x;
+        
+        if let Some(found_pos) = content[start_pos..].find(query) {
+            let absolute_pos = start_pos + found_pos;
+            self.cursor_y = self.buffer.char_to_line(absolute_pos);
+            self.cursor_x = absolute_pos - self.buffer.line_to_char(self.cursor_y);
+        } else if let Some(found_pos) = content[..start_pos].find(query) {
+            // Wrap around
+            self.cursor_y = self.buffer.char_to_line(found_pos);
+            self.cursor_x = found_pos - self.buffer.line_to_char(self.cursor_y);
         }
     }
 
