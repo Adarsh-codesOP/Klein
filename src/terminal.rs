@@ -1,10 +1,10 @@
-use portable_pty::{native_pty_system, CommandBuilder, PtyPair, PtySize, PtySystem};
+use portable_pty::{native_pty_system, CommandBuilder, PtyPair, PtySize};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 pub struct Terminal {
-    pub pty_pair: PtyPair,
+    pub _pty_pair: PtyPair,
     pub writer: Box<dyn Write + Send>,
     pub output: Arc<Mutex<String>>,
 }
@@ -22,7 +22,7 @@ impl Terminal {
             .unwrap();
 
         let cmd = CommandBuilder::new("powershell.exe"); // Default for Windows
-        let child = pty_pair.slave.spawn_command(cmd).unwrap();
+        let _child = pty_pair.slave.spawn_command(cmd).unwrap();
 
         let writer = pty_pair.master.take_writer().unwrap();
         let mut reader = pty_pair.master.try_clone_reader().unwrap();
@@ -46,7 +46,7 @@ impl Terminal {
         });
 
         Terminal {
-            pty_pair,
+            _pty_pair: pty_pair,
             writer,
             output,
         }
