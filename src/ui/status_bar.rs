@@ -14,7 +14,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let status_text = format!(
         " {} | {} | Ln {}, Col {} | Ctrl+H: Help | Ctrl+Arrows: Panel ",
         if let Some(path) = &app.editor.path {
-            path.file_name().unwrap_or_default().to_string_lossy().into_owned()
+            path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "".to_string())
         } else {
             "No file".to_string()
         },

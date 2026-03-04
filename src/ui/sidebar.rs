@@ -11,7 +11,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     for (i, (path, depth, is_dir)) in app.sidebar.flat_list.iter().enumerate() {
         let prefix = "  ".repeat(*depth);
         let icon = if *is_dir { "📁 " } else { "📄 " };
-        let name = path.file_name().unwrap_or_default().to_string_lossy();
+        let name = path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
         let mut style = ratatui::style::Style::default();
         if i == app.sidebar.selected_index {
             style = style.bg(ratatui::style::Color::DarkGray).fg(ratatui::style::Color::White);

@@ -14,7 +14,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
             app.editor
                 .path
                 .as_ref()
-                .and_then(|p| p.file_name())
+                .and_then(|p: &std::path::PathBuf| p.file_name())
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| "No file".to_string())
         ))

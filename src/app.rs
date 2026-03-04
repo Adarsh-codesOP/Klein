@@ -2,7 +2,7 @@ use std::cell::Cell;
 use crate::sidebar::Sidebar;
 use crate::editor::Editor;
 use crate::terminal::Terminal;
-# i have typed here
+
 pub enum Panel {
     Sidebar,
     Editor,
