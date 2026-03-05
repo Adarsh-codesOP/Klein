@@ -141,6 +141,9 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             KeyCode::Char('v') => {
                 app.editor.paste(app.last_editor_height.get());
             }
+            KeyCode::Char('a') => {
+                app.editor.select_all();
+            }
             KeyCode::Char('h') => app.show_help = !app.show_help,
             KeyCode::Right | KeyCode::Left => {
                 app.active_panel = match app.active_panel {
@@ -283,6 +286,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.editor.insert_char('\n');
                 app.editor.cursor_y += 1;
                 app.editor.cursor_x = 0;
+                app.editor.ensure_cursor_visible(app.last_editor_height.get());
                 return Ok(());
             }
             KeyCode::Char(c) => {
