@@ -83,9 +83,12 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
 
     // Show cursor in editor
     if matches!(app.active_panel, Panel::Editor) && !app.show_quit_confirm {
-        f.set_cursor(
-            content_area.x + app.editor.cursor_x as u16,
-            content_area.y + app.editor.cursor_y.saturating_sub(app.editor.scroll_y) as u16,
-        );
+        let cursor_screen_y = app.editor.cursor_y.saturating_sub(app.editor.scroll_y);
+        if cursor_screen_y < content_area.height as usize {
+            f.set_cursor(
+                content_area.x + app.editor.cursor_x as u16,
+                content_area.y + cursor_screen_y as u16,
+            );
+        }
     }
 }

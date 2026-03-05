@@ -263,7 +263,7 @@ impl Editor {
         }
     }
 
-    pub fn paste(&mut self) {
+    pub fn paste(&mut self, height: usize) {
         if let Some(clipboard) = &mut self.clipboard {
             if let Ok(text) = clipboard.get_text() {
                 if self.selection_start.is_some() {
@@ -283,6 +283,7 @@ impl Editor {
                 }
                 self.is_dirty = true;
                 self.clamp_cursor_x();
+                self.ensure_cursor_visible(height);
             }
         }
     }
@@ -310,6 +311,16 @@ impl Editor {
         // Update scroll if needed
         if self.cursor_y < self.scroll_y {
             self.scroll_y = self.cursor_y;
+        }
+    }
+
+    pub fn ensure_cursor_visible(&mut self, height: usize) {
+        if height == 0 { return; }
+        
+        if self.cursor_y < self.scroll_y {
+            self.scroll_y = self.cursor_y;
+        } else if self.cursor_y >= self.scroll_y + height {
+            self.scroll_y = self.cursor_y - height + 1;
         }
     }
 

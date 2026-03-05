@@ -269,7 +269,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 return Ok(());
             }
             KeyCode::Char('v') if app.editor.selection_start.is_some() => {
-                app.editor.paste();
+                app.editor.paste(app.last_editor_height.get());
                 return Ok(());
             }
             KeyCode::Backspace => {
