@@ -41,6 +41,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let gutter_area = layout[0];
     let content_area = layout[1];
     
+    app.editor_area.set(content_area);
     app.last_editor_height.set(content_area.height as usize);
     
     // Render Gutter (Line Numbers)

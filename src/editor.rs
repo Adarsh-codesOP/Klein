@@ -328,7 +328,7 @@ impl Editor {
         }
     }
 
-    fn clamp_cursor_x(&mut self) {
+    pub fn clamp_cursor_x(&mut self) {
         let max_x = self.get_max_cursor_x(self.cursor_y);
         if self.cursor_x > max_x {
             self.cursor_x = max_x;
