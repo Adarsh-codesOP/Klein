@@ -6,9 +6,22 @@ $ErrorActionPreference = "Stop"
 $AppDir = "$env:LOCALAPPDATA\Klein"
 $ConfigPath = "$AppDir\config.toml"
 
-Write-Host "===========================" -ForegroundColor Cyan
-Write-Host "  Klein IDE Setup/Config   " -ForegroundColor Cyan
-Write-Host "===========================" -ForegroundColor Cyan
+$AsciiArt = @"
+  _  __ _      _         _____  ____  ______ 
+ | |/ /| |    (_)       |_   _||  _ \|  ____|
+ | ' / | |     _  _ __    | |  | |  \| |__   
+ |  <  | |    | || '_ \   | |  | |  |  ___|  
+ | . \ | |____| || | | | _| |_ | |_/ / |____ 
+ |_|\_\|______|_||_| |_||_____||____/|______|
+                                             
+"@
+
+Write-Host "`n"
+Write-Host $AsciiArt -ForegroundColor Cyan
+Write-Host " ==========================================" -ForegroundColor DarkGray
+Write-Host "     The aesthetic terminal IDE in Rust    " -ForegroundColor White
+Write-Host " ==========================================" -ForegroundColor DarkGray
+Write-Host "`n"
 
 # 1. Ensure Directory Exists
 if (-not (Test-Path -Path $AppDir)) {

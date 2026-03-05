@@ -9,9 +9,25 @@ if [ -z "$LOCALAPPDATA" ]; then
 fi
 CONFIG_PATH="$APP_DIR/config.toml"
 
-echo "==========================="
-echo "  Klein IDE Setup/Config   "
-echo "==========================="
+# Colors
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+DARKGRAY='\033[1;30m'
+NC='\033[0m' # No Color
+
+echo -e "\n${CYAN}"
+cat << "EOF"
+  _  __ _      _         _____  ____  ______ 
+ | |/ /| |    (_)       |_   _||  _ \|  ____|
+ | ' / | |     _  _ __    | |  | |  \| |__   
+ |  <  | |    | || '_ \   | |  | |  |  ___|  
+ | . \ | |____| || | | | _| |_ | |_/ / |____ 
+ |_|\_\|______|_||_| |_||_____||____/|______|
+                                             
+EOF
+echo -e "${DARKGRAY} ==========================================${NC}"
+echo -e "${WHITE}     The aesthetic terminal IDE in Rust    ${NC}"
+echo -e "${DARKGRAY} ==========================================${NC}\n"
 
 if [ ! -d "$APP_DIR" ]; then
     mkdir -p "$APP_DIR"
