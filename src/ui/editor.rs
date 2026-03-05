@@ -85,7 +85,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     if matches!(app.active_panel, Panel::Editor) && !app.show_quit_confirm {
         f.set_cursor(
             content_area.x + app.editor.cursor_x as u16,
-            content_area.y + (app.editor.cursor_y - app.editor.scroll_y) as u16,
+            content_area.y + app.editor.cursor_y.saturating_sub(app.editor.scroll_y) as u16,
         );
     }
 }
