@@ -317,10 +317,15 @@ impl Editor {
     pub fn ensure_cursor_visible(&mut self, height: usize) {
         if height == 0 { return; }
         
-        if self.cursor_y < self.scroll_y {
-            self.scroll_y = self.cursor_y;
-        } else if self.cursor_y >= self.scroll_y + height {
-            self.scroll_y = self.cursor_y - height + 1;
+        if self.cursor_y < self.scroll_y || self.cursor_y >= self.scroll_y + height {
+            // Center the cursor if it's out of view
+            self.scroll_y = self.cursor_y.saturating_sub(height / 2);
+            
+            // Limit scroll to buffer length
+            let max_scroll = self.buffer.len_lines().saturating_sub(height);
+            if self.scroll_y > max_scroll {
+                self.scroll_y = max_scroll;
+            }
         }
     }
 

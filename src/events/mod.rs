@@ -138,6 +138,9 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             KeyCode::Char('c') => {
                 app.editor.copy();
             }
+            KeyCode::Char('v') => {
+                app.editor.paste(app.last_editor_height.get());
+            }
             KeyCode::Char('h') => app.show_help = !app.show_help,
             KeyCode::Right | KeyCode::Left => {
                 app.active_panel = match app.active_panel {
