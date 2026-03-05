@@ -215,13 +215,12 @@ impl Editor {
             self.cursor_x -= 1;
         } else if self.cursor_y > 0 {
             self.cursor_y -= 1;
-            self.cursor_x = self.buffer.line(self.cursor_y).len_chars().saturating_sub(1);
+            self.cursor_x = self.get_max_cursor_x(self.cursor_y);
         }
     }
 
     pub fn move_cursor_right(&mut self) {
-        let line_len = self.buffer.line(self.cursor_y).len_chars().saturating_sub(1);
-        if self.cursor_x < line_len {
+        if self.cursor_x < self.get_max_cursor_x(self.cursor_y) {
             self.cursor_x += 1;
         } else if self.cursor_y + 1 < self.buffer.len_lines() {
             self.cursor_y += 1;
@@ -314,22 +313,79 @@ impl Editor {
         }
     }
 
-    fn clamp_cursor_x(&mut self) {
+    fn get_max_cursor_x(&self, line_y: usize) -> usize {
         if self.buffer.len_lines() == 0 {
-            self.cursor_x = 0;
-            return;
+            return 0;
         }
-        let line = self.buffer.line(self.cursor_y);
+        let line = self.buffer.line(line_y);
         let line_len = line.len_chars();
-        let mut max_x = line_len.saturating_sub(1);
         
         let line_str = line.to_string();
-        if !line_str.ends_with('\n') && !line_str.ends_with('\r') {
-            max_x = line_len;
+        if line_str.ends_with('\n') || line_str.ends_with('\r') {
+            line_len.saturating_sub(1)
+        } else {
+            line_len
         }
+    }
 
+    fn clamp_cursor_x(&mut self) {
+        let max_x = self.get_max_cursor_x(self.cursor_y);
         if self.cursor_x > max_x {
             self.cursor_x = max_x;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_max_cursor_x() {
+        let mut editor = Editor::new();
+        
+        // Empty buffer
+        assert_eq!(editor.get_max_cursor_x(0), 0);
+        
+        // Line with newline
+        editor.buffer = Rope::from_str("abc\n");
+        assert_eq!(editor.get_max_cursor_x(0), 3); // Position after 'c', but before '\n'
+        
+        // Line without newline (last line)
+        editor.buffer = Rope::from_str("abc");
+        assert_eq!(editor.get_max_cursor_x(0), 3); // Position after 'c'
+        
+        // Multiple lines
+        editor.buffer = Rope::from_str("abc\ndef");
+        assert_eq!(editor.get_max_cursor_x(0), 3); // After 'c'
+        assert_eq!(editor.get_max_cursor_x(1), 3); // After 'f'
+    }
+
+    #[test]
+    fn test_move_cursor_right() {
+        let mut editor = Editor::new();
+        editor.buffer = Rope::from_str("abc");
+        
+        editor.move_cursor_right(); // -> 'a'
+        assert_eq!(editor.cursor_x, 1);
+        editor.move_cursor_right(); // -> 'b'
+        assert_eq!(editor.cursor_x, 2);
+        editor.move_cursor_right(); // -> 'c'
+        assert_eq!(editor.cursor_x, 3);
+        editor.move_cursor_right(); // stays at 3
+        assert_eq!(editor.cursor_x, 3);
+    }
+
+    #[test]
+    fn test_move_cursor_left_wrap() {
+        let mut editor = Editor::new();
+        editor.buffer = Rope::from_str("abc\ndef");
+        
+        editor.cursor_y = 1;
+        editor.cursor_x = 0;
+        editor.move_cursor_left();
+        
+        assert_eq!(editor.cursor_y, 0);
+        assert_eq!(editor.cursor_x, 3); // Should wrap to position after 'c'
     }
 }
