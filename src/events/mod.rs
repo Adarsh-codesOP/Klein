@@ -18,15 +18,61 @@ pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
 }
 
 fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
+    let area = app.editor_area.get();
+    let is_in_editor = mouse.column >= area.x 
+        && mouse.column < area.x + area.width 
+        && mouse.row >= area.y 
+        && mouse.row < area.y + area.height;
+
     match mouse.kind {
         MouseEventKind::ScrollUp => {
             if matches!(app.active_panel, Panel::Terminal) {
                 app.terminal_scroll = app.terminal_scroll.saturating_add(3);
+            } else if is_in_editor {
+                app.editor.scroll_y = app.editor.scroll_y.saturating_sub(3);
             }
         }
         MouseEventKind::ScrollDown => {
             if matches!(app.active_panel, Panel::Terminal) {
                 app.terminal_scroll = app.terminal_scroll.saturating_sub(3);
+            } else if is_in_editor {
+                app.editor.scroll_y = app.editor.scroll_y.saturating_add(3);
+                let max_scroll = app.editor.buffer.len_lines().saturating_sub(1);
+                if app.editor.scroll_y > max_scroll {
+                    app.editor.scroll_y = max_scroll;
+                }
+            }
+        }
+        MouseEventKind::Down(crossterm::event::MouseButton::Left) if is_in_editor => {
+            app.active_panel = Panel::Editor;
+            let new_y = (mouse.row - area.y) as usize + app.editor.scroll_y;
+            let new_x = (mouse.column - area.x) as usize;
+            
+            if new_y < app.editor.buffer.len_lines() {
+                if mouse.modifiers.contains(KeyModifiers::SHIFT) {
+                    if app.editor.selection_start.is_none() {
+                        app.editor.toggle_selection();
+                    }
+                } else {
+                    app.editor.clear_selection();
+                }
+                
+                app.editor.cursor_y = new_y;
+                app.editor.cursor_x = new_x;
+                app.editor.clamp_cursor_x();
+            }
+        }
+        MouseEventKind::Drag(crossterm::event::MouseButton::Left) if is_in_editor => {
+            let new_y = (mouse.row - area.y) as usize + app.editor.scroll_y;
+            let new_x = (mouse.column - area.x) as usize;
+            
+            if new_y < app.editor.buffer.len_lines() {
+                if app.editor.selection_start.is_none() {
+                    app.editor.toggle_selection();
+                }
+                app.editor.cursor_y = new_y;
+                app.editor.cursor_x = new_x;
+                app.editor.clamp_cursor_x();
             }
         }
         _ => {}
