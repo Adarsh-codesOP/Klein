@@ -65,7 +65,7 @@ We provide an installation script that sets up your default workspace, preferred
 
 **Using PowerShell (Windows Native):**
 ```powershell
-irm https://raw.githubusercontent.com/Adarsh-CodesOP/Klein/main/install.sh | iex
+irm https://raw.githubusercontent.com/Adarsh-CodesOP/Klein/main/install.ps1 | iex
 ```
 *(Note: If you already have the repository cloned, you can just run `.\install.ps1`)*
 
