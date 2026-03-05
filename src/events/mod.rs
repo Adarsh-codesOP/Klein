@@ -28,19 +28,11 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
         MouseEventKind::ScrollUp => {
             if matches!(app.active_panel, Panel::Terminal) {
                 app.terminal_scroll = app.terminal_scroll.saturating_add(3);
-            } else if is_in_editor {
-                app.editor.scroll_y = app.editor.scroll_y.saturating_sub(3);
             }
         }
         MouseEventKind::ScrollDown => {
             if matches!(app.active_panel, Panel::Terminal) {
                 app.terminal_scroll = app.terminal_scroll.saturating_sub(3);
-            } else if is_in_editor {
-                app.editor.scroll_y = app.editor.scroll_y.saturating_add(3);
-                let max_scroll = app.editor.buffer.len_lines().saturating_sub(1);
-                if app.editor.scroll_y > max_scroll {
-                    app.editor.scroll_y = max_scroll;
-                }
             }
         }
         MouseEventKind::Down(crossterm::event::MouseButton::Left) if is_in_editor => {
