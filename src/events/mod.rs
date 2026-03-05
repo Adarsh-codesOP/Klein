@@ -54,18 +54,30 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
                 app.editor.clamp_cursor_x();
             }
         }
-        MouseEventKind::Drag(crossterm::event::MouseButton::Left) if is_in_editor => {
-            let new_y = (mouse.row - area.y) as usize + app.editor.scroll_y;
-            let new_x = (mouse.column - area.x) as usize;
-            
-            if new_y < app.editor.buffer.len_lines() {
-                if app.editor.selection_start.is_none() {
-                    app.editor.toggle_selection();
-                }
-                app.editor.cursor_y = new_y;
-                app.editor.cursor_x = new_x;
-                app.editor.clamp_cursor_x();
+        MouseEventKind::Drag(crossterm::event::MouseButton::Left) => {
+            if app.editor.selection_start.is_none() {
+                app.editor.toggle_selection();
             }
+
+            let new_x = (mouse.column.saturating_sub(area.x)) as usize;
+            
+            if mouse.row < area.y {
+                // Dragging above the editor area
+                app.editor.scroll_y = app.editor.scroll_y.saturating_sub(1);
+                app.editor.cursor_y = app.editor.scroll_y;
+            } else if mouse.row >= area.y + area.height {
+                // Dragging below the editor area
+                if app.editor.scroll_y + (area.height as usize) < app.editor.buffer.len_lines() {
+                    app.editor.scroll_y += 1;
+                }
+                app.editor.cursor_y = (app.editor.scroll_y + area.height as usize).saturating_sub(1).min(app.editor.buffer.len_lines().saturating_sub(1));
+            } else {
+                // Within editor area y-bounds
+                app.editor.cursor_y = (mouse.row - area.y) as usize + app.editor.scroll_y;
+            }
+
+            app.editor.cursor_x = new_x;
+            app.editor.clamp_cursor_x();
         }
         _ => {}
     }
