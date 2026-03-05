@@ -10,6 +10,7 @@ use anyhow::Result;
 mod app;
 mod sidebar;
 mod editor;
+mod micro_editor;
 mod terminal;
 mod ui;
 mod events;

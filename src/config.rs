@@ -28,6 +28,7 @@ pub const HELP_TEXT: &str = r#"
 "#;
 
 pub const TERMINAL_BASH_PATH: &str = "C:\\Program Files\\Git\\bin\\bash.exe";
+pub const MICRO_PATH: &str = "micro";
 
 pub mod colors {
     use ratatui::style::Color;

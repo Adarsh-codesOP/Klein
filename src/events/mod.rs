@@ -1,8 +1,10 @@
 use std::io;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind};
-use crate::app::{App, Panel};
+use crate::app::{App, Panel, EditorMode};
 
 pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
+    app.resize_micro(app.last_micro_width.get(), app.last_micro_height.get());
+
     match event {
         Event::Key(key) => {
             if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat {
@@ -58,6 +60,12 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     // Global shortcuts
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         match key.code {
+            KeyCode::Char('g') => {
+                app.editor_mode = match app.editor_mode {
+                    EditorMode::Internal => EditorMode::Micro,
+                    EditorMode::Micro => EditorMode::Internal,
+                };
+            }
             KeyCode::Char('q') => {
                 if app.editor.is_dirty {
                     app.show_quit_confirm = true;
@@ -124,6 +132,16 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             _ => {}
         }
         return Ok(());
+    }
+
+    if matches!(app.active_panel, Panel::Editor) && matches!(app.editor_mode, EditorMode::Micro) {
+        if let Some(micro) = &mut app.micro_editor {
+            let seq = key_to_seq(key);
+            if !seq.is_empty() {
+                micro.write(&seq);
+            }
+            return Ok(());
+        }
     }
 
     if matches!(app.active_panel, Panel::Terminal) {
@@ -243,17 +261,26 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     match key.code {
         KeyCode::Down if matches!(app.active_panel, Panel::Sidebar) => {
             if let Some(path) = app.sidebar.next() {
-                let _ = app.editor.open(path);
+                let _ = app.editor.open(path.clone());
+                if let Some(micro) = &mut app.micro_editor {
+                    micro.open_file(path);
+                }
             }
         }
         KeyCode::Up if matches!(app.active_panel, Panel::Sidebar) => {
             if let Some(path) = app.sidebar.previous() {
-                let _ = app.editor.open(path);
+                let _ = app.editor.open(path.clone());
+                if let Some(micro) = &mut app.micro_editor {
+                    micro.open_file(path);
+                }
             }
         }
         KeyCode::Enter if matches!(app.active_panel, Panel::Sidebar) => {
             if let Ok(Some(path)) = app.sidebar.toggle_selected() {
-                let _ = app.editor.open(path);
+                let _ = app.editor.open(path.clone());
+                if let Some(micro) = &mut app.micro_editor {
+                    micro.open_file(path);
+                }
                 app.active_panel = Panel::Editor;
             }
         }
@@ -261,4 +288,36 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+fn key_to_seq(key: KeyEvent) -> String {
+    match key.code {
+        KeyCode::Char(c) => {
+            if key.modifiers.contains(KeyModifiers::CONTROL) {
+                match c {
+                    'a'..='z' => {
+                        let b = c as u8 - b'a' + 1;
+                        (b as char).to_string()
+                    }
+                    _ => c.to_string(),
+                }
+            } else {
+                c.to_string()
+            }
+        }
+        KeyCode::Enter => "\r".to_string(),
+        KeyCode::Backspace => "\x7f".to_string(),
+        KeyCode::Esc => "\x1b".to_string(),
+        KeyCode::Tab => "\t".to_string(),
+        KeyCode::Up => "\x1b[A".to_string(),
+        KeyCode::Down => "\x1b[B".to_string(),
+        KeyCode::Right => "\x1b[C".to_string(),
+        KeyCode::Left => "\x1b[D".to_string(),
+        KeyCode::Delete => "\x1b[3~".to_string(),
+        KeyCode::Home => "\x1b[H".to_string(),
+        KeyCode::End => "\x1b[F".to_string(),
+        KeyCode::PageUp => "\x1b[5~".to_string(),
+        KeyCode::PageDown => "\x1b[6~".to_string(),
+        _ => "".to_string(),
+    }
 }

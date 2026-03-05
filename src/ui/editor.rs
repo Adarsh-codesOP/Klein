@@ -7,6 +7,64 @@ use crate::app::{App, Panel};
 use crate::config;
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
+    match app.editor_mode {
+        crate::app::EditorMode::Internal => render_internal(f, area, app),
+        crate::app::EditorMode::Micro => render_micro(f, area, app),
+    }
+}
+
+pub fn render_micro(f: &mut Frame, area: Rect, app: &App) {
+    let editor_block = Block::default()
+        .title(" Micro Editor ")
+        .borders(Borders::ALL)
+        .border_style(if matches!(app.active_panel, Panel::Editor) {
+            ratatui::style::Style::default().fg(config::colors::EDITOR_FOCUS)
+        } else {
+            ratatui::style::Style::default()
+        });
+    
+    let inner_area = editor_block.inner(area);
+    app.last_micro_width.set(inner_area.width);
+    app.last_micro_height.set(inner_area.height);
+    f.render_widget(editor_block, area);
+
+    if let Some(micro) = &app.micro_editor {
+        let parser = micro.parser.lock().unwrap();
+        let screen = parser.screen();
+        
+        for y in 0..inner_area.height {
+            for x in 0..inner_area.width {
+                if let Some(cell) = screen.cell(y, x) {
+                    let fg = match cell.fgcolor() {
+                        vt100::Color::Default => ratatui::style::Color::Reset,
+                        vt100::Color::Idx(i) => ratatui::style::Color::Indexed(i),
+                        vt100::Color::Rgb(r, g, b) => ratatui::style::Color::Rgb(r, g, b),
+                    };
+                    let bg = match cell.bgcolor() {
+                        vt100::Color::Default => ratatui::style::Color::Reset,
+                        vt100::Color::Idx(i) => ratatui::style::Color::Indexed(i),
+                        vt100::Color::Rgb(r, g, b) => ratatui::style::Color::Rgb(r, g, b),
+                    };
+                    
+                    let style = ratatui::style::Style::default().fg(fg).bg(bg);
+                    let symbol = cell.contents();
+                    if inner_area.x + (x as u16) < f.size().width && inner_area.y + (y as u16) < f.size().height {
+                        f.buffer_mut().get_mut(inner_area.x + (x as u16), inner_area.y + (y as u16)).set_symbol(&symbol).set_style(style);
+                    }
+                }
+            }
+        }
+        
+        if matches!(app.active_panel, Panel::Editor) {
+            let cursor = screen.cursor_position();
+            if cursor.1 < inner_area.width && cursor.0 < inner_area.height {
+                f.set_cursor(inner_area.x + cursor.1, inner_area.y + cursor.0);
+            }
+        }
+    }
+}
+
+pub fn render_internal(f: &mut Frame, area: Rect, app: &App) {
     let editor_block = Block::default()
         .title(format!(
             " {} - {} ",
