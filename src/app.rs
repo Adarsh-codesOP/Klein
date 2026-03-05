@@ -20,6 +20,7 @@ pub struct App {
     pub last_editor_height: Cell<usize>,
     pub show_help: bool,
     pub terminal_scroll: usize,
+    pub show_quit_confirm: bool,
 }
 
 impl App {
@@ -36,6 +37,7 @@ impl App {
             last_editor_height: Cell::new(20),
             show_help: false,
             terminal_scroll: 0,
+            show_quit_confirm: false,
         }
     }
 }

@@ -35,10 +35,36 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
 }
 
 fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    // Handle Quit Confirmation
+    if app.show_quit_confirm {
+        match key.code {
+            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                let _ = app.editor.save();
+                app.should_quit = true;
+                return Ok(());
+            }
+            KeyCode::Char('n') | KeyCode::Char('N') => {
+                app.should_quit = true;
+                return Ok(());
+            }
+            KeyCode::Esc | KeyCode::Char('c') | KeyCode::Char('C') => {
+                app.show_quit_confirm = false;
+                return Ok(());
+            }
+            _ => return Ok(()),
+        }
+    }
+
     // Global shortcuts
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         match key.code {
-            KeyCode::Char('q') => app.should_quit = true,
+            KeyCode::Char('q') => {
+                if app.editor.is_dirty {
+                    app.show_quit_confirm = true;
+                } else {
+                    app.should_quit = true;
+                }
+            }
             KeyCode::Char('b') => app.show_sidebar = !app.show_sidebar,
             KeyCode::Char('`') => app.show_terminal = !app.show_terminal,
             KeyCode::Char('s') => {
@@ -157,65 +183,78 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
         return Ok(());
     }
 
-    match key.code {
-        KeyCode::Down => {
-            match app.active_panel {
-                Panel::Sidebar => {
-                    if let Some(path) = app.sidebar.next() {
-                        let _ = app.editor.open(path);
-                    }
-                }
-                Panel::Editor => app.editor.move_cursor_down(app.last_editor_height.get()),
-                _ => {}
+    if matches!(app.active_panel, Panel::Editor) {
+        let is_selecting = key.modifiers.contains(KeyModifiers::CONTROL) && key.modifiers.contains(KeyModifiers::SHIFT);
+        
+        match key.code {
+            KeyCode::Down => {
+                if is_selecting { app.editor.toggle_selection(); }
+                else { app.editor.clear_selection(); }
+                app.editor.move_cursor_down(app.last_editor_height.get());
+                return Ok(());
             }
-        }
-        KeyCode::Up => {
-            match app.active_panel {
-                Panel::Sidebar => {
-                    if let Some(path) = app.sidebar.previous() {
-                        let _ = app.editor.open(path);
-                    }
-                }
-                Panel::Editor => app.editor.move_cursor_up(),
-                _ => {}
+            KeyCode::Up => {
+                if is_selecting { app.editor.toggle_selection(); }
+                else { app.editor.clear_selection(); }
+                app.editor.move_cursor_up();
+                return Ok(());
             }
-        }
-        KeyCode::Left => {
-            if matches!(app.active_panel, Panel::Editor) {
+            KeyCode::Left => {
+                app.editor.clear_selection();
                 app.editor.move_cursor_left();
+                return Ok(());
             }
-        }
-        KeyCode::Right => {
-            if matches!(app.active_panel, Panel::Editor) {
+            KeyCode::Right => {
+                app.editor.clear_selection();
                 app.editor.move_cursor_right();
+                return Ok(());
             }
-        }
-        KeyCode::Enter => {
-            match app.active_panel {
-                Panel::Sidebar => {
-                    if let Ok(Some(path)) = app.sidebar.toggle_selected() {
-                        let _ = app.editor.open(path);
-                        app.active_panel = Panel::Editor;
-                    }
-                }
-                Panel::Editor => {
-                    app.editor.insert_char('\n');
-                    app.editor.cursor_y += 1;
-                    app.editor.cursor_x = 0;
-                }
-                _ => {}
+            KeyCode::Tab => {
+                app.editor.insert_tab();
+                return Ok(());
             }
-        }
-        KeyCode::Backspace => {
-            if matches!(app.active_panel, Panel::Editor) {
+            KeyCode::Char('c') if app.editor.selection_start.is_some() => {
+                app.editor.copy();
+                app.editor.clear_selection();
+                return Ok(());
+            }
+            KeyCode::Char('v') if app.editor.selection_start.is_some() => {
+                app.editor.paste();
+                return Ok(());
+            }
+            KeyCode::Backspace => {
                 app.editor.delete_char();
+                return Ok(());
+            }
+            KeyCode::Enter => {
+                app.editor.insert_char('\n');
+                app.editor.cursor_y += 1;
+                app.editor.cursor_x = 0;
+                return Ok(());
+            }
+            KeyCode::Char(c) => {
+                app.editor.insert_char(c);
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
+    match key.code {
+        KeyCode::Down if matches!(app.active_panel, Panel::Sidebar) => {
+            if let Some(path) = app.sidebar.next() {
+                let _ = app.editor.open(path);
             }
         }
-        KeyCode::Char(c) => {
-            if matches!(app.active_panel, Panel::Editor) {
-                if !key.modifiers.contains(KeyModifiers::CONTROL) {
-                    app.editor.insert_char(c);
-                }
+        KeyCode::Up if matches!(app.active_panel, Panel::Sidebar) => {
+            if let Some(path) = app.sidebar.previous() {
+                let _ = app.editor.open(path);
+            }
+        }
+        KeyCode::Enter if matches!(app.active_panel, Panel::Sidebar) => {
+            if let Ok(Some(path)) = app.sidebar.toggle_selected() {
+                let _ = app.editor.open(path);
+                app.active_panel = Panel::Editor;
             }
         }
         _ => {}

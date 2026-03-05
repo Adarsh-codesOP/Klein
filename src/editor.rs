@@ -17,6 +17,8 @@ pub struct Editor {
     pub search_query: String,
     pub is_searching: bool,
     pub clipboard: Option<arboard::Clipboard>,
+    pub selection_start: Option<(usize, usize)>,
+    pub is_dirty: bool,
 }
 
 impl Editor {
@@ -32,6 +34,8 @@ impl Editor {
             search_query: String::new(),
             is_searching: false,
             clipboard: arboard::Clipboard::new().ok(),
+            selection_start: None,
+            is_dirty: false,
         }
     }
 
@@ -42,12 +46,15 @@ impl Editor {
         self.cursor_x = 0;
         self.cursor_y = 0;
         self.scroll_y = 0;
+        self.is_dirty = false;
+        self.selection_start = None;
         Ok(())
     }
 
     pub fn save(&mut self) -> Result<()> {
         if let Some(path) = &self.path {
             fs::write(path, self.buffer.to_string())?;
+            self.is_dirty = false;
         }
         Ok(())
     }
@@ -57,9 +64,16 @@ impl Editor {
         let char_idx = line_idx + self.cursor_x;
         self.buffer.insert_char(char_idx, c);
         self.cursor_x += 1;
+        self.is_dirty = true;
+        self.selection_start = None;
     }
 
     pub fn delete_char(&mut self) {
+        if self.selection_start.is_some() {
+            self.delete_selection();
+            return;
+        }
+
         let line_idx = self.buffer.line_to_char(self.cursor_y);
         let char_idx = line_idx + self.cursor_x;
 
@@ -74,7 +88,34 @@ impl Editor {
                 self.cursor_y -= 1;
                 self.cursor_x = prev_line_len.saturating_sub(1);
             }
+            self.is_dirty = true;
         }
+    }
+
+    pub fn delete_selection(&mut self) {
+        if let Some((start_y, start_x)) = self.selection_start {
+            let (sy, sx, ey, ex) = if (start_y, start_x) < (self.cursor_y, self.cursor_x) {
+                (start_y, start_x, self.cursor_y, self.cursor_x)
+            } else {
+                (self.cursor_y, self.cursor_x, start_y, start_x)
+            };
+
+            let start_char = self.buffer.line_to_char(sy) + sx;
+            let end_char = self.buffer.line_to_char(ey) + ex;
+
+            if start_char < end_char {
+                self.buffer.remove(start_char..end_char);
+                self.cursor_y = sy;
+                self.cursor_x = sx;
+                self.is_dirty = true;
+            }
+            self.selection_start = None;
+        }
+    }
+
+    pub fn get_gutter_width(&self) -> usize {
+        let lines = self.buffer.len_lines();
+        lines.to_string().len() + 2
     }
 
     pub fn get_highlighted_lines(&self, _width: usize, height: usize) -> Vec<ratatui::text::Line<'_>> {
@@ -97,11 +138,49 @@ impl Editor {
             let line = self.buffer.line(i).to_string();
             let highlights = h.highlight_line(&line, &self.syntax_set).unwrap_or_default();
             
+            let mut current_char_in_line = 0;
             let spans: Vec<ratatui::text::Span> = highlights
                 .into_iter()
                 .map(|(style, text)| {
-                    let color = ratatui::style::Color::Rgb(style.foreground.r, style.foreground.g, style.foreground.b);
-                    ratatui::text::Span::styled(text.to_string(), ratatui::style::Style::default().fg(color))
+                    let mut span_style = ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(
+                        style.foreground.r,
+                        style.foreground.g,
+                        style.foreground.b,
+                    ));
+
+                    // Check for selection
+                    if let Some((start_y, start_x)) = self.selection_start {
+                        let (sy, sx, ey, ex) = if (start_y, start_x) < (self.cursor_y, self.cursor_x) {
+                            (start_y, start_x, self.cursor_y, self.cursor_x)
+                        } else {
+                            (self.cursor_y, self.cursor_x, start_y, start_x)
+                        };
+
+                        let text_len = text.chars().count();
+                        let span_range_start = current_char_in_line;
+                        let span_range_end = current_char_in_line + text_len;
+
+                        let line_idx = i;
+                        
+                        let is_selected = if line_idx > sy && line_idx < ey {
+                            true
+                        } else if line_idx == sy && line_idx == ey {
+                            span_range_start < ex && span_range_end > sx
+                        } else if line_idx == sy {
+                            span_range_end > sx
+                        } else if line_idx == ey {
+                            span_range_start < ex
+                        } else {
+                            false
+                        };
+
+                        if is_selected {
+                            span_style = span_style.bg(ratatui::style::Color::Yellow).fg(ratatui::style::Color::Black);
+                        }
+                        current_char_in_line += text_len;
+                    }
+
+                    ratatui::text::Span::styled(text.to_string(), span_style)
                 })
                 .collect();
             
@@ -150,20 +229,61 @@ impl Editor {
         }
     }
 
+    pub fn toggle_selection(&mut self) {
+        if self.selection_start.is_none() {
+            self.selection_start = Some((self.cursor_y, self.cursor_x));
+        }
+    }
+
+    pub fn clear_selection(&mut self) {
+        self.selection_start = None;
+    }
+
+    pub fn insert_tab(&mut self) {
+        self.insert_char(' ');
+        self.insert_char(' ');
+        self.insert_char(' ');
+        self.insert_char(' ');
+    }
+
     pub fn copy(&mut self) {
         if let Some(clipboard) = &mut self.clipboard {
-            let line = self.buffer.line(self.cursor_y).to_string();
-            let _ = clipboard.set_text(line);
+            let text = if let Some((start_y, start_x)) = self.selection_start {
+                let (sy, sx, ey, ex) = if (start_y, start_x) < (self.cursor_y, self.cursor_x) {
+                    (start_y, start_x, self.cursor_y, self.cursor_x)
+                } else {
+                    (self.cursor_y, self.cursor_x, start_y, start_x)
+                };
+                let start_char = self.buffer.line_to_char(sy) + sx;
+                let end_char = self.buffer.line_to_char(ey) + ex;
+                self.buffer.slice(start_char..end_char).to_string()
+            } else {
+                self.buffer.line(self.cursor_y).to_string()
+            };
+            let _ = clipboard.set_text(text);
         }
     }
 
     pub fn paste(&mut self) {
         if let Some(clipboard) = &mut self.clipboard {
             if let Ok(text) = clipboard.get_text() {
+                if self.selection_start.is_some() {
+                    self.delete_selection();
+                }
                 let line_idx = self.buffer.line_to_char(self.cursor_y);
                 let char_idx = line_idx + self.cursor_x;
                 self.buffer.insert(char_idx, &text);
-                self.cursor_x += text.len();
+                
+                // Update cursor after paste
+                let text_rope = Rope::from_str(&text);
+                if text_rope.len_lines() > 1 {
+                    self.cursor_y += text_rope.len_lines() - 1;
+                    self.cursor_x = text_rope.line(text_rope.len_lines() - 1).len_chars();
+                } else {
+                    self.cursor_x += text.len();
+                }
+                self.is_dirty = true;
+                self.clamp_cursor_x();
             }
         }
     }

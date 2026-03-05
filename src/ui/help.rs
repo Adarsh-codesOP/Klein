@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::Rect,
     widgets::{Block, Borders, Paragraph, Clear},
     Frame,
 };
@@ -25,7 +25,7 @@ pub fn render(f: &mut Frame, area: Rect) {
         .border_style(ratatui::style::Style::default().fg(config::colors::HELP_BORDER))
         .style(ratatui::style::Style::default().bg(ratatui::style::Color::Reset));
 
-    let area = centered_rect(65, 75, area);
+    let area = crate::ui::layout::centered_rect(65, 75, area);
     f.render_widget(Clear, area); // Clear the area before rendering the popup
     
     let help_text = config::HELP_TEXT;
@@ -34,31 +34,4 @@ pub fn render(f: &mut Frame, area: Rect) {
         .style(ratatui::style::Style::default().fg(ratatui::style::Color::White));
         
     f.render_widget(help_paragraph, area);
-}
-
-/// helper function to create a centered rect using up certain percentage of the available rect `r`
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Percentage((100 - percent_y) / 2),
-                Constraint::Percentage(percent_y),
-                Constraint::Percentage((100 - percent_y) / 2),
-            ]
-            .as_ref(),
-        )
-        .split(r);
-
-    Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Percentage((100 - percent_x) / 2),
-                Constraint::Percentage(percent_x),
-                Constraint::Percentage((100 - percent_x) / 2),
-            ]
-            .as_ref(),
-        )
-        .split(popup_layout[1])[1]
 }

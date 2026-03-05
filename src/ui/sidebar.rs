@@ -14,7 +14,11 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         let name = path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
         let mut style = ratatui::style::Style::default();
         if i == app.sidebar.selected_index {
-            style = style.bg(ratatui::style::Color::DarkGray).fg(ratatui::style::Color::White);
+            if matches!(app.active_panel, Panel::Sidebar) {
+                style = style.bg(ratatui::style::Color::Green).fg(ratatui::style::Color::Black);
+            } else {
+                style = style.bg(ratatui::style::Color::DarkGray).fg(ratatui::style::Color::White);
+            }
         }
         list_items.push(ratatui::text::Line::from(vec![
             ratatui::text::Span::styled(prefix, style),
