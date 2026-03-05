@@ -245,6 +245,13 @@ impl Editor {
         self.insert_char(' ');
     }
 
+    pub fn select_all(&mut self) {
+        self.selection_start = Some((0, 0));
+        let last_line = self.buffer.len_lines().saturating_sub(1);
+        self.cursor_y = last_line;
+        self.cursor_x = self.get_max_cursor_x(last_line);
+    }
+
     pub fn copy(&mut self) {
         if let Some(clipboard) = &mut self.clipboard {
             let text = if let Some((start_y, start_x)) = self.selection_start {
@@ -269,6 +276,7 @@ impl Editor {
                 if self.selection_start.is_some() {
                     self.delete_selection();
                 }
+                
                 let line_idx = self.buffer.line_to_char(self.cursor_y);
                 let char_idx = line_idx + self.cursor_x;
                 self.buffer.insert(char_idx, &text);
@@ -283,6 +291,9 @@ impl Editor {
                 }
                 self.is_dirty = true;
                 self.clamp_cursor_x();
+                
+                // Ensure the cursor (at the end of the paste) is visible.
+                // This naturally pushes the view down for large pastes, showing the text.
                 self.ensure_cursor_visible(height);
             }
         }
@@ -317,15 +328,10 @@ impl Editor {
     pub fn ensure_cursor_visible(&mut self, height: usize) {
         if height == 0 { return; }
         
-        if self.cursor_y < self.scroll_y || self.cursor_y >= self.scroll_y + height {
-            // Center the cursor if it's out of view
-            self.scroll_y = self.cursor_y.saturating_sub(height / 2);
-            
-            // Limit scroll to buffer length
-            let max_scroll = self.buffer.len_lines().saturating_sub(height);
-            if self.scroll_y > max_scroll {
-                self.scroll_y = max_scroll;
-            }
+        if self.cursor_y < self.scroll_y {
+            self.scroll_y = self.cursor_y;
+        } else if self.cursor_y >= self.scroll_y + height {
+            self.scroll_y = self.cursor_y - height + 1;
         }
     }
 
