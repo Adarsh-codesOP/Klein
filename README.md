@@ -65,13 +65,13 @@ We provide an installation script that sets up your default workspace, preferred
 
 **Using PowerShell (Windows Native):**
 ```powershell
-irm https://raw.githubusercontent.com/Klein-IDE/Klein/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/Adarsh-CodesOP/Klein/main/install.sh | iex
 ```
 *(Note: If you already have the repository cloned, you can just run `.\install.ps1`)*
 
 **Using Bash (Git Bash/WSL/Linux):**
 ```bash
-curl -sSL https://raw.githubusercontent.com/Klein-IDE/Klein/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/Adarsh-CodesOP/Klein/main/install.sh | bash
 ```
 
 **Reconfiguring:**
