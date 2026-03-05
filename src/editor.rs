@@ -14,8 +14,6 @@ pub struct Editor {
     pub scroll_y: usize,
     pub syntax_set: SyntaxSet,
     pub theme_set: ThemeSet,
-    pub search_query: String,
-    pub is_searching: bool,
     pub clipboard: Option<arboard::Clipboard>,
     pub selection_start: Option<(usize, usize)>,
     pub is_dirty: bool,
@@ -31,8 +29,6 @@ impl Editor {
             scroll_y: 0,
             syntax_set: SyntaxSet::load_defaults_newlines(),
             theme_set: ThemeSet::load_defaults(),
-            search_query: String::new(),
-            is_searching: false,
             clipboard: arboard::Clipboard::new().ok(),
             selection_start: None,
             is_dirty: false,
@@ -296,32 +292,6 @@ impl Editor {
                 // This naturally pushes the view down for large pastes, showing the text.
                 self.ensure_cursor_visible(height);
             }
-        }
-    }
-
-    pub fn search(&mut self, query: &str) {
-        if query.is_empty() {
-            return;
-        }
-        let content = self.buffer.to_string();
-        let current_pos = self.buffer.line_to_char(self.cursor_y) + self.cursor_x;
-        
-        // Find next occurrence
-        if let Some(found_pos) = content[current_pos + 1..].find(query) {
-            let absolute_pos = current_pos + 1 + found_pos;
-            self.move_to_pos(absolute_pos);
-        } else if let Some(found_pos) = content[..current_pos].find(query) {
-            // Wrap around
-            self.move_to_pos(found_pos);
-        }
-    }
-
-    fn move_to_pos(&mut self, pos: usize) {
-        self.cursor_y = self.buffer.char_to_line(pos);
-        self.cursor_x = pos - self.buffer.line_to_char(self.cursor_y);
-        // Update scroll if needed
-        if self.cursor_y < self.scroll_y {
-            self.scroll_y = self.cursor_y;
         }
     }
 

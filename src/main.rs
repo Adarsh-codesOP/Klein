@@ -14,6 +14,7 @@ mod terminal;
 mod ui;
 mod events;
 mod config;
+mod tabs;
 
 use crate::app::App;
 

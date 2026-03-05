@@ -3,11 +3,12 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 pub fn get_main_layout(area: Rect, show_terminal: bool) -> Vec<Rect> {
     let constraints = vec![
         Constraint::Length(1), // Help Hint Tab
+        Constraint::Length(1), // Tab Bar
         Constraint::Fill(1),   // Main workspace
         if show_terminal { Constraint::Length(10) } else { Constraint::Length(0) }, // Terminal
         Constraint::Length(1), // Status Bar
     ];
-    
+
     Layout::default()
         .direction(Direction::Vertical)
         .constraints(constraints)
