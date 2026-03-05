@@ -19,9 +19,9 @@ pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
 
 fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
     let area = app.editor_area.get();
-    let is_in_editor = mouse.column >= area.x 
-        && mouse.column < area.x + area.width 
-        && mouse.row >= area.y 
+    let is_in_editor = mouse.column >= area.x
+        && mouse.column < area.x + area.width
+        && mouse.row >= area.y
         && mouse.row < area.y + area.height;
 
     match mouse.kind {
@@ -37,51 +37,69 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
         }
         MouseEventKind::Down(crossterm::event::MouseButton::Left) if is_in_editor => {
             app.active_panel = Panel::Editor;
-            let new_y = (mouse.row - area.y) as usize + app.editor.scroll_y;
+            let new_y = (mouse.row - area.y) as usize + app.editor().scroll_y;
             let new_x = (mouse.column - area.x) as usize;
-            
-            if new_y < app.editor.buffer.len_lines() {
+
+            if new_y < app.editor().buffer.len_lines() {
                 if mouse.modifiers.contains(KeyModifiers::SHIFT) {
-                    if app.editor.selection_start.is_none() {
-                        app.editor.toggle_selection();
+                    if app.editor().selection_start.is_none() {
+                        app.editor_mut().toggle_selection();
                     }
                 } else {
-                    app.editor.clear_selection();
+                    app.editor_mut().clear_selection();
                 }
-                
-                app.editor.cursor_y = new_y;
-                app.editor.cursor_x = new_x;
-                app.editor.clamp_cursor_x();
+
+                app.editor_mut().cursor_y = new_y;
+                app.editor_mut().cursor_x = new_x;
+                app.editor_mut().clamp_cursor_x();
             }
         }
         MouseEventKind::Drag(crossterm::event::MouseButton::Left) => {
-            if app.editor.selection_start.is_none() {
-                app.editor.toggle_selection();
+            if app.editor().selection_start.is_none() {
+                app.editor_mut().toggle_selection();
             }
 
             let new_x = (mouse.column.saturating_sub(area.x)) as usize;
-            
+
             if mouse.row < area.y {
                 // Dragging above the editor area
-                app.editor.scroll_y = app.editor.scroll_y.saturating_sub(1);
-                app.editor.cursor_y = app.editor.scroll_y;
+                let scroll_y = app.editor().scroll_y;
+                app.editor_mut().scroll_y = scroll_y.saturating_sub(1);
+                let scroll_y = app.editor().scroll_y;
+                app.editor_mut().cursor_y = scroll_y;
             } else if mouse.row >= area.y + area.height {
                 // Dragging below the editor area
-                if app.editor.scroll_y + (area.height as usize) < app.editor.buffer.len_lines() {
-                    app.editor.scroll_y += 1;
+                let scroll_y = app.editor().scroll_y;
+                let buf_len = app.editor().buffer.len_lines();
+                if scroll_y + (area.height as usize) < buf_len {
+                    app.editor_mut().scroll_y += 1;
                 }
-                app.editor.cursor_y = (app.editor.scroll_y + area.height as usize).saturating_sub(1).min(app.editor.buffer.len_lines().saturating_sub(1));
+                let scroll_y = app.editor().scroll_y;
+                app.editor_mut().cursor_y = (scroll_y + area.height as usize)
+                    .saturating_sub(1)
+                    .min(buf_len.saturating_sub(1));
             } else {
                 // Within editor area y-bounds
-                app.editor.cursor_y = (mouse.row - area.y) as usize + app.editor.scroll_y;
+                let scroll_y = app.editor().scroll_y;
+                app.editor_mut().cursor_y = (mouse.row - area.y) as usize + scroll_y;
             }
 
-            app.editor.cursor_x = new_x;
-            app.editor.clamp_cursor_x();
+            app.editor_mut().cursor_x = new_x;
+            app.editor_mut().clamp_cursor_x();
         }
         _ => {}
     }
     Ok(())
+}
+
+fn try_open_path(app: &mut App, path: std::path::PathBuf) {
+    if app.editor().is_dirty {
+        app.pending_open_path = Some(path);
+        app.show_unsaved_confirm = true;
+    } else {
+        app.open_in_new_tab(path);
+        app.active_panel = Panel::Editor;
+    }
 }
 
 fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
@@ -89,7 +107,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     if app.show_quit_confirm {
         match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => {
-                let _ = app.editor.save();
+                let _ = app.editor_mut().save();
                 app.should_quit = true;
                 return Ok(());
             }
@@ -105,11 +123,56 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
         }
     }
 
-    // Global shortcuts
+    // Handle Unsaved Changes Confirm (file switch)
+    if app.show_unsaved_confirm {
+        match key.code {
+            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                let _ = app.editor_mut().save();
+                if let Some(path) = app.pending_open_path.take() {
+                    app.open_in_new_tab(path);
+                    app.active_panel = Panel::Editor;
+                }
+                app.show_unsaved_confirm = false;
+                return Ok(());
+            }
+            KeyCode::Char('n') | KeyCode::Char('N') => {
+                app.editor_mut().is_dirty = false;
+                if let Some(path) = app.pending_open_path.take() {
+                    app.open_in_new_tab(path);
+                    app.active_panel = Panel::Editor;
+                }
+                app.show_unsaved_confirm = false;
+                return Ok(());
+            }
+            KeyCode::Char('c') | KeyCode::Char('C') | KeyCode::Esc => {
+                app.pending_open_path = None;
+                app.show_unsaved_confirm = false;
+                return Ok(());
+            }
+            _ => return Ok(()),
+        }
+    }
+
+    // Global Control shortcuts
     if key.modifiers.contains(KeyModifiers::CONTROL) {
+        // Ctrl+Shift combos
+        if key.modifiers.contains(KeyModifiers::SHIFT) {
+            match key.code {
+                KeyCode::Tab | KeyCode::BackTab => {
+                    app.next_tab();
+                    return Ok(());
+                }
+                KeyCode::Char('x') | KeyCode::Char('X') => {
+                    app.close_tab();
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
+
         match key.code {
             KeyCode::Char('q') => {
-                if app.editor.is_dirty {
+                if app.editor().is_dirty {
                     app.show_quit_confirm = true;
                 } else {
                     app.should_quit = true;
@@ -118,7 +181,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             KeyCode::Char('b') => app.show_sidebar = !app.show_sidebar,
             KeyCode::Char('`') => app.show_terminal = !app.show_terminal,
             KeyCode::Char('s') => {
-                let _ = app.editor.save();
+                let _ = app.editor_mut().save();
             }
             KeyCode::Char('e') => {
                 app.active_panel = Panel::Editor;
@@ -131,18 +194,15 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.active_panel = Panel::Terminal;
                 app.show_terminal = true;
             }
-            KeyCode::Char('f') => {
-                app.editor.is_searching = true;
-                app.editor.search_query.clear();
-            }
             KeyCode::Char('c') => {
-                app.editor.copy();
+                app.editor_mut().copy();
             }
             KeyCode::Char('v') => {
-                app.editor.paste(app.last_editor_height.get());
+                let h = app.last_editor_height.get();
+                app.editor_mut().paste(h);
             }
             KeyCode::Char('a') => {
-                app.editor.select_all();
+                app.editor_mut().select_all();
             }
             KeyCode::Char('h') => app.show_help = !app.show_help,
             KeyCode::Right | KeyCode::Left => {
@@ -164,24 +224,6 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
         return Ok(());
     }
 
-    if app.editor.is_searching {
-        match key.code {
-            KeyCode::Char(c) => app.editor.search_query.push(c),
-            KeyCode::Backspace => {
-                app.editor.search_query.pop();
-            }
-            KeyCode::Enter => {
-                app.editor.search(&app.editor.search_query.clone());
-                app.editor.is_searching = false;
-            }
-            KeyCode::Esc => {
-                app.editor.is_searching = false;
-            }
-            _ => {}
-        }
-        return Ok(());
-    }
-
     if matches!(app.active_panel, Panel::Terminal) {
         match key.code {
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -189,7 +231,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 app.terminal_scroll = 0;
-                app.terminal.write("\x08"); // Ctrl+H is often \x08
+                app.terminal.write("\x08");
             }
             KeyCode::Char(c) => {
                 app.terminal_scroll = 0;
@@ -201,7 +243,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Backspace => {
                 app.terminal_scroll = 0;
-                app.terminal.write("\x7f"); // Git Bash usually expects \x7f
+                app.terminal.write("\x7f");
             }
             KeyCode::Tab => {
                 app.terminal.write("\t");
@@ -240,78 +282,82 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     }
 
     if matches!(app.active_panel, Panel::Editor) {
-        let is_selecting = key.modifiers.contains(KeyModifiers::CONTROL) && key.modifiers.contains(KeyModifiers::SHIFT);
-        
+        let is_selecting = key.modifiers.contains(KeyModifiers::CONTROL)
+            && key.modifiers.contains(KeyModifiers::SHIFT);
+
         match key.code {
             KeyCode::Down => {
-                if is_selecting { app.editor.toggle_selection(); }
-                else { app.editor.clear_selection(); }
-                app.editor.move_cursor_down(app.last_editor_height.get());
+                if is_selecting { app.editor_mut().toggle_selection(); }
+                else { app.editor_mut().clear_selection(); }
+                let h = app.last_editor_height.get();
+                app.editor_mut().move_cursor_down(h);
                 return Ok(());
             }
             KeyCode::Up => {
-                if is_selecting { app.editor.toggle_selection(); }
-                else { app.editor.clear_selection(); }
-                app.editor.move_cursor_up();
+                if is_selecting { app.editor_mut().toggle_selection(); }
+                else { app.editor_mut().clear_selection(); }
+                app.editor_mut().move_cursor_up();
                 return Ok(());
             }
             KeyCode::Left => {
-                app.editor.clear_selection();
-                app.editor.move_cursor_left();
+                app.editor_mut().clear_selection();
+                app.editor_mut().move_cursor_left();
                 return Ok(());
             }
             KeyCode::Right => {
-                app.editor.clear_selection();
-                app.editor.move_cursor_right();
+                app.editor_mut().clear_selection();
+                app.editor_mut().move_cursor_right();
                 return Ok(());
             }
             KeyCode::Tab => {
-                app.editor.insert_tab();
+                app.editor_mut().insert_tab();
                 return Ok(());
             }
-            KeyCode::Char('c') if app.editor.selection_start.is_some() => {
-                app.editor.copy();
-                app.editor.clear_selection();
+            KeyCode::Char('c') if app.editor().selection_start.is_some() => {
+                app.editor_mut().copy();
+                app.editor_mut().clear_selection();
                 return Ok(());
             }
-            KeyCode::Char('v') if app.editor.selection_start.is_some() => {
-                app.editor.paste(app.last_editor_height.get());
+            KeyCode::Char('v') if app.editor().selection_start.is_some() => {
+                let h = app.last_editor_height.get();
+                app.editor_mut().paste(h);
                 return Ok(());
             }
             KeyCode::Backspace => {
-                app.editor.delete_char();
+                app.editor_mut().delete_char();
                 return Ok(());
             }
             KeyCode::Enter => {
-                app.editor.insert_char('\n');
-                app.editor.cursor_y += 1;
-                app.editor.cursor_x = 0;
-                app.editor.ensure_cursor_visible(app.last_editor_height.get());
+                app.editor_mut().insert_char('\n');
+                app.editor_mut().cursor_y += 1;
+                app.editor_mut().cursor_x = 0;
+                let h = app.last_editor_height.get();
+                app.editor_mut().ensure_cursor_visible(h);
                 return Ok(());
             }
             KeyCode::Char(c) => {
-                app.editor.insert_char(c);
+                app.editor_mut().insert_char(c);
                 return Ok(());
             }
             _ => {}
         }
     }
 
+    // Sidebar navigation
     match key.code {
         KeyCode::Down if matches!(app.active_panel, Panel::Sidebar) => {
             if let Some(path) = app.sidebar.next() {
-                let _ = app.editor.open(path);
+                try_open_path(app, path);
             }
         }
         KeyCode::Up if matches!(app.active_panel, Panel::Sidebar) => {
             if let Some(path) = app.sidebar.previous() {
-                let _ = app.editor.open(path);
+                try_open_path(app, path);
             }
         }
         KeyCode::Enter if matches!(app.active_panel, Panel::Sidebar) => {
             if let Ok(Some(path)) = app.sidebar.toggle_selected() {
-                let _ = app.editor.open(path);
-                app.active_panel = Panel::Editor;
+                try_open_path(app, path);
             }
         }
         _ => {}

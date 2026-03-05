@@ -1,7 +1,9 @@
 use std::cell::Cell;
+use std::path::PathBuf;
 use crate::sidebar::Sidebar;
 use crate::editor::Editor;
 use crate::terminal::Terminal;
+use crate::tabs::TabState;
 
 pub enum Panel {
     Sidebar,
@@ -15,13 +17,16 @@ pub struct App {
     pub show_terminal: bool,
     pub should_quit: bool,
     pub sidebar: Sidebar,
-    pub editor: Editor,
+    pub tabs: Vec<TabState>,
+    pub active_tab: usize,
     pub terminal: Terminal,
     pub last_editor_height: Cell<usize>,
     pub editor_area: Cell<ratatui::layout::Rect>,
     pub show_help: bool,
     pub terminal_scroll: usize,
     pub show_quit_confirm: bool,
+    pub show_unsaved_confirm: bool,
+    pub pending_open_path: Option<PathBuf>,
 }
 
 impl App {
@@ -33,13 +38,59 @@ impl App {
             show_terminal: true,
             should_quit: false,
             sidebar: Sidebar::new(&current_dir),
-            editor: Editor::new(),
+            tabs: vec![TabState::new()],
+            active_tab: 0,
             terminal: Terminal::new(current_dir),
             last_editor_height: Cell::new(20),
             editor_area: Cell::new(ratatui::layout::Rect::default()),
             show_help: false,
             terminal_scroll: 0,
             show_quit_confirm: false,
+            show_unsaved_confirm: false,
+            pending_open_path: None,
+        }
+    }
+
+    /// Get a reference to the current tab's editor
+    pub fn editor(&self) -> &Editor {
+        &self.tabs[self.active_tab].editor
+    }
+
+    /// Get a mutable reference to the current tab's editor
+    pub fn editor_mut(&mut self) -> &mut Editor {
+        &mut self.tabs[self.active_tab].editor
+    }
+
+    /// Open a file in a new tab (always creates a new tab)
+    pub fn open_in_new_tab(&mut self, path: PathBuf) {
+        let mut tab = TabState::new();
+        let _ = tab.editor.open(path);
+        self.tabs.push(tab);
+        self.active_tab = self.tabs.len() - 1;
+    }
+
+    /// Open a file in the current tab (replaces current editor state)
+    pub fn open_in_current_tab(&mut self, path: PathBuf) {
+        let _ = self.tabs[self.active_tab].editor.open(path);
+    }
+
+    /// Switch to the next tab (wraps around)
+    pub fn next_tab(&mut self) {
+        if self.tabs.len() > 1 {
+            self.active_tab = (self.active_tab + 1) % self.tabs.len();
+        }
+    }
+
+    /// Close the active tab. Switches to adjacent tab.
+    pub fn close_tab(&mut self) {
+        if self.tabs.len() == 1 {
+            // Don't close the last tab; just clear it
+            self.tabs[0] = TabState::new();
+            return;
+        }
+        self.tabs.remove(self.active_tab);
+        if self.active_tab >= self.tabs.len() {
+            self.active_tab = self.tabs.len() - 1;
         }
     }
 }
