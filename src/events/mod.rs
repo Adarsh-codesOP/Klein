@@ -92,7 +92,13 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
     Ok(())
 }
 
-fn try_open_path(app: &mut App, path: std::path::PathBuf) {
+fn load_preview(app: &mut App, path: std::path::PathBuf) {
+    let mut preview_editor = crate::editor::Editor::new();
+    let _ = preview_editor.open(path);
+    app.preview = Some(preview_editor);
+}
+
+fn open_tab_from_path(app: &mut App, path: std::path::PathBuf) {
     if app.editor().is_dirty {
         app.pending_open_path = Some(path);
         app.show_unsaved_confirm = true;
@@ -158,7 +164,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
         // Ctrl+Shift combos
         if key.modifiers.contains(KeyModifiers::SHIFT) {
             match key.code {
-                KeyCode::Tab | KeyCode::BackTab => {
+                KeyCode::Char('z') | KeyCode::Char('Z') => {
                     app.next_tab();
                     return Ok(());
                 }
@@ -172,7 +178,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
 
         match key.code {
             KeyCode::Char('q') => {
-                if app.editor().is_dirty {
+                if app.tabs.iter().any(|t| t.editor.is_dirty) {
                     app.show_quit_confirm = true;
                 } else {
                     app.should_quit = true;
@@ -184,6 +190,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 let _ = app.editor_mut().save();
             }
             KeyCode::Char('e') => {
+                app.preview = None;
                 app.active_panel = Panel::Editor;
             }
             KeyCode::Char('r') => {
@@ -191,6 +198,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.show_sidebar = true;
             }
             KeyCode::Char('t') => {
+                app.preview = None;
                 app.active_panel = Panel::Terminal;
                 app.show_terminal = true;
             }
@@ -276,6 +284,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             _ => {}
         }
         if key.code == KeyCode::Esc {
+            app.preview = None;
             app.active_panel = Panel::Editor;
         }
         return Ok(());
@@ -347,17 +356,19 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     match key.code {
         KeyCode::Down if matches!(app.active_panel, Panel::Sidebar) => {
             if let Some(path) = app.sidebar.next() {
-                try_open_path(app, path);
+                load_preview(app, path);
             }
         }
         KeyCode::Up if matches!(app.active_panel, Panel::Sidebar) => {
             if let Some(path) = app.sidebar.previous() {
-                try_open_path(app, path);
+                load_preview(app, path);
             }
         }
         KeyCode::Enter if matches!(app.active_panel, Panel::Sidebar) => {
+            // First try to expand dirs
             if let Ok(Some(path)) = app.sidebar.toggle_selected() {
-                try_open_path(app, path);
+                app.preview = None;
+                open_tab_from_path(app, path);
             }
         }
         _ => {}

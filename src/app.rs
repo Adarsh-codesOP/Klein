@@ -19,6 +19,7 @@ pub struct App {
     pub sidebar: Sidebar,
     pub tabs: Vec<TabState>,
     pub active_tab: usize,
+    pub preview: Option<Editor>,
     pub terminal: Terminal,
     pub last_editor_height: Cell<usize>,
     pub editor_area: Cell<ratatui::layout::Rect>,
@@ -40,6 +41,7 @@ impl App {
             sidebar: Sidebar::new(&current_dir),
             tabs: vec![TabState::new()],
             active_tab: 0,
+            preview: None,
             terminal: Terminal::new(current_dir),
             last_editor_height: Cell::new(20),
             editor_area: Cell::new(ratatui::layout::Rect::default()),
@@ -49,6 +51,18 @@ impl App {
             show_unsaved_confirm: false,
             pending_open_path: None,
         }
+    }
+
+    /// Get a reference to the editor that should be displayed.
+    /// Returns preview editor when sidebar is focused and preview exists,
+    /// otherwise returns the active tab's editor.
+    pub fn active_editor(&self) -> &Editor {
+        if matches!(self.active_panel, Panel::Sidebar) {
+            if let Some(preview) = &self.preview {
+                return preview;
+            }
+        }
+        self.editor()
     }
 
     /// Get a reference to the current tab's editor
