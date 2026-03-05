@@ -5,7 +5,7 @@ pub const HELP_TEXT: &str = r#"
 [Ctrl + Arrows] Switch Panels
 [Up/Down/Left/Right] Move Cursor (Editor)
 [Up/Down] Scroll Viewport (Terminal)
-[Enter] Selection (Sidebar) / New Line (Editor)
+[Enter] Expand Folder (Sidebar) / New Line (Editor)
 
 --- FOCUS CONTROL ---
 [Ctrl + R] Focus Explorer (Sidebar)
@@ -14,13 +14,19 @@ pub const HELP_TEXT: &str = r#"
 [Ctrl + B] Toggle Sidebar Visibility
 [Ctrl + `] Toggle Terminal Visibility
 
+--- TAB MANAGEMENT ---
+[Ctrl + Shift + Z] Next Tab
+[Ctrl + Shift + X] Close Current Tab
+
 --- FILE OPERATIONS ---
 [Ctrl + S] Save Current File
 [Ctrl + Q] Quit Application
 
 --- EDITOR FEATURES ---
-[Ctrl + F] Start Search
 [Ctrl + C] Copy Selection
+[Ctrl + V] Paste
+[Ctrl + A] Select All
+[Ctrl + Shift + Up/Down] Multiline Selection
 [Backspace] Delete Character
 
 --- HELP ---
