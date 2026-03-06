@@ -1,12 +1,12 @@
 <h1 align="center">
   <br>
-  <img src="src/Assets/logo.png" alt="Klein IDE" width="200">
+  <img src="src/Assets/logo.png" alt="Klein" width="200">
   <br>
-  Klein IDE
+  Klein — A TIDE (Terminal Integrated Development Environment)
   <br>
 </h1>
 
-<h4 align="center">A sleek, terminal-based Integrated Development Environment written in Rust.</h4>
+<h4 align="center">A professional terminal-based text editor with IDE‑like features, written in Rust.</h4>
 
 <p align="center">
   <a href="https://rustup.rs/">
@@ -33,12 +33,12 @@
 
 ## 🌟 Overview
 
-**Klein** is a blazingly fast, terminal-based IDE built strictly with Rust. Leveraging the power of `ratatui` for its aesthetic user interface and `portable-pty` for robust terminal integration, Klein aims to provide developers with a seamless, keyboard-centric coding experience directly in their command line. 
+**Klein** is a lightweight, terminal-based text editor built in Rust. It provides an IDE-like interface using `ratatui` for the user interface and `portable-pty` for terminal integration, giving developers a keyboard‑centric coding environment directly in the command line.
 
-Whether you're editing code across multiple tabs, exploring your project directory, or compiling your app via the integrated bash terminal, Klein houses all your workflow needs into a single, beautifully rendered console window.
+Whether you're editing multiple files, browsing a project directory, or compiling code from the embedded shell, Klein brings essential workflow tools into one efficient console application.
 
-![Klein IDE Screenshot](https://via.placeholder.com/1000x500.png?text=Klein+IDE+-+Your+Terminal+Workflow+Reimagined)
-*(Note: Replace the placeholder image above with an actual screenshot or GIF of the IDE in action)*
+![Klein TIDE Screenshot](src/Assets/logo.png)
+
 
 ---
 
@@ -57,31 +57,31 @@ Klein doesn't compromise on functionality or looks. Here is what you get out of 
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ### Automatic Setup (Recommended for Windows)
 
-We provide an installation script that sets up your default workspace, preferred terminal, and builds the application for you.
+A pair of installation scripts will configure your workspace, set a preferred shell, download the latest pre‑built binary, and present a polished, colorful console interface during setup.
 
-**Using PowerShell (Windows Native):**
+**Using PowerShell (Windows):**
 ```powershell
 irm https://raw.githubusercontent.com/Adarsh-CodesOP/Klein/main/install.ps1 | iex
 ```
 *(Note: If you already have the repository cloned, you can just run `.\install.ps1`)*
 
-**Using Bash (Git Bash/WSL/Linux):**
+**Using Bash (Git Bash, WSL or Linux):**
 ```bash
 curl -sSL https://raw.githubusercontent.com/Adarsh-CodesOP/Klein/main/install.sh | bash
 ```
 
 **Reconfiguring:**
-If you ever need to change your default workspace or preferred shell later, run:
+To adjust your workspace or shell after installation, run:
 ```powershell
 .\install.ps1 -Reconfigure
 ```
 *(Or `./install.sh --reconfigure`)*
 
-### Manual Installation
+### Manual Build and Install
 
 If you prefer to build it manually from source:
 
@@ -133,7 +133,7 @@ Klein is designed to be fully navigable via keyboard, maximizing your productivi
 | <kbd>Ctrl</kbd> + <kbd>H</kbd> | Toggle display of the Help Command Overlay |
 | <kbd>Ctrl</kbd> + <kbd>Q</kbd> | Quit the Application (safeguarded against unsaved changes) |
 
-> 💡 **Tip:** Don't remember a shortcut? Just press <kbd>Ctrl</kbd> + <kbd>H</kbd> inside the IDE to summon the handy help menu!
+> 💡 **Tip:** Don't remember a shortcut? Just press <kbd>Ctrl</kbd> + <kbd>H</kbd> inside Klein to summon the handy help menu!
 
 ---
 
@@ -141,7 +141,7 @@ Klein is designed to be fully navigable via keyboard, maximizing your productivi
 
 Make Klein truly yours. Core configurations, including default shell paths, UI colors, and text banners, can be easily modified.
 
-Navigate to `src/config.rs` to adjust the IDE's environment:
+Navigate to `src/config.rs` to adjust the TIDE's environment:
 ```rust
 // Example: Altering default focus colors in src/config.rs
 pub mod colors {
@@ -160,10 +160,10 @@ pub mod colors {
 
 We welcome contributions of all shapes and sizes! Whether you are squashing a bug, adding a new feature, or simply fixing a typo, your help is greatly appreciated.
 
-Please read our [Contributing Guidelines](CONTRIBUTING.md) to understand the workflow for submitting pull requests, setting up the development environment, and reporting issues. Let's build a better terminal IDE together!
+Please read our [Contributing Guidelines](CONTRIBUTING.md) to understand the workflow for submitting pull requests, setting up the development environment, and reporting issues. Let's build a better terminal text editor together!
 
 ---
 
 ## 📜 License
 
-Klein IDE is open-sourced software licensed under the [MIT license](LICENSE).
+Klein TIDE is open‑sourced software licensed under the [MIT license](LICENSE).

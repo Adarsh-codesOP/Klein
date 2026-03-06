@@ -13,21 +13,25 @@ CONFIG_PATH="$APP_DIR/config.toml"
 CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 DARKGRAY='\033[1;30m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "\n${CYAN}"
-cat << "EOF"
-  _  __ _      _         _____  ____  ______ 
- | |/ /| |    (_)       |_   _||  _ \|  ____|
- | ' / | |     _  _ __    | |  | |  \| |__   
- |  <  | |    | || '_ \   | |  | |  |  ___|  
- | . \ | |____| || | | | _| |_ | |_/ / |____ 
- |_|\_\|______|_||_| |_||_____||____/|______|
-                                             
-EOF
-echo -e "${DARKGRAY} ==========================================${NC}"
-echo -e "${WHITE}     The aesthetic terminal IDE in Rust    ${NC}"
-echo -e "${DARKGRAY} ==========================================${NC}\n"
+print_banner() {
+    echo -e "${CYAN}"
+    echo "oooo   oooo ooooo       ooooooooooo ooooo oooo   oooo "
+    echo " 888  o88    888         888    88   888   8888o  88  "
+    echo " 888888      888         888ooo8     888   88 888o88  "
+    echo " 888  88o    888      o  888    oo   888   88   8888  "
+    echo "o888o o888o o888ooooo88 o888ooo8888 o888o o88o    88  "
+    echo "                                                      "
+    echo -e "${NC}"
+}
+
+# show header
+print_banner
+
+echo -e "${YELLOW}Starting installation...${NC}"
 
 if [ ! -d "$APP_DIR" ]; then
     mkdir -p "$APP_DIR"
@@ -35,7 +39,7 @@ if [ ! -d "$APP_DIR" ]; then
 fi
 
 prompt_configuration() {
-    echo -e "\n--- Configuration ---"
+    echo -e "\n${CYAN}╭────────────┤ Configuration ├────────────╮${NC}"
     
     # Check for Git Bash installation path in default Windows locations
     if [ ! -d "/c/Program Files/Git" ] && [ ! -d "/c/Users/$USER/AppData/Local/Programs/Git" ] && ! command -v bash &> /dev/null; then
@@ -67,7 +71,7 @@ prompt_configuration() {
     fi
 
     cat > "$CONFIG_PATH" <<EOF
-# Klein IDE Configuration
+# Klein TIDE Configuration
 default_workspace = "$workspace"
 shell = "$shell"
 EOF
@@ -77,7 +81,7 @@ EOF
 
 if [[ "$1" == "--reconfigure" || "$1" == "-Reconfigure" ]]; then
     prompt_configuration
-    echo -e "\nReconfiguration complete!"
+    echo -e "\n${GREEN}✔ Reconfiguration complete!${NC}"
     exit 0
 fi
 
@@ -105,5 +109,7 @@ fi
 
 prompt_configuration
 
-echo -e "\nInstallation & Configuration Complete!"
-echo "You can run this script later with '--reconfigure' to update your settings."
+echo -e "\n${GREEN}╔════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}✔ Installation & Configuration Complete!${NC}"
+echo -e "${GREEN}You can run this script later with '--reconfigure' to update your settings.${NC}"
+echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
