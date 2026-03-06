@@ -73,6 +73,7 @@ irm https://raw.githubusercontent.com/Adarsh-CodesOP/Klein/main/install.ps1 | ie
 ```bash
 curl -sSL https://raw.githubusercontent.com/Adarsh-CodesOP/Klein/main/install.sh | bash
 ```
+*Note: The native Linux version is still under development and will be available shortly. For now, use WSL or Git Bash on Windows.*
 
 **Reconfiguring:**
 To adjust your workspace or shell after installation, run:
