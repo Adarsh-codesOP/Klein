@@ -16,8 +16,8 @@ version: "3"
 #   task test:install:alpine → test install.sh in an Alpine container
 #   task test:install:all    → run all install.sh Docker tests in parallel
 #
-# Override the test repo (must have GitHub Releases with the new asset naming):
-#   task test:install:ubuntu TEST_REPO=tobiashochguertel/Klein
+# TEST_REPO is auto-detected (see vars section). Override explicitly if needed:
+#   task test:install:ubuntu TEST_REPO=owner/repo
 # ─────────────────────────────────────────────────────────────────────────────
 
 vars:
@@ -25,10 +25,37 @@ vars:
     sh: rustc -vV 2>/dev/null | awk '/host:/{print $2}'
   CARGO_FLAGS: ""
   DEBUG: '{{.DEBUG | default "false"}}'
-  # Repo used for Docker install tests. Defaults to our fork which has releases
-  # with the new asset naming (klein-<version>-<triple>.tar.gz).
-  # Change to Adarsh-codesOP/Klein once the PR is merged and a release exists.
-  TEST_REPO: '{{.TEST_REPO | default "tobiashochguertel/Klein"}}'
+  # TEST_REPO: auto-detected via the following priority chain:
+  #   1. CLI override:        task test:install:ubuntu TEST_REPO=owner/repo
+  #   2. $GITHUB_REPOSITORY:  set automatically by GitHub Actions on every run
+  #   3. git remote origin:   parsed from the clone's remote URL (works in forks)
+  #   4. Fallback:            tobiashochguertel/Klein (fork with published releases)
+  #
+  # The repo must have GitHub Releases using the new asset naming:
+  #   klein-<version>-<rust-triple>.(tar.gz|zip)
+  TEST_REPO:
+    sh: |
+      # ── 1. GitHub Actions CI ──────────────────────────────────────────────
+      if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+        printf '%s' "${GITHUB_REPOSITORY}"
+        exit 0
+      fi
+      # ── 2. Git remote of this clone ───────────────────────────────────────
+      _remote=$(git remote get-url origin 2>/dev/null || true)
+      if [ -n "${_remote}" ]; then
+        # Strip everything up to github.com/ or github.com:, then strip .git
+        # Works with both HTTPS and SSH remotes, and both BSD and GNU sed.
+        _parsed=$(printf '%s' "${_remote}" \
+          | sed 's|.*github\.com[:/]||' \
+          | sed 's|\.git$||')
+        # Accept only if result looks like exactly owner/repo (one slash)
+        case "${_parsed}" in
+          */*) _slashes=$(printf '%s' "${_parsed}" | tr -cd '/' | wc -c | tr -d ' ')
+               [ "${_slashes}" -eq 1 ] && { printf '%s' "${_parsed}"; exit 0; } ;;
+        esac
+      fi
+      # ── 3. Fallback ───────────────────────────────────────────────────────
+      printf '%s' "tobiashochguertel/Klein"
 
 tasks:
   # ── Default ────────────────────────────────────────────────────────────────
