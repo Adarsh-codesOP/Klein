@@ -1,13 +1,13 @@
-use ratatui::Frame;
 use crate::app::App;
+use ratatui::Frame;
 
-pub mod sidebar;
 pub mod editor;
-pub mod terminal;
-pub mod status_bar;
 pub mod help;
 pub mod layout;
+pub mod sidebar;
+pub mod status_bar;
 pub mod tabs;
+pub mod terminal;
 
 pub fn render(f: &mut Frame, app: &App) {
     let chunks = layout::get_main_layout(f.size(), app.show_terminal);
@@ -65,9 +65,11 @@ pub fn render(f: &mut Frame, app: &App) {
             .borders(ratatui::widgets::Borders::ALL)
             .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Yellow))
             .style(ratatui::style::Style::default().bg(ratatui::style::Color::Reset));
-        let paragraph = ratatui::widgets::Paragraph::new("File has unsaved changes!\nSave (y), Discard (n), Cancel (c)")
-            .block(block)
-            .alignment(ratatui::layout::Alignment::Center);
+        let paragraph = ratatui::widgets::Paragraph::new(
+            "File has unsaved changes!\nSave (y), Discard (n), Cancel (c)",
+        )
+        .block(block)
+        .alignment(ratatui::layout::Alignment::Center);
         f.render_widget(paragraph, area);
     }
 }

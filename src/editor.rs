@@ -1,10 +1,10 @@
+use anyhow::Result;
 use ropey::Rope;
+use std::fs;
+use std::path::PathBuf;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::ThemeSet;
 use syntect::parsing::SyntaxSet;
-use std::path::PathBuf;
-use std::fs;
-use anyhow::Result;
 
 pub struct Editor {
     pub buffer: Rope,
@@ -114,7 +114,11 @@ impl Editor {
         lines.to_string().len() + 2
     }
 
-    pub fn get_highlighted_lines(&self, _width: usize, height: usize) -> Vec<ratatui::text::Line<'_>> {
+    pub fn get_highlighted_lines(
+        &self,
+        _width: usize,
+        height: usize,
+    ) -> Vec<ratatui::text::Line<'_>> {
         let syntax = if let Some(path) = &self.path {
             self.syntax_set
                 .find_syntax_for_file(path)
@@ -132,32 +136,36 @@ impl Editor {
 
         for i in start_line..end_line {
             let line = self.buffer.line(i).to_string();
-            let highlights = h.highlight_line(&line, &self.syntax_set).unwrap_or_default();
-            
+            let highlights = h
+                .highlight_line(&line, &self.syntax_set)
+                .unwrap_or_default();
+
             let mut current_char_in_line = 0;
             let spans: Vec<ratatui::text::Span> = highlights
                 .into_iter()
                 .map(|(style, text)| {
-                    let mut span_style = ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(
-                        style.foreground.r,
-                        style.foreground.g,
-                        style.foreground.b,
-                    ));
+                    let mut span_style =
+                        ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(
+                            style.foreground.r,
+                            style.foreground.g,
+                            style.foreground.b,
+                        ));
 
                     // Check for selection
                     if let Some((start_y, start_x)) = self.selection_start {
-                        let (sy, sx, ey, ex) = if (start_y, start_x) < (self.cursor_y, self.cursor_x) {
-                            (start_y, start_x, self.cursor_y, self.cursor_x)
-                        } else {
-                            (self.cursor_y, self.cursor_x, start_y, start_x)
-                        };
+                        let (sy, sx, ey, ex) =
+                            if (start_y, start_x) < (self.cursor_y, self.cursor_x) {
+                                (start_y, start_x, self.cursor_y, self.cursor_x)
+                            } else {
+                                (self.cursor_y, self.cursor_x, start_y, start_x)
+                            };
 
                         let text_len = text.chars().count();
                         let span_range_start = current_char_in_line;
                         let span_range_end = current_char_in_line + text_len;
 
                         let line_idx = i;
-                        
+
                         let is_selected = if line_idx > sy && line_idx < ey {
                             true
                         } else if line_idx == sy && line_idx == ey {
@@ -171,7 +179,9 @@ impl Editor {
                         };
 
                         if is_selected {
-                            span_style = span_style.bg(ratatui::style::Color::Yellow).fg(ratatui::style::Color::Black);
+                            span_style = span_style
+                                .bg(ratatui::style::Color::Yellow)
+                                .fg(ratatui::style::Color::Black);
                         }
                         current_char_in_line += text_len;
                     }
@@ -179,7 +189,7 @@ impl Editor {
                     ratatui::text::Span::styled(text.to_string(), span_style)
                 })
                 .collect();
-            
+
             lines.push(ratatui::text::Line::from(spans));
         }
 
@@ -272,11 +282,11 @@ impl Editor {
                 if self.selection_start.is_some() {
                     self.delete_selection();
                 }
-                
+
                 let line_idx = self.buffer.line_to_char(self.cursor_y);
                 let char_idx = line_idx + self.cursor_x;
                 self.buffer.insert(char_idx, &text);
-                
+
                 // Update cursor after paste
                 let text_rope = Rope::from_str(&text);
                 if text_rope.len_lines() > 1 {
@@ -287,7 +297,7 @@ impl Editor {
                 }
                 self.is_dirty = true;
                 self.clamp_cursor_x();
-                
+
                 // Ensure the cursor (at the end of the paste) is visible.
                 // This naturally pushes the view down for large pastes, showing the text.
                 self.ensure_cursor_visible(height);
@@ -296,8 +306,10 @@ impl Editor {
     }
 
     pub fn ensure_cursor_visible(&mut self, height: usize) {
-        if height == 0 { return; }
-        
+        if height == 0 {
+            return;
+        }
+
         if self.cursor_y < self.scroll_y {
             self.scroll_y = self.cursor_y;
         } else if self.cursor_y >= self.scroll_y + height {
@@ -311,7 +323,7 @@ impl Editor {
         }
         let line = self.buffer.line(line_y);
         let line_len = line.len_chars();
-        
+
         let line_str = line.to_string();
         if line_str.ends_with('\n') || line_str.ends_with('\r') {
             line_len.saturating_sub(1)
@@ -335,18 +347,18 @@ mod tests {
     #[test]
     fn test_max_cursor_x() {
         let mut editor = Editor::new();
-        
+
         // Empty buffer
         assert_eq!(editor.get_max_cursor_x(0), 0);
-        
+
         // Line with newline
         editor.buffer = Rope::from_str("abc\n");
         assert_eq!(editor.get_max_cursor_x(0), 3); // Position after 'c', but before '\n'
-        
+
         // Line without newline (last line)
         editor.buffer = Rope::from_str("abc");
         assert_eq!(editor.get_max_cursor_x(0), 3); // Position after 'c'
-        
+
         // Multiple lines
         editor.buffer = Rope::from_str("abc\ndef");
         assert_eq!(editor.get_max_cursor_x(0), 3); // After 'c'
@@ -357,7 +369,7 @@ mod tests {
     fn test_move_cursor_right() {
         let mut editor = Editor::new();
         editor.buffer = Rope::from_str("abc");
-        
+
         editor.move_cursor_right(); // -> 'a'
         assert_eq!(editor.cursor_x, 1);
         editor.move_cursor_right(); // -> 'b'
@@ -372,11 +384,11 @@ mod tests {
     fn test_move_cursor_left_wrap() {
         let mut editor = Editor::new();
         editor.buffer = Rope::from_str("abc\ndef");
-        
+
         editor.cursor_y = 1;
         editor.cursor_x = 0;
         editor.move_cursor_left();
-        
+
         assert_eq!(editor.cursor_y, 0);
         assert_eq!(editor.cursor_x, 3); // Should wrap to position after 'c'
     }

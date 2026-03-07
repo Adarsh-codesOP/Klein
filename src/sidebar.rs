@@ -1,6 +1,6 @@
+use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
-use anyhow::Result;
 
 pub struct FileNode {
     pub path: PathBuf,
@@ -81,6 +81,7 @@ impl Sidebar {
         self.flat_list = list;
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn flatten(&self, node: &FileNode, depth: usize, list: &mut Vec<(PathBuf, usize, bool)>) {
         // Skip root itself if it's the current project dir? No, let's show it or its children.
         // Usually we show children of root.

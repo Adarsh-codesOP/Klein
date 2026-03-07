@@ -33,7 +33,6 @@ pub const HELP_TEXT: &str = r#"
 [Ctrl + H] Toggle this help overlay
 "#;
 
-
 pub mod colors {
     use ratatui::style::Color;
     pub const EXPLORER_FOCUS: Color = Color::Green;
@@ -42,11 +41,11 @@ pub mod colors {
     pub const HELP_BORDER: Color = Color::Cyan;
     pub const STATUS_BG: Color = Color::DarkGray;
     pub const STATUS_FG: Color = Color::Gray;
+    #[allow(dead_code)]
     pub const SEARCH_BORDER: Color = Color::Cyan;
 }
 
 use serde::Deserialize;
-use std::path::PathBuf;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct AppConfig {
@@ -59,7 +58,7 @@ impl AppConfig {
         if let Some(proj_dirs) = directories::ProjectDirs::from("", "", "Klein") {
             let config_dir = proj_dirs.config_dir();
             let config_path = config_dir.join("config.toml");
-            
+
             if config_path.exists() {
                 if let Ok(contents) = std::fs::read_to_string(&config_path) {
                     if let Ok(config) = toml::from_str::<AppConfig>(&contents) {

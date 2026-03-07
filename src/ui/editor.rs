@@ -1,10 +1,10 @@
+use crate::app::{App, Panel};
+use crate::config;
 use ratatui::{
     layout::Rect,
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
-use crate::app::{App, Panel};
-use crate::config;
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let is_preview = matches!(app.active_panel, Panel::Sidebar) && app.preview.is_some();
@@ -13,7 +13,9 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let title = if is_preview {
         format!(
             " [PREVIEW] {} ",
-            editor.path.as_ref()
+            editor
+                .path
+                .as_ref()
                 .and_then(|p: &std::path::PathBuf| p.file_name())
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| "No file".to_string())
@@ -22,7 +24,9 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         format!(
             " {} - {} ",
             config::APP_TITLE,
-            editor.path.as_ref()
+            editor
+                .path
+                .as_ref()
                 .and_then(|p: &std::path::PathBuf| p.file_name())
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| "No file".to_string())
@@ -77,10 +81,8 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(gutter_widget, gutter_area);
 
     // Render Editor Content
-    let highlighted_lines = editor.get_highlighted_lines(
-        content_area.width as usize,
-        content_area.height as usize,
-    );
+    let highlighted_lines =
+        editor.get_highlighted_lines(content_area.width as usize, content_area.height as usize);
 
     let editor_widget = Paragraph::new(highlighted_lines);
     f.render_widget(editor_widget, content_area);

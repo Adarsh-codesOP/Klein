@@ -1,0 +1,149 @@
+version: "3"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Klein — Local CI simulation Taskfile
+#
+# Mirrors the steps in .github/workflows/ci.yml so every CI check can be
+# validated locally before pushing.
+#
+# Usage:
+#   task            → show available tasks
+#   task ci:all     → run the full CI suite (fmt + build + clippy)
+#   task ci:fix     → auto-fix formatting and clippy issues then re-verify
+# ─────────────────────────────────────────────────────────────────────────────
+
+vars:
+  TARGET:
+    sh: rustc -vV 2>/dev/null | awk '/host:/{print $2}'
+  CARGO_FLAGS: ""
+  DEBUG: '{{.DEBUG | default "false"}}'
+
+tasks:
+  # ── Default ────────────────────────────────────────────────────────────────
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  # ── CI suite ───────────────────────────────────────────────────────────────
+  ci:all:
+    desc: Run the complete local CI suite (fmt-check → build → clippy)
+    summary: |
+      Mirrors .github/workflows/ci.yml end-to-end.
+
+      Runs in order:
+        1. cargo fmt --check
+        2. cargo build
+        3. cargo clippy -- -D warnings
+
+      All steps must pass for the suite to succeed.
+
+      Examples:
+        task ci:all
+        task ci:all DEBUG=true
+    cmds:
+      - task: ci:fmt-check
+      - task: ci:build
+      - task: ci:clippy
+
+  # ── Individual CI steps ────────────────────────────────────────────────────
+  ci:fmt-check:
+    desc: "CI step 1 — check source formatting (cargo fmt --check)"
+    summary: |
+      Equivalent to the 'Check formatting' step in ci.yml.
+      Fails if any file differs from rustfmt output.
+
+      Fix automatically with: task ci:fmt-fix
+    cmds:
+      - |
+        {{if eq .DEBUG "true"}}echo "▶ cargo fmt --check"{{end}}
+        cargo fmt --check
+
+  ci:build:
+    desc: "CI step 2 — compile the project (cargo build)"
+    summary: |
+      Equivalent to the 'Build' step in ci.yml.
+      Uses the host target (no cross-compilation locally).
+    vars:
+      CARGO_FLAGS: '{{.CARGO_FLAGS | default ""}}'
+    cmds:
+      - |
+        {{if eq .DEBUG "true"}}echo "▶ cargo build {{.CARGO_FLAGS}}"{{end}}
+        cargo build {{.CARGO_FLAGS}}
+
+  ci:clippy:
+    desc: "CI step 3 — lint with clippy, deny warnings (cargo clippy -- -D warnings)"
+    summary: |
+      Equivalent to the 'Clippy' step in ci.yml.
+      Treats every clippy warning as a hard error (-D warnings).
+
+      Fix automatically with: task ci:clippy-fix
+    cmds:
+      - |
+        {{if eq .DEBUG "true"}}echo "▶ cargo clippy -- -D warnings"{{end}}
+        cargo clippy -- -D warnings
+
+  ci:clippy-permissive:
+    desc: "Run clippy without -D warnings (shows warnings without failing)"
+    cmds:
+      - cargo clippy 2>&1
+
+  # ── Fix helpers ────────────────────────────────────────────────────────────
+  ci:fix:
+    desc: Auto-fix formatting and clippy issues, then verify
+    summary: |
+      Runs all auto-fixers in order:
+        1. cargo fmt        (auto-formats all source files)
+        2. cargo clippy --fix --allow-dirty  (applies machine-fixable clippy suggestions)
+        3. task ci:all      (verifies everything passes)
+    cmds:
+      - task: ci:fmt-fix
+      - task: ci:clippy-fix
+      - task: ci:all
+
+  ci:fmt-fix:
+    desc: Auto-format source with rustfmt (cargo fmt)
+    cmds:
+      - |
+        {{if eq .DEBUG "true"}}echo "▶ cargo fmt"{{end}}
+        cargo fmt
+      - echo "✓ Formatting applied"
+
+  ci:clippy-fix:
+    desc: Apply machine-fixable clippy suggestions (cargo clippy --fix)
+    cmds:
+      - |
+        {{if eq .DEBUG "true"}}echo "▶ cargo clippy --fix --allow-dirty"{{end}}
+        cargo clippy --fix --allow-dirty -- -D warnings 2>&1 || true
+      - echo "✓ Clippy auto-fixes applied (remaining issues need manual fixing)"
+
+  # ── Utility ────────────────────────────────────────────────────────────────
+  ci:status:
+    desc: Quick summary of which CI checks pass/fail (non-blocking)
+    cmds:
+      - |
+        echo "═══════════════════════════════════════"
+        echo "  Klein CI — local status check"
+        echo "═══════════════════════════════════════"
+
+        run_check() {
+          local label="$1"; shift
+          if "$@" >/dev/null 2>&1; then
+            echo "  ✅  $label"
+          else
+            echo "  ❌  $label"
+          fi
+        }
+
+        run_check "cargo fmt --check" cargo fmt --check
+        run_check "cargo build"       cargo build
+        run_check "cargo clippy -D warnings" cargo clippy -- -D warnings
+        echo "═══════════════════════════════════════"
+
+  build:release:
+    desc: Build an optimised release binary for the host platform
+    vars:
+      TARGET: '{{.TARGET}}'
+    cmds:
+      - cargo build --release
+      - echo "✓ Binary at target/release/klein"

@@ -1,9 +1,9 @@
+use crate::editor::Editor;
+use crate::sidebar::Sidebar;
+use crate::tabs::TabState;
+use crate::terminal::Terminal;
 use std::cell::Cell;
 use std::path::PathBuf;
-use crate::sidebar::Sidebar;
-use crate::editor::Editor;
-use crate::terminal::Terminal;
-use crate::tabs::TabState;
 
 pub enum Panel {
     Sidebar,
@@ -33,19 +33,19 @@ pub struct App {
 impl App {
     pub fn new() -> App {
         let config = crate::config::AppConfig::load();
-        
+
         // Try to respect workspace from config first, fallback to current_dir
         let current_dir = if let Some(ws) = config.default_workspace {
             let path = std::path::PathBuf::from(ws);
             if path.exists() {
-               path
+                path
             } else {
-               std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
             }
         } else {
             std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
         };
-        
+
         App {
             active_panel: Panel::Editor,
             show_sidebar: true,
@@ -97,6 +97,7 @@ impl App {
     }
 
     /// Open a file in the current tab (replaces current editor state)
+    #[allow(dead_code)]
     pub fn open_in_current_tab(&mut self, path: PathBuf) {
         let _ = self.tabs[self.active_tab].editor.open(path);
     }

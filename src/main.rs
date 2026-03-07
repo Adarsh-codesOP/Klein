@@ -1,21 +1,21 @@
-use std::io;
+use anyhow::Result;
+use clap::Parser;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-use anyhow::Result;
-use clap::Parser;
+use std::io;
 
 mod app;
-mod sidebar;
+mod config;
 mod editor;
+mod events;
+mod sidebar;
+mod tabs;
 mod terminal;
 mod ui;
-mod events;
-mod config;
-mod tabs;
 
 use crate::app::App;
 
@@ -23,7 +23,9 @@ use crate::app::App;
 #[command(name = "klein")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "A professional terminal-based text editor with IDE-like features")]
-#[command(long_about = "Klein is a lightweight, terminal-based text editor built in Rust. It provides an IDE-like interface using ratatui for the user interface and portable-pty for terminal integration, giving developers a keyboard-centric coding environment directly in the command line.")]
+#[command(
+    long_about = "Klein is a lightweight, terminal-based text editor built in Rust. It provides an IDE-like interface using ratatui for the user interface and portable-pty for terminal integration, giving developers a keyboard-centric coding environment directly in the command line."
+)]
 struct Cli;
 
 #[tokio::main]

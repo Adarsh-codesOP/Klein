@@ -1,24 +1,24 @@
+use crate::app::{App, Panel};
+use crate::config;
 use ratatui::{
     layout::Rect,
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
-use crate::app::{App, Panel};
-use crate::config;
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let output_raw = app.terminal.output.lock().unwrap();
     let output = strip_ansi(&output_raw);
-    
+
     let lines: Vec<&str> = output.lines().collect();
     let height = area.height.saturating_sub(2) as usize;
-    
+
     let max_scroll = lines.len().saturating_sub(height);
     let scroll = app.terminal_scroll.min(max_scroll);
 
     let start = lines.len().saturating_sub(height).saturating_sub(scroll);
     let end = lines.len().saturating_sub(scroll);
-    
+
     let terminal_lines: Vec<ratatui::text::Line<'_>> = lines[start..end]
         .iter()
         .map(|l| ratatui::text::Line::from(l.to_string()))
@@ -32,7 +32,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         } else {
             ratatui::style::Style::default()
         });
-    
+
     let terminal_widget = Paragraph::new(terminal_lines).block(terminal_block);
     f.render_widget(terminal_widget, area);
 
@@ -55,9 +55,12 @@ pub fn strip_ansi(s: &str) -> String {
         if chars[i] == '\x1b' {
             let _start = i;
             i += 1;
-            if i >= chars.len() { break; } 
+            if i >= chars.len() {
+                break;
+            }
             match chars[i] {
-                '[' => { // CSI
+                '[' => {
+                    // CSI
                     i += 1;
                     let mut found = false;
                     while i < chars.len() {
@@ -68,9 +71,12 @@ pub fn strip_ansi(s: &str) -> String {
                             break;
                         }
                     }
-                    if !found { break; } // Truncate partial
+                    if !found {
+                        break;
+                    } // Truncate partial
                 }
-                ']' => { // OSC (Window title etc)
+                ']' => {
+                    // OSC (Window title etc)
                     i += 1;
                     let mut found = false;
                     while i < chars.len() {
@@ -79,17 +85,22 @@ pub fn strip_ansi(s: &str) -> String {
                             found = true;
                             break;
                         }
-                        if chars[i] == '\x1b' && i + 1 < chars.len() && chars[i+1] == '\\' {
+                        if chars[i] == '\x1b' && i + 1 < chars.len() && chars[i + 1] == '\\' {
                             found = true;
                             i += 2;
                             break;
                         }
                         i += 1;
                     }
-                    if !found { break; }
+                    if !found {
+                        break;
+                    }
                 }
-                '(' | ')' | '*' | '+' | '-' | '.' | '/' => { // Charset
-                    if i + 1 >= chars.len() { break; }
+                '(' | ')' | '*' | '+' | '-' | '.' | '/' => {
+                    // Charset
+                    if i + 1 >= chars.len() {
+                        break;
+                    }
                     i += 2;
                 }
                 _ => {
@@ -101,7 +112,10 @@ pub fn strip_ansi(s: &str) -> String {
             i += 1;
         } else {
             let c = chars[i];
-            if c == '\r' { i += 1; continue; } // Skip \r for clean display in TUI
+            if c == '\r' {
+                i += 1;
+                continue;
+            } // Skip \r for clean display in TUI
             if (c as u32) >= 32 || c == '\n' || c == '\t' {
                 result.push(c);
             }

@@ -1,6 +1,8 @@
-use std::io;
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind};
 use crate::app::{App, Panel};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
+};
+use std::io;
 
 pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
     match event {
@@ -296,15 +298,21 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
 
         match key.code {
             KeyCode::Down => {
-                if is_selecting { app.editor_mut().toggle_selection(); }
-                else { app.editor_mut().clear_selection(); }
+                if is_selecting {
+                    app.editor_mut().toggle_selection();
+                } else {
+                    app.editor_mut().clear_selection();
+                }
                 let h = app.last_editor_height.get();
                 app.editor_mut().move_cursor_down(h);
                 return Ok(());
             }
             KeyCode::Up => {
-                if is_selecting { app.editor_mut().toggle_selection(); }
-                else { app.editor_mut().clear_selection(); }
+                if is_selecting {
+                    app.editor_mut().toggle_selection();
+                } else {
+                    app.editor_mut().clear_selection();
+                }
                 app.editor_mut().move_cursor_up();
                 return Ok(());
             }
