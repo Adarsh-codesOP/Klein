@@ -96,6 +96,21 @@ If you prefer to build it manually from source:
    cargo install --path .
    ```
 
+### CLI Usage
+
+Klein supports standard command-line options:
+
+```bash
+# Show help information
+klein --help
+
+# Show version information
+klein --version
+
+# Start the editor (normal usage)
+klein
+```
+
 ---
 
 ## ⌨️ Keybindings & Shortcuts

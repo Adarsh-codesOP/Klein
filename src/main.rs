@@ -6,6 +6,7 @@ use crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use anyhow::Result;
+use clap::Parser;
 
 mod app;
 mod sidebar;
@@ -18,8 +19,17 @@ mod tabs;
 
 use crate::app::App;
 
+#[derive(Parser)]
+#[command(name = "klein")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(about = "A professional terminal-based text editor with IDE-like features")]
+#[command(long_about = "Klein is a lightweight, terminal-based text editor built in Rust. It provides an IDE-like interface using ratatui for the user interface and portable-pty for terminal integration, giving developers a keyboard-centric coding environment directly in the command line.")]
+struct Cli;
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    let _cli = Cli::parse();
+
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
