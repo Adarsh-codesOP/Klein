@@ -37,15 +37,15 @@ jobs:
           - os: "Alpine 3.19"
             image: "alpine:3.19"
             pkg_install: "apk add --quiet bash curl ca-certificates git"
-            shell_cmd: "sh"
     container:
       image: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install prerequisites
+        # Use sh (always available) — bash may not exist yet on Alpine
+        shell: sh -e {0}
         run: ${{ matrix.pkg_install }}
-        shell: ${{ matrix.shell_cmd || 'bash' }} -e {0}
 
       - name: Run install.sh --yes
         env:

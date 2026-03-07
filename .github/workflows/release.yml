@@ -77,7 +77,7 @@ jobs:
           fi
 
           # ── Collect commits since the last tag ─────────────────────────────
-          COMMITS=$(git log --format='%s%n%b' ${COMMIT_RANGE} 2>/dev/null || true)
+          COMMITS=$(git log --format='%s%n%b' "${COMMIT_RANGE}" 2>/dev/null || true)
 
           if [[ -z "$(echo "${COMMITS}" | tr -d '[:space:]')" ]]; then
             echo "✓ No commits since last tag — nothing to release"
@@ -345,17 +345,19 @@ jobs:
       # ── Summary ───────────────────────────────────────────────────────────
       - name: Release summary
         run: |
-          echo "## Release ${VERSION} created 🎉" >> "${GITHUB_STEP_SUMMARY}"
-          echo "" >> "${GITHUB_STEP_SUMMARY}"
-          echo "**Bump type:** ${BUMP_TYPE}" >> "${GITHUB_STEP_SUMMARY}"
-          echo "" >> "${GITHUB_STEP_SUMMARY}"
-          echo "### Artifacts" >> "${GITHUB_STEP_SUMMARY}"
-          for f in dist/*; do
-            SIZE=$(du -sh "$f" | cut -f1)
-            echo "- \`$(basename $f)\` (${SIZE})" >> "${GITHUB_STEP_SUMMARY}"
-          done
-          echo "" >> "${GITHUB_STEP_SUMMARY}"
-          echo "### Install via mise" >> "${GITHUB_STEP_SUMMARY}"
-          echo '```' >> "${GITHUB_STEP_SUMMARY}"
-          echo "mise use -g github:\${{ github.repository }}" >> "${GITHUB_STEP_SUMMARY}"
-          echo '```' >> "${GITHUB_STEP_SUMMARY}"
+          {
+            echo "## Release ${VERSION} created 🎉"
+            echo ""
+            echo "**Bump type:** ${BUMP_TYPE}"
+            echo ""
+            echo "### Artifacts"
+            for f in dist/*; do
+              SIZE=$(du -sh "$f" | cut -f1)
+              echo "- \`$(basename "$f")\` (${SIZE})"
+            done
+            echo ""
+            echo "### Install via mise"
+            echo '```'
+            echo "mise use -g github:${{ github.repository }}"
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
