@@ -59,12 +59,18 @@ jobs:
         run: |
           strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
 
+      - name: Rename binary to asset name
+        shell: bash
+        run: |
+          cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
+
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         with:
-          files: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
-          name_suffix: ${{ matrix.asset_name }}
+          files: ${{ matrix.asset_name }}
           tag_name: ${{ github.event.release.tag_name || inputs.version }}
+          overwrite: true
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -76,6 +82,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: main
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract and Update Version
@@ -97,7 +105,7 @@ jobs:
           git config --local user.name "GitHub Action"
           git add Cargo.toml
           git commit -m "chore: bump version to ${{ github.event.release.tag_name }}" || true
-          git push origin main
+          git push
 
   update-install-scripts:
     name: Update Install Scripts
