@@ -1,19 +1,51 @@
 param (
-    [switch]$Reconfigure
+    [switch]$Reconfigure,
+    [switch]$Yes   # Non-interactive: accept all defaults (useful in CI)
 )
 
 $ErrorActionPreference = "Stop"
-$AppDir = "$env:LOCALAPPDATA\Klein"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Klein — Windows installer (PowerShell)
+#
+# Usage:
+#   irm https://raw.githubusercontent.com/<owner>/Klein/main/install.ps1 | iex
+#   .\install.ps1              # interactive
+#   .\install.ps1 -Yes         # non-interactive (CI-friendly)
+#   .\install.ps1 -Reconfigure # re-run configuration only
+#
+# Environment variable override:
+#   $env:REPO = "owner/repo"   # defaults to upstream or auto-detected from git remote
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Repository detection ─────────────────────────────────────────────────────
+function Get-Repo {
+    $scriptDir = Split-Path -Parent $MyInvocation.ScriptName
+    if ($scriptDir -and (Test-Path "$scriptDir\.git" -ErrorAction SilentlyContinue)) {
+        try {
+            $remoteUrl = git -C $scriptDir remote get-url origin 2>$null
+            if ($remoteUrl -match 'github\.com[:/]([^/]+/[^/]+?)(\.git)?$') {
+                return $Matches[1]
+            }
+        } catch {}
+    }
+    return "Adarsh-codesOP/Klein"
+}
+$Repo = if ($env:REPO) { $env:REPO } else { Get-Repo }
+$RepoOwner = $Repo.Split("/")[0]
+$RepoName  = $Repo.Split("/")[1]
+
+# ── Paths ────────────────────────────────────────────────────────────────────
+$AppDir     = "$env:LOCALAPPDATA\Klein"
+$BinDir     = $AppDir
 $ConfigPath = "$AppDir\config.toml"
+$BinName    = "klein.exe"
+$BinPath    = "$BinDir\$BinName"
 
-# color constants
-$Cyan = "Cyan"
-$White = "White"
-$Green = "Green"
-$Yellow = "Yellow"
-$DarkGray = "DarkGray"
+# ── Colours ──────────────────────────────────────────────────────────────────
+$Cyan = "Cyan"; $White = "White"; $Green = "Green"
+$Yellow = "Yellow"; $DarkGray = "DarkGray"; $Red = "Red"
 
-# box banner
 Write-Host "" -ForegroundColor $Cyan
 Write-Host "oooo   oooo ooooo       ooooooooooo ooooo oooo   oooo " -ForegroundColor $Cyan
 Write-Host " 888  o88    888         888    88   888   8888o  88  " -ForegroundColor $Cyan
@@ -23,109 +55,184 @@ Write-Host "o888o o888o o888ooooo88 o888ooo8888 o888o o88o    88  " -ForegroundC
 Write-Host "                                                      " -ForegroundColor $Cyan
 Write-Host "A professional terminal text editor with IDE-like features.`n" -ForegroundColor $White
 
-# 1. Ensure Directory Exists
-if (-not (Test-Path -Path $AppDir)) {
-    New-Item -ItemType Directory -Path $AppDir | Out-Null
-    Write-Host "Created application directory at $AppDir"
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+function Get-LatestVersion {
+    $apiUrl = "https://api.github.com/repos/$Repo/releases/latest"
+    try {
+        $resp = Invoke-RestMethod -Uri $apiUrl -ErrorAction Stop
+        return $resp.tag_name
+    } catch {
+        Write-Host "Warning: could not fetch release info from GitHub." -ForegroundColor $Yellow
+        return $null
+    }
 }
 
-# 2. Configuration Step
-function Prompt-Configuration {
+function Get-TargetTriple {
+    # Determine Rust target triple for the current Windows architecture.
+    # Asset naming: klein-<version>-<triple>.zip
+    $arch = $env:PROCESSOR_ARCHITECTURE
+    switch ($arch) {
+        "AMD64"  { return "x86_64-pc-windows-msvc" }
+        "ARM64"  { return "aarch64-pc-windows-msvc" }
+        default  { return "x86_64-pc-windows-msvc" }  # safe default
+    }
+}
+
+# ── Installation methods ──────────────────────────────────────────────────────
+
+function Install-ViaMise {
+    if (-not (Get-Command mise -ErrorAction SilentlyContinue)) { return $false }
+    Write-Host "Trying mise (github backend)…" -ForegroundColor $Yellow
+    try {
+        mise use -g "github:$Repo"
+        Write-Host "✔ Installed via mise!" -ForegroundColor $Green
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Install-ViaGitHubRelease {
+    $version = Get-LatestVersion
+    if (-not $version) {
+        Write-Host "No GitHub release found, skipping." -ForegroundColor $Yellow
+        return $false
+    }
+
+    $triple  = Get-TargetTriple
+    $archive = "klein-$version-$triple.zip"
+    $url     = "https://github.com/$Repo/releases/download/$version/$archive"
+
+    Write-Host "Downloading $archive ($version)…" -ForegroundColor $Yellow
+    Write-Host "URL: $url" -ForegroundColor $DarkGray
+
+    $tmpDir = Join-Path $env:TEMP "klein-install-$([System.Guid]::NewGuid().ToString('N').Substring(0,8))"
+    New-Item -ItemType Directory -Path $tmpDir | Out-Null
+
+    try {
+        Invoke-WebRequest -Uri $url -OutFile "$tmpDir\$archive" -ErrorAction Stop
+
+        Expand-Archive -Path "$tmpDir\$archive" -DestinationPath $tmpDir -Force
+
+        $extracted = Get-ChildItem -Path $tmpDir -Filter "klein.exe" -Recurse | Select-Object -First 1
+        if ($extracted) {
+            New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
+            Copy-Item -Path $extracted.FullName -Destination $BinPath -Force
+            Write-Host "✔ Installed $version to $BinPath" -ForegroundColor $Green
+            return $true
+        }
+
+        # Fallback: legacy plain-exe naming (klein-windows-x86_64.exe)
+        $legacyUrl = "https://github.com/$Repo/releases/download/$version/klein-windows-x86_64.exe"
+        Write-Host "Archive binary not found, trying legacy .exe…" -ForegroundColor $Yellow
+        Invoke-WebRequest -Uri $legacyUrl -OutFile $BinPath -ErrorAction Stop
+        Write-Host "✔ Installed $version (legacy) to $BinPath" -ForegroundColor $Green
+        return $true
+
+    } catch {
+        Write-Host "Download failed: $_" -ForegroundColor $Yellow
+        return $false
+    } finally {
+        Remove-Item -Path $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Install-FromSource {
+    if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
+        Write-Host "Rust is not installed. Install from https://rustup.rs/" -ForegroundColor $Red
+        return $false
+    }
+    Write-Host "Building from source (this may take a few minutes)…" -ForegroundColor $Yellow
+    try {
+        cargo install klein
+        return $true
+    } catch {
+        try {
+            cargo install --path .
+            return $true
+        } catch {
+            return $false
+        }
+    }
+}
+
+# ── Configuration ─────────────────────────────────────────────────────────────
+
+function Invoke-Configuration {
+    New-Item -ItemType Directory -Path $AppDir -Force | Out-Null
     Write-Host "`n╭────────────┤ Configuration ├────────────╮" -ForegroundColor $Cyan
-    
-    # Check for Git Bash
-    $gitBashExists = Test-Path "C:\Program Files\Git\bin\bash.exe"
-    $gitBashLocalExists = Test-Path "$env:LOCALAPPDATA\Programs\Git\bin\bash.exe"
-    
-    if (-not $gitBashExists -and -not $gitBashLocalExists) {
-        Write-Host "WARNING: Git Bash was not found in standard locations." -ForegroundColor Red
-        Write-Host "We highly recommend installing Git Bash for the best terminal experience in Klein." -ForegroundColor Yellow
-        Write-Host "You can download it from: https://gitforwindows.org/" -ForegroundColor Cyan
-        $installGit = Read-Host "Would you like to install Git Bash later? (y/n)"
-        if ($installGit -eq 'n') {
-            Write-Host "You can continue, but terminal features might be limited to PowerShell or CMD."
-        }
-    }
 
-    $workspace = Read-Host "Enter your default workspace/projects path (Leave blank for $env:USERPROFILE)"
-    if ([string]::IsNullOrWhiteSpace($workspace)) {
+    if ($Yes) {
         $workspace = $env:USERPROFILE
-    }
-
-    # Verify workspace exists or create it
-    if (-not (Test-Path -Path $workspace)) {
-        $createWs = Read-Host "Path '$workspace' does not exist. Create it? (y/N)"
-        if ($createWs -eq 'y') {
-            New-Item -ItemType Directory -Path $workspace | Out-Null
-        }
-        else {
-            Write-Host "Warning: Workspace path may be invalid." -ForegroundColor Yellow
-        }
-    }
-
-    if ($gitBashExists -or $gitBashLocalExists) {
-        $shell = "bash"
-    }
-    else {
         $shell = "auto"
+    } else {
+        $gitBashExists = (Test-Path "C:\Program Files\Git\bin\bash.exe") -or
+                         (Test-Path "$env:LOCALAPPDATA\Programs\Git\bin\bash.exe")
+        if (-not $gitBashExists) {
+            Write-Host "Git Bash not found — install from https://gitforwindows.org/ for best experience." -ForegroundColor $Yellow
+        }
+
+        $workspace = Read-Host "Default workspace path (blank = $env:USERPROFILE)"
+        if ([string]::IsNullOrWhiteSpace($workspace)) { $workspace = $env:USERPROFILE }
+
+        if (-not (Test-Path $workspace)) {
+            $create = Read-Host "Path '$workspace' does not exist. Create it? (y/N)"
+            if ($create -eq 'y') { New-Item -ItemType Directory -Path $workspace | Out-Null }
+        }
+        $shell = if ($gitBashExists) { "bash" } else { "auto" }
     }
 
-    $configContent = @"
+    @"
 # Klein TIDE Configuration
-default_workspace = `"$workspace`"
-shell = `"$shell`"
-"@
-
-    $configContent | Out-File -FilePath $ConfigPath -Encoding utf8
-    Write-Host "Configuration saved to $ConfigPath" -ForegroundColor Green
+default_workspace = "$workspace"
+shell = "$shell"
+"@ | Out-File -FilePath $ConfigPath -Encoding utf8
+    Write-Host "Configuration saved to $ConfigPath" -ForegroundColor $Green
 }
+
+# ── PATH setup ────────────────────────────────────────────────────────────────
+
+function Add-ToPath {
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    if ($userPath -notmatch [regex]::Escape($BinDir)) {
+        [Environment]::SetEnvironmentVariable("Path", "$userPath;$BinDir", "User")
+        Write-Host "Added $BinDir to User PATH." -ForegroundColor $Green
+        Write-Host "Restart your terminal to use 'klein' globally." -ForegroundColor $Yellow
+    }
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+Write-Host "Starting installation (repo: $Repo)…" -ForegroundColor $Yellow
+New-Item -ItemType Directory -Path $AppDir  -Force | Out-Null
+New-Item -ItemType Directory -Path $BinDir  -Force | Out-Null
 
 if ($Reconfigure) {
-    Prompt-Configuration
-    Write-Host "`n`n$((" "*20))" -ForegroundColor $Green
-    Write-Host "✔ Reconfiguration complete!" -ForegroundColor $Green
-    Write-Host "`n" -ForegroundColor $Green
-    exit
+    Invoke-Configuration
+    Write-Host "`n✔ Reconfiguration complete!" -ForegroundColor $Green
+    exit 0
 }
 
-# 3. Installation Step
 Write-Host "`n╭────────────┤ Installation ├────────────╮" -ForegroundColor $Cyan
 
-$exePath = "$AppDir\klein.exe"
-$downloadUrl = "https://github.com/Adarsh-codesOP/Klein/releases/download/v0.2.5/klein-windows-x86_64.exe"
+$installed = $false
 
-try {
-    Write-Host "Downloading pre-compiled binary from GitHub Releases..." -ForegroundColor $Yellow
-    Write-Host "URL: $downloadUrl" -ForegroundColor $DarkGray
-    Invoke-WebRequest -Uri $downloadUrl -OutFile "$exePath" -ErrorAction Stop
-    Write-Host "Successfully downloaded to $exePath" -ForegroundColor $Green
-    
-    # Add to User PATH if not present
-    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    if ($userPath -notmatch [regex]::Escape($AppDir)) {
-        $newPath = $userPath + ";" + $AppDir
-        [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-        Write-Host "Added $AppDir to your User PATH environment variable." -ForegroundColor $Green
-        Write-Host "You may need to restart your terminal to use the 'klein' command globally." -ForegroundColor $Yellow
-    }
-}
-catch {
-    Write-Host "Failed to download the executable from GitHub Releases." -ForegroundColor Red
-    Write-Host "Error: $_" -ForegroundColor Red
-    Write-Host "`nFallback: Installing from source using Rust..." -ForegroundColor Yellow
-    
-    if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
-        Write-Host "Rust is not installed. Please install Rust from https://rustup.rs/" -ForegroundColor Red
-        exit 1
-    }
-    
-    Write-Host "Building Klein from source...\n" -ForegroundColor Yellow
-    cargo install --path .
+# 1. mise github backend
+if (-not $installed) { $installed = Install-ViaMise }
+# 2. GitHub Release archive download
+if (-not $installed) { $installed = Install-ViaGitHubRelease }
+# 3. Source build fallback
+if (-not $installed) { $installed = Install-FromSource }
+
+if (-not $installed) {
+    Write-Host "All installation methods failed." -ForegroundColor $Red
+    exit 1
 }
 
-Prompt-Configuration
+Add-ToPath
+Invoke-Configuration
 
-Write-Host "`n`n$((" "*20))" -ForegroundColor $Green
-Write-Host "✔ Installation & Configuration Complete!" -ForegroundColor $Green
-Write-Host "You can run this script later with '-Reconfigure' to update your settings." -ForegroundColor $Cyan
-Write-Host "`n$((" "*20))" -ForegroundColor $Green
+Write-Host "`n✔ Installation & Configuration Complete!" -ForegroundColor $Green
+Write-Host "  Run 'klein' to start the editor." -ForegroundColor $Cyan
+Write-Host "  Use '-Reconfigure' to update your settings." -ForegroundColor $Cyan

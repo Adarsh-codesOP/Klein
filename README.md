@@ -59,32 +59,45 @@ Klein doesn't compromise on functionality or looks. Here is what you get out of 
 
 ## Installation
 
-### Automatic Setup (Recommended for Windows)
+### Via mise (Linux / macOS / Windows — recommended)
 
-A pair of installation scripts will configure your workspace, set a preferred shell, download the latest pre‑built binary, and present a polished, colorful console interface during setup.
+If you have [mise](https://mise.jdx.dev) installed, a single command downloads and
+activates the latest pre-built binary for your platform:
 
-**Using PowerShell (Windows):**
-```powershell
-irm https://raw.githubusercontent.com/Adarsh-CodesOP/Klein/main/install.ps1 | iex
+```sh
+mise use -g github:Adarsh-codesOP/Klein
 ```
-*(Note: If you already have the repository cloned, you can just run `.\install.ps1`)*
 
-**Using Bash (Git Bash, WSL or Linux):**
+> **Tip:** `mise` auto-detects your OS and architecture, so no platform-specific
+> flags are needed. Run `mise install github:Adarsh-codesOP/Klein@latest` to
+> refresh to a newer release.
+
+### Automatic Setup Script
+
+A pair of installer scripts configure your workspace, set a preferred shell,
+download the latest pre-built binary, and present a colourful console interface.
+
+**Bash (Linux / macOS / Git Bash / WSL):**
 ```bash
 curl -sSL https://raw.githubusercontent.com/Adarsh-CodesOP/Klein/main/install.sh | bash
 ```
+*(Non-interactive / CI: append `-- --yes` to skip prompts)*
 
+**PowerShell (Windows):**
+```powershell
+irm https://raw.githubusercontent.com/Adarsh-CodesOP/Klein/main/install.ps1 | iex
+```
+*(Non-interactive: `... | iex; .\install.ps1 -Yes` or run the cloned script directly)*
 
 **Reconfiguring:**
-To adjust your workspace or shell after installation, run:
-```powershell
-.\install.ps1 -Reconfigure
+```bash
+./install.sh --reconfigure        # Bash
+.\install.ps1 -Reconfigure        # PowerShell
 ```
-*(Or `./install.sh --reconfigure`)*
 
 ### Manual Build and Install
 
-If you prefer to build it manually from source:
+If you prefer to build from source:
 
 1. Clone the repository:
    ```bash

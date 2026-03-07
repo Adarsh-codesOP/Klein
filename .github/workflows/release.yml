@@ -357,5 +357,5 @@ jobs:
           echo "" >> "${GITHUB_STEP_SUMMARY}"
           echo "### Install via mise" >> "${GITHUB_STEP_SUMMARY}"
           echo '```' >> "${GITHUB_STEP_SUMMARY}"
-          echo "mise use -g ubi:Adarsh-codesOP/Klein" >> "${GITHUB_STEP_SUMMARY}"
+          echo "mise use -g github:\${{ github.repository }}" >> "${GITHUB_STEP_SUMMARY}"
           echo '```' >> "${GITHUB_STEP_SUMMARY}"

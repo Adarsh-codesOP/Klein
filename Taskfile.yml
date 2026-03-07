@@ -1,15 +1,23 @@
 version: "3"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Klein — Local CI simulation Taskfile
+# Klein — Local CI simulation + install-script test Taskfile
 #
 # Mirrors the steps in .github/workflows/ci.yml so every CI check can be
-# validated locally before pushing.
+# validated locally before pushing. Also provides Docker-based tasks to test
+# install.sh across different Linux distributions.
 #
 # Usage:
-#   task            → show available tasks
-#   task ci:all     → run the full CI suite (fmt + build + clippy)
-#   task ci:fix     → auto-fix formatting and clippy issues then re-verify
+#   task                     → show available tasks
+#   task ci:all              → run the full CI suite (fmt + build + clippy)
+#   task ci:fix              → auto-fix formatting and clippy issues then re-verify
+#   task test:install:ubuntu → test install.sh in an Ubuntu 22.04 container
+#   task test:install:debian → test install.sh in a Debian Bookworm container
+#   task test:install:alpine → test install.sh in an Alpine container
+#   task test:install:all    → run all install.sh Docker tests in parallel
+#
+# Override the test repo (must have GitHub Releases with the new asset naming):
+#   task test:install:ubuntu TEST_REPO=tobiashochguertel/Klein
 # ─────────────────────────────────────────────────────────────────────────────
 
 vars:
@@ -17,6 +25,10 @@ vars:
     sh: rustc -vV 2>/dev/null | awk '/host:/{print $2}'
   CARGO_FLAGS: ""
   DEBUG: '{{.DEBUG | default "false"}}'
+  # Repo used for Docker install tests. Defaults to our fork which has releases
+  # with the new asset naming (klein-<version>-<triple>.tar.gz).
+  # Change to Adarsh-codesOP/Klein once the PR is merged and a release exists.
+  TEST_REPO: '{{.TEST_REPO | default "tobiashochguertel/Klein"}}'
 
 tasks:
   # ── Default ────────────────────────────────────────────────────────────────
@@ -147,3 +159,100 @@ tasks:
     cmds:
       - cargo build --release
       - echo "✓ Binary at target/release/klein"
+
+  # ── Docker install.sh tests ────────────────────────────────────────────────
+  # These tasks run install.sh inside disposable Docker containers to verify
+  # the download and installation logic across different Linux distributions.
+  #
+  # Requirements: Docker must be running.
+  # The TEST_REPO variable should point to a repo that has GitHub Releases with
+  # the new asset naming (klein-<version>-<triple>.tar.gz).
+
+  test:install:ubuntu:
+    desc: "Test install.sh in Ubuntu 22.04 (amd64)"
+    summary: |
+      Spins up an ubuntu:22.04 container, mounts the repo read-only, and
+      runs install.sh --yes (non-interactive). Verifies the klein binary
+      is present after installation.
+
+      Override the target repo with: TEST_REPO=owner/repo
+    cmds:
+      - |
+        echo "▶ Testing install.sh on Ubuntu 22.04 (repo: {{.TEST_REPO}})"
+        docker run --rm \
+          --volume "{{.ROOT_DIR}}:/klein:ro" \
+          --env REPO="{{.TEST_REPO}}" \
+          ubuntu:22.04 \
+          bash -c "
+            set -euo pipefail
+            apt-get update -qq >/dev/null
+            apt-get install -y --no-install-recommends curl ca-certificates git >/dev/null
+            cp -r /klein /tmp/klein-src
+            cd /tmp/klein-src
+            bash install.sh --yes
+            echo ''
+            BIN=\$(find \$HOME -name 'klein' -type f 2>/dev/null | head -1 || true)
+            if [ -z \"\$BIN\" ]; then
+              echo '✗ FAIL: klein binary not found after install'
+              exit 1
+            fi
+            echo \"✔ PASS: klein binary found at \$BIN\"
+          "
+
+  test:install:debian:
+    desc: "Test install.sh in Debian Bookworm (amd64)"
+    cmds:
+      - |
+        echo "▶ Testing install.sh on Debian Bookworm (repo: {{.TEST_REPO}})"
+        docker run --rm \
+          --volume "{{.ROOT_DIR}}:/klein:ro" \
+          --env REPO="{{.TEST_REPO}}" \
+          debian:bookworm-slim \
+          bash -c "
+            set -euo pipefail
+            apt-get update -qq >/dev/null
+            apt-get install -y --no-install-recommends curl ca-certificates git >/dev/null
+            cp -r /klein /tmp/klein-src
+            cd /tmp/klein-src
+            bash install.sh --yes
+            BIN=\$(find \$HOME -name 'klein' -type f 2>/dev/null | head -1 || true)
+            if [ -z \"\$BIN\" ]; then
+              echo '✗ FAIL: klein binary not found after install'
+              exit 1
+            fi
+            echo \"✔ PASS: klein binary found at \$BIN\"
+          "
+
+  test:install:alpine:
+    desc: "Test install.sh in Alpine Linux (amd64)"
+    cmds:
+      - |
+        echo "▶ Testing install.sh on Alpine (repo: {{.TEST_REPO}})"
+        docker run --rm \
+          --volume "{{.ROOT_DIR}}:/klein:ro" \
+          --env REPO="{{.TEST_REPO}}" \
+          alpine:3.19 \
+          sh -c "
+            set -eu
+            apk add --quiet bash curl ca-certificates git
+            cp -r /klein /tmp/klein-src
+            cd /tmp/klein-src
+            bash install.sh --yes
+            BIN=\$(find \$HOME -name 'klein' -type f 2>/dev/null | head -1 || true)
+            if [ -z \"\$BIN\" ]; then
+              echo '✗ FAIL: klein binary not found after install'
+              exit 1
+            fi
+            echo \"✔ PASS: klein binary found at \$BIN\"
+          "
+
+  test:install:all:
+    desc: "Run install.sh Docker tests on Ubuntu, Debian, and Alpine"
+    summary: |
+      Runs all three Linux Docker tests sequentially.
+      Override the test repo with: TEST_REPO=owner/repo
+    cmds:
+      - task: test:install:ubuntu
+      - task: test:install:debian
+      - task: test:install:alpine
+      - echo "✔ All Docker install tests passed!"
