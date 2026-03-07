@@ -99,7 +99,7 @@ jobs:
       - name: Verify binary exists
         shell: pwsh
         run: |
-          $bin = Get-ChildItem -Path $HOME -Filter 'klein' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          $bin = Get-ChildItem -Path $HOME -Filter 'klein' -Recurse -Force -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $bin) {
             Write-Host "✗ FAIL: klein binary not found" -ForegroundColor Red
             exit 1
