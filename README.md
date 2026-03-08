@@ -12,7 +12,7 @@
   <a href="https://rustup.rs/">
     <img src="https://img.shields.io/badge/Rust-1.75+-orange.svg" alt="Rust Version">
   </a>
-  <a href="https://github.com/Adarsh-CodesOP/klein/blob/main/LICENSE">
+  <a href="https://github.com/Adarsh-codesOP/klein/blob/main/LICENSE">
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg">
 </a>
   <a href="#features">
@@ -79,13 +79,13 @@ download the latest pre-built binary, and present a colourful console interface.
 
 **Bash (Linux / macOS / Git Bash / WSL):**
 ```bash
-curl -sSL https://raw.githubusercontent.com/Adarsh-CodesOP/Klein/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/Adarsh-codesOP/Klein/main/install.sh | bash
 ```
 *(Non-interactive / CI: append `-- --yes` to skip prompts)*
 
 **PowerShell (Windows):**
 ```powershell
-irm https://raw.githubusercontent.com/Adarsh-CodesOP/Klein/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/Adarsh-codesOP/Klein/main/install.ps1 | iex
 ```
 *(Non-interactive: `... | iex; .\install.ps1 -Yes` or run the cloned script directly)*
 
