@@ -83,29 +83,39 @@ jobs:
           echo "✔ PASS: $BIN"
 
   # ── install.ps1 — Linux (PowerShell Core) ────────────────────────────────
-  test-install-ps1-linux:
-    name: "install.ps1 / Linux (pwsh)"
-    runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/powershell:latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run install.ps1 -Yes
-        env:
-          REPO: ${{ inputs.repo || github.repository }}
-        shell: pwsh
-        run: |
-          ./install.ps1 -Yes
-      - name: Verify binary exists
-        shell: pwsh
-        run: |
-          $bin = Get-ChildItem -Path $HOME -Filter 'klein' -Recurse -Force -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $bin) {
-            Write-Host "✗ FAIL: klein binary not found" -ForegroundColor Red
-            exit 1
-          }
-          Write-Host ("✔ PASS: " + $bin.FullName) -ForegroundColor Green
+ test-install-ps1-linux:
+  name: "install.ps1 / Linux (pwsh)"
+  runs-on: ubuntu-latest
+  container:
+    image: mcr.microsoft.com/powershell:latest
 
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Install prerequisites (Rust)
+      shell: bash
+      run: |
+        apt-get update -qq
+        apt-get install -y curl build-essential
+        curl https://sh.rustup.rs -sSf | sh -s -- -y
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Run install.ps1 -Yes
+      env:
+        REPO: ${{ inputs.repo || github.repository }}
+      shell: pwsh
+      run: |
+        ./install.ps1 -Yes
+
+    - name: Verify binary exists
+      shell: pwsh
+      run: |
+        $bin = Get-ChildItem -Path $HOME -Filter 'klein' -Recurse -Force -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not $bin) {
+          Write-Host "✗ FAIL: klein binary not found" -ForegroundColor Red
+          exit 1
+        }
+        Write-Host ("✔ PASS: " + $bin.FullName) -ForegroundColor Green
   # ── install.ps1 — Windows ─────────────────────────────────────────────────
   test-install-ps1-windows:
     name: "install.ps1 / Windows (amd64)"
