@@ -19,6 +19,11 @@ on:
       - "install.sh"
       - "install.ps1"
 
+# ── Application identity (update here if the project is renamed) ─────────────
+env:
+  BINARY_NAME: klein
+  APP_NAME: Klein
+
 jobs:
   # ── install.sh — Linux ────────────────────────────────────────────────────
   test-install-sh-linux:
@@ -55,9 +60,9 @@ jobs:
 
       - name: Verify binary exists
         run: |
-          BIN=$(find "$HOME" -name 'klein' -type f 2>/dev/null | head -1 || true)
+          BIN=$(find "$HOME" -name '${{ env.BINARY_NAME }}' -type f 2>/dev/null | head -1 || true)
           if [ -z "$BIN" ]; then
-            echo "✗ FAIL: klein binary not found"
+            echo "✗ FAIL: ${{ env.BINARY_NAME }} binary not found"
             exit 1
           fi
           echo "✔ PASS: $BIN"
@@ -75,47 +80,51 @@ jobs:
         run: bash install.sh --yes
       - name: Verify binary exists
         run: |
-          BIN=$(find "$HOME" -name 'klein' -type f 2>/dev/null | head -1 || true)
+          BIN=$(find "$HOME" -name '${{ env.BINARY_NAME }}' -type f 2>/dev/null | head -1 || true)
           if [ -z "$BIN" ]; then
-            echo "✗ FAIL: klein binary not found"
+            echo "✗ FAIL: ${{ env.BINARY_NAME }} binary not found"
             exit 1
           fi
           echo "✔ PASS: $BIN"
 
   # ── install.ps1 — Linux (PowerShell Core) ────────────────────────────────
- test-install-ps1-linux:
-  name: "install.ps1 / Linux (pwsh)"
-  runs-on: ubuntu-latest
-  container:
-    image: mcr.microsoft.com/powershell:latest
+  test-install-ps1-linux:
+    name: "install.ps1 / Linux (pwsh)"
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/powershell:latest
+    steps:
+      - uses: actions/checkout@v4
 
-  steps:
-    - uses: actions/checkout@v4
+      - name: Install Rust toolchain (required for source-build fallback)
+        # The pwsh container has no package manager with Klein and no releases
+        # exist yet on the upstream repo, so the source-build path is exercised.
+        shell: bash
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends curl ca-certificates gcc libc6-dev
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --no-modify-path --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
-    - name: Install prerequisites (Rust)
-      shell: bash
-      run: |
-        apt-get update -qq
-        apt-get install -y curl build-essential
-        curl https://sh.rustup.rs -sSf | sh -s -- -y
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Run install.ps1 -Yes
+        env:
+          REPO: ${{ inputs.repo || github.repository }}
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:HOME/.cargo/bin:$env:PATH"
+          ./install.ps1 -Yes
 
-    - name: Run install.ps1 -Yes
-      env:
-        REPO: ${{ inputs.repo || github.repository }}
-      shell: pwsh
-      run: |
-        ./install.ps1 -Yes
+      - name: Verify binary exists
+        shell: pwsh
+        run: |
+          $bin = Get-ChildItem -Path $HOME -Filter '${{ env.BINARY_NAME }}' -Recurse -Force -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $bin) {
+            Write-Host "✗ FAIL: ${{ env.BINARY_NAME }} binary not found" -ForegroundColor Red
+            exit 1
+          }
+          Write-Host ("✔ PASS: " + $bin.FullName) -ForegroundColor Green
 
-    - name: Verify binary exists
-      shell: pwsh
-      run: |
-        $bin = Get-ChildItem -Path $HOME -Filter 'klein' -Recurse -Force -ErrorAction SilentlyContinue | Select-Object -First 1
-        if (-not $bin) {
-          Write-Host "✗ FAIL: klein binary not found" -ForegroundColor Red
-          exit 1
-        }
-        Write-Host ("✔ PASS: " + $bin.FullName) -ForegroundColor Green
   # ── install.ps1 — Windows ─────────────────────────────────────────────────
   test-install-ps1-windows:
     name: "install.ps1 / Windows (amd64)"
@@ -131,9 +140,13 @@ jobs:
       - name: Verify binary exists
         shell: pwsh
         run: |
-          $bin = Get-ChildItem -Path "$env:LOCALAPPDATA\Klein" -Filter 'klein.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          # Search recursively — source builds install to <AppDir>\bin\klein.exe
+          # while release downloads place the binary at <AppDir>\klein.exe.
+          $bin = Get-ChildItem -Path "$env:LOCALAPPDATA\${{ env.APP_NAME }}" `
+            -Filter '${{ env.BINARY_NAME }}.exe' -Recurse -ErrorAction SilentlyContinue |
+            Select-Object -First 1
           if (-not $bin) {
-            Write-Host "✗ FAIL: klein.exe not found" -ForegroundColor Red
+            Write-Host "✗ FAIL: ${{ env.BINARY_NAME }}.exe not found under $env:LOCALAPPDATA\${{ env.APP_NAME }}" -ForegroundColor Red
             exit 1
           }
           Write-Host ("✔ PASS: " + $bin.FullName) -ForegroundColor Green

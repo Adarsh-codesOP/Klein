@@ -31,6 +31,9 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: short
+  # ── Application identity (update here if the project is renamed) ──────────
+  BINARY_NAME: klein
+  APP_NAME: Klein
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Job 1 — Detect next version from conventional commits
@@ -232,10 +235,10 @@ jobs:
       - name: Package archive (Linux / macOS)
         if: matrix.platform != 'windows'
         run: |
-          ARCHIVE="klein-${VERSION}-${{ matrix.target }}${{ matrix.archive_ext }}"
-          cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" ./klein
-          tar czf "${ARCHIVE}" klein
-          rm klein
+          ARCHIVE="${{ env.BINARY_NAME }}-${VERSION}-${{ matrix.target }}${{ matrix.archive_ext }}"
+          cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" ./${{ env.BINARY_NAME }}
+          tar czf "${ARCHIVE}" ${{ env.BINARY_NAME }}
+          rm ${{ env.BINARY_NAME }}
           echo "ARCHIVE=${ARCHIVE}" >> "${GITHUB_ENV}"
 
       - name: Package archive (Windows)
@@ -244,7 +247,7 @@ jobs:
         run: |
           $binarySource = "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}"
           $binaryName = "${{ matrix.artifact_name }}"
-          $archive = "klein-$env:VERSION-${{ matrix.target }}${{ matrix.archive_ext }}"
+          $archive = "${{ env.BINARY_NAME }}-$env:VERSION-${{ matrix.target }}${{ matrix.archive_ext }}"
           Copy-Item -Path $binarySource -Destination $binaryName -Force
           Compress-Archive -Path $binaryName -DestinationPath $archive
           Remove-Item -Path $binaryName -Force
@@ -253,7 +256,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: klein-${{ matrix.target }}
+          name: ${{ env.BINARY_NAME }}-${{ matrix.target }}
           path: ${{ env.ARCHIVE }}
           if-no-files-found: error
           retention-days: 1
@@ -337,7 +340,7 @@ jobs:
       - name: Create GitHub Release
         run: |
           gh release create "${VERSION}" \
-            --title "Klein ${VERSION}" \
+            --title "${{ env.APP_NAME }} ${VERSION}" \
             --notes-file RELEASE_NOTES.md \
             dist/*.tar.gz \
             dist/*.zip

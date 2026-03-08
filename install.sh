@@ -38,22 +38,28 @@ REPO="${REPO:-$(_detect_repo)}"
 REPO_OWNER="${REPO%%/*}"
 REPO_NAME="${REPO##*/}"
 
+# ── Application identity ─────────────────────────────────────────────────────
+# Single place to update if the project or binary is ever renamed.
+# Can also be overridden via environment variables (e.g. in CI).
+APP_NAME="${APP_NAME:-Klein}"       # Directory / brand name (e.g. ~/AppData/Local/Klein)
+BINARY_NAME="${BINARY_NAME:-klein}" # Executable base name (no extension)
+
 # ── Installation paths ───────────────────────────────────────────────────────
 # Windows (Git Bash / WSL): install into %LOCALAPPDATA%\Klein
 # Linux / macOS:            install into ~/.local/bin  (or ~/bin as fallback)
 if [[ -n "${LOCALAPPDATA:-}" ]]; then
-    APP_DIR="${LOCALAPPDATA}/Klein"
-    BIN_DIR="${APP_DIR}"
+    APP_DIR="${LOCALAPPDATA}/${APP_NAME}"
+    BIN_DIR="${APP_DIR}/bin"   # cargo install --root uses <root>/bin/ — keep consistent
 else
     BIN_DIR="${HOME}/.local/bin"
     # Fall back to ~/bin if ~/.local/bin is not standard on the system
     if [[ -d "${HOME}/bin" ]] && ! [[ -d "${HOME}/.local/bin" ]]; then
         BIN_DIR="${HOME}/bin"
     fi
-    APP_DIR="${HOME}/.config/klein"
+    APP_DIR="${HOME}/.config/${BINARY_NAME}"
 fi
 CONFIG_PATH="${APP_DIR}/config.toml"
-BIN_NAME="klein"
+BIN_NAME="${BINARY_NAME}"
 BIN_PATH="${BIN_DIR}/${BIN_NAME}"
 
 # ── Flags ────────────────────────────────────────────────────────────────────
