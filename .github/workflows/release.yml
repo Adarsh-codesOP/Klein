@@ -237,8 +237,8 @@ jobs:
         run: |
           ARCHIVE="${{ env.BINARY_NAME }}-${VERSION}-${{ matrix.target }}${{ matrix.archive_ext }}"
           cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" ./${{ env.BINARY_NAME }}
-          tar czf "${ARCHIVE}" ${{ env.BINARY_NAME }}
-          rm ${{ env.BINARY_NAME }}
+          tar czf "${ARCHIVE}" "./${{ env.BINARY_NAME }}"
+          rm "./${{ env.BINARY_NAME }}"
           echo "ARCHIVE=${ARCHIVE}" >> "${GITHUB_ENV}"
 
       - name: Package archive (Windows)

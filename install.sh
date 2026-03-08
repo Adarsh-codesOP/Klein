@@ -45,7 +45,7 @@ APP_NAME="${APP_NAME:-Klein}"       # Directory / brand name (e.g. ~/AppData/Loc
 BINARY_NAME="${BINARY_NAME:-klein}" # Executable base name (no extension)
 
 # ── Installation paths ───────────────────────────────────────────────────────
-# Windows (Git Bash / WSL): install into %LOCALAPPDATA%\Klein
+# Windows (Git Bash / WSL): install into %LOCALAPPDATA%\$APP_NAME (e.g. %LOCALAPPDATA%\Klein)
 # Linux / macOS:            install into ~/.local/bin  (or ~/bin as fallback)
 if [[ -n "${LOCALAPPDATA:-}" ]]; then
     APP_DIR="${LOCALAPPDATA}/${APP_NAME}"

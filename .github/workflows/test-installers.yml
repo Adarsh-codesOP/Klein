@@ -118,7 +118,7 @@ jobs:
       - name: Verify binary exists
         shell: pwsh
         run: |
-          $bin = Get-ChildItem -Path $HOME -Filter '${{ env.BINARY_NAME }}' -Recurse -Force -ErrorAction SilentlyContinue | Select-Object -First 1
+          $bin = Get-ChildItem -Path "$HOME/.local" -Filter '${{ env.BINARY_NAME }}' -Recurse -Force -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $bin) {
             Write-Host "✗ FAIL: ${{ env.BINARY_NAME }} binary not found" -ForegroundColor Red
             exit 1
