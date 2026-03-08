@@ -33,8 +33,12 @@ $OnLinux   = [bool]$IsLinux
 
 # ── Repository detection ─────────────────────────────────────────────────────
 function Get-Repo {
-    $scriptDir = Split-Path -Parent $MyInvocation.ScriptName
-    $sep = if ($OnWindows) { "\" } else { "/" }
+    $scriptDir = $null
+
+    if ($MyInvocation.MyCommand.Path) {
+        $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+
     if ($scriptDir) {
         $gitDir = Join-Path $scriptDir ".git"
         if (Test-Path $gitDir -ErrorAction SilentlyContinue) {
@@ -46,7 +50,8 @@ function Get-Repo {
             } catch {}
         }
     }
-    return "Adarsh-codesOP/Klein"
+
+    return "Adarsh-CodesOP/Klein"
 }
 $Repo = if ($env:REPO) { $env:REPO } else { Get-Repo }
 $RepoOwner = $Repo.Split("/")[0]
