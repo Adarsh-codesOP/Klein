@@ -176,12 +176,40 @@ fn open_tab_from_path(app: &mut App, path: std::path::PathBuf) {
 }
 
 fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    if app.save_as_state.active {
+        match key.code {
+            KeyCode::Esc => {
+                app.save_as_state.active = false;
+            }
+            KeyCode::Enter => {
+                let _ = app.execute_save_as();
+            }
+            KeyCode::Tab | KeyCode::Up | KeyCode::Down => {
+                app.save_as_state.focus_filename = !app.save_as_state.focus_filename;
+            }
+            KeyCode::Backspace => {
+                if app.save_as_state.focus_filename {
+                    app.save_as_state.filename.pop();
+                }
+            }
+            KeyCode::Char(c) => {
+                if app.save_as_state.focus_filename {
+                    app.save_as_state.filename.push(c);
+                }
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     // Handle Quit Confirmation
     if app.show_quit_confirm {
         match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => {
-                let _ = app.editor_mut().save();
-                app.should_quit = true;
+                if app.try_save_or_show_save_as(crate::app::SaveAsContext::QuitAfter) {
+                    app.should_quit = true;
+                }
+                app.show_quit_confirm = false;
                 return Ok(());
             }
             KeyCode::Char('n') | KeyCode::Char('N') => {
