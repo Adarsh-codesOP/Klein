@@ -238,3 +238,50 @@ impl Sidebar {
         Ok(false)
     }
 }
+
+impl FileNode {
+    pub fn refresh(&mut self) {
+        if self.is_dir && self.expanded {
+            let mut new_children = Vec::new();
+            if let Ok(entries) = std::fs::read_dir(&self.path) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    let file_name = entry.file_name().to_string_lossy().to_string();
+                    let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+                    
+                    let mut expanded = false;
+                    let mut old_children = None;
+                    if let Some(existing_children) = &self.children {
+                        if let Some(existing_node) = existing_children.iter().find(|c| c.path == path) {
+                            expanded = existing_node.expanded;
+                            old_children = existing_node.children.clone();
+                        }
+                    }
+                    
+                    let mut new_node = FileNode {
+                        path,
+                        name: file_name,
+                        is_dir,
+                        expanded,
+                        children: old_children,
+                    };
+                    
+                    if new_node.expanded {
+                        new_node.refresh();
+                    }
+                    new_children.push(new_node);
+                }
+            }
+            new_children.sort_by(|a, b| {
+                if a.is_dir && !b.is_dir {
+                    std::cmp::Ordering::Less
+                } else if !a.is_dir && b.is_dir {
+                    std::cmp::Ordering::Greater
+                } else {
+                    a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                }
+            });
+            self.children = Some(new_children);
+        }
+    }
+}
