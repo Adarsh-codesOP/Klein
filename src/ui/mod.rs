@@ -10,7 +10,6 @@ pub mod tabs;
 pub mod terminal;
 
 pub fn render(f: &mut Frame, app: &App) {
-
     f.render_widget(ratatui::widgets::Clear, f.size());
 
     let show_terminal_layout = if app.maximized == crate::app::Maximized::Editor {
@@ -149,7 +148,10 @@ pub fn render(f: &mut Frame, app: &App) {
         let inner_width = chunks[1].width as usize;
         let file_para_content = if file_display.chars().count() > inner_width && inner_width > 1 {
             let skip_count = file_display.chars().count() - (inner_width - 1);
-            format!("…{}", file_display.chars().skip(skip_count).collect::<String>())
+            format!(
+                "…{}",
+                file_display.chars().skip(skip_count).collect::<String>()
+            )
         } else {
             file_display
         };
@@ -160,9 +162,11 @@ pub fn render(f: &mut Frame, app: &App) {
         );
 
         f.render_widget(
-            ratatui::widgets::Paragraph::new("Tab/Up/Down switches field | Enter saves | Esc cancels")
-                .style(ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray))
-                .alignment(ratatui::layout::Alignment::Center),
+            ratatui::widgets::Paragraph::new(
+                "Tab/Up/Down switches field | Enter saves | Esc cancels",
+            )
+            .style(ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray))
+            .alignment(ratatui::layout::Alignment::Center),
             chunks[2],
         );
     }

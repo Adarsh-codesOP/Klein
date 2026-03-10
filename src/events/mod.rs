@@ -212,7 +212,10 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 }
             }
             KeyCode::Char(c) => {
-                if app.save_as_state.focus_filename && !key.modifiers.contains(KeyModifiers::CONTROL) && !key.modifiers.contains(KeyModifiers::ALT) {
+                if app.save_as_state.focus_filename
+                    && !key.modifiers.contains(KeyModifiers::CONTROL)
+                    && !key.modifiers.contains(KeyModifiers::ALT)
+                {
                     if !app.save_as_state.is_edited {
                         app.save_as_state.filename.clear();
                         app.save_as_state.is_edited = true;
