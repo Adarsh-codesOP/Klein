@@ -171,4 +171,59 @@ impl App {
             self.active_tab = self.tabs.len() - 1;
         }
     }
+
+    pub fn save_current_file(&mut self) -> std::io::Result<()> {
+        let active_tab = self.active_tab;
+        let tab = &mut self.tabs[active_tab];
+        if let Some(path) = &tab.path {
+            tab.editor.save(path)?;
+        }
+        Ok(())
+    }
+
+    pub fn try_save_or_show_save_as(&mut self, context: SaveAsContext) -> bool {
+        let tab = &mut self.tabs[self.active_tab];
+        if tab.path.is_some() {
+            let _ = self.save_current_file();
+            return true;
+        } else {
+            self.save_as_state.active = true;
+            self.save_as_state.context = context;
+            
+            let mut counter = 1;
+            let mut proposed_name = format!("Untitled-{}.txt", counter);
+            while self.save_as_state.cur_dir.join(&proposed_name).exists() {
+                counter += 1;
+                proposed_name = format!("Untitled-{}.txt", counter);
+            }
+            self.save_as_state.filename = proposed_name;
+            self.save_as_state.focus_filename = true;
+            return false;
+        }
+    }
+
+    pub fn execute_save_as(&mut self) -> std::io::Result<()> {
+        let path = self.save_as_state.cur_dir.join(&self.save_as_state.filename);
+        let tab = &mut self.tabs[self.active_tab];
+        tab.path = Some(path);
+        let _ = self.save_current_file();
+        self.save_as_state.active = false;
+        
+        self.sidebar.refresh();
+        
+        match self.save_as_state.context.clone() {
+            SaveAsContext::QuitAfter => {
+                self.should_quit = true;
+            }
+            SaveAsContext::CloseTabAfter => {
+                self.close_tab();
+            }
+            SaveAsContext::SwitchFileAfter(path) => {
+                self.open_in_new_tab(path);
+                self.active_panel = Panel::Editor;
+            }
+            SaveAsContext::SaveOnly => {}
+        }
+        Ok(())
+    }
 }
