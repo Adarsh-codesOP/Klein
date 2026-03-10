@@ -368,6 +368,69 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.editor_mut().paste(h);
                 return Ok(());
             }
+            KeyCode::Home => {
+                if is_selecting {
+                    app.editor_mut().toggle_selection();
+                } else {
+                    app.editor_mut().clear_selection();
+                }
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    app.editor_mut().cursor_y = 0;
+                }
+                app.editor_mut().cursor_x = 0;
+                let h = app.last_editor_height.get();
+                app.editor_mut().ensure_cursor_visible(h);
+                return Ok(());
+            }
+            KeyCode::End => {
+                if is_selecting {
+                    app.editor_mut().toggle_selection();
+                } else {
+                    app.editor_mut().clear_selection();
+                }
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    let lines = app.editor().buffer.len_lines();
+                    app.editor_mut().cursor_y = lines.saturating_sub(1);
+                }
+                let y = app.editor().cursor_y;
+                let max_x = app.editor().get_max_cursor_x(y);
+                app.editor_mut().cursor_x = max_x;
+                let h = app.last_editor_height.get();
+                app.editor_mut().ensure_cursor_visible(h);
+                return Ok(());
+            }
+            KeyCode::PageUp => {
+                if is_selecting {
+                    app.editor_mut().toggle_selection();
+                } else {
+                    app.editor_mut().clear_selection();
+                }
+                let h = app.last_editor_height.get();
+                for _ in 0..h {
+                    app.editor_mut().move_cursor_up();
+                }
+                return Ok(());
+            }
+            KeyCode::PageDown => {
+                if is_selecting {
+                    app.editor_mut().toggle_selection();
+                } else {
+                    app.editor_mut().clear_selection();
+                }
+                let h = app.last_editor_height.get();
+                for _ in 0..h {
+                    app.editor_mut().move_cursor_down(h);
+                }
+                return Ok(());
+            }
+            KeyCode::Delete => {
+                app.editor_mut().delete_forward_char();
+                return Ok(());
+            }
+            KeyCode::Char('x') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.editor_mut().cut();
+                return Ok(());
+            }
             KeyCode::Backspace => {
                 app.editor_mut().delete_char();
                 return Ok(());
