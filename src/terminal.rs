@@ -26,7 +26,7 @@ impl Terminal {
 
         // Check if preferred shell exists and is usable
         let mut explicit_shell: Option<(String, Vec<&str>)> = None;
-        if let Some(shell) = preferred_shell {
+        if let Some(ref shell) = preferred_shell {
             if shell != "auto" {
                 // Determine test arguments based on the shell
                 let test_arg = if shell.contains("powershell") {
@@ -48,9 +48,9 @@ impl Terminal {
 
                 if cmd.output().is_ok() {
                     if shell == "bash" || shell.ends_with("bash.exe") {
-                        explicit_shell = Some((shell, vec!["--login", "-i"]));
+                        explicit_shell = Some((shell.clone(), vec!["--login", "-i"]));
                     } else {
-                        explicit_shell = Some((shell, vec![]));
+                        explicit_shell = Some((shell.clone(), vec![]));
                     }
                 }
             }
@@ -91,7 +91,7 @@ impl Terminal {
         cmd.args(&args);
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
-        cmd.cwd(cwd);
+        cmd.cwd(&cwd);
         let child = pty_pair.slave.spawn_command(cmd).unwrap();
         
         // Drop slave proactively to ensure EOF reaches master when child exits
