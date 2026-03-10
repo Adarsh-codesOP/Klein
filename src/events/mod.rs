@@ -444,7 +444,8 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     app.terminal_scroll = app.terminal_scroll.saturating_add(1);
                 } else {
                     app.terminal_scroll = 0;
-                    app.terminal.write("\x1b[A");
+                    let app_cursor = app.terminal.parser.lock().unwrap().screen().application_cursor();
+                    app.terminal.write(if app_cursor { "\x1bOA" } else { "\x1b[A" });
                 }
             }
             KeyCode::Down => {
@@ -452,11 +453,18 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     app.terminal_scroll = app.terminal_scroll.saturating_sub(1);
                 } else {
                     app.terminal_scroll = 0;
-                    app.terminal.write("\x1b[B");
+                    let app_cursor = app.terminal.parser.lock().unwrap().screen().application_cursor();
+                    app.terminal.write(if app_cursor { "\x1bOB" } else { "\x1b[B" });
                 }
             }
-            KeyCode::Right => app.terminal.write("\x1b[C"),
-            KeyCode::Left => app.terminal.write("\x1b[D"),
+            KeyCode::Right => {
+                let app_cursor = app.terminal.parser.lock().unwrap().screen().application_cursor();
+                app.terminal.write(if app_cursor { "\x1bOC" } else { "\x1b[C" });
+            }
+            KeyCode::Left => {
+                let app_cursor = app.terminal.parser.lock().unwrap().screen().application_cursor();
+                app.terminal.write(if app_cursor { "\x1bOD" } else { "\x1b[D" });
+            }
             KeyCode::PageUp => {
                 if key.modifiers.contains(KeyModifiers::SHIFT) {
                     app.terminal_scroll = app.terminal_scroll.saturating_add(5);

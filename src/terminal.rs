@@ -122,7 +122,19 @@ impl Terminal {
                 }
                 
                 let mut p = parser_clone.lock().unwrap();
-                p.process(&buf[..n]);
+                
+                // Many shells on Windows/Portable-PTY fail to emit \r with \n in raw mode.
+                // We inject \r before \n if missing to prevent staircasing in the VT100 grid.
+                let mut processed = Vec::with_capacity(n * 2);
+                for &b in &buf[..n] {
+                    if b == b'\n' {
+                        // Idempotent even if \r was already sent, as VT100 \r just moves to col 0.
+                        processed.push(b'\r');
+                    }
+                    processed.push(b);
+                }
+                
+                p.process(&processed);
             }
         });
 

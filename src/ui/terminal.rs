@@ -31,7 +31,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         .map(|r| {
             let mut spans = Vec::new();
             let mut current_text = String::new();
-            let mut current_attrs: Option<vt100::Cell> = None;
+            let mut current_attrs: Option<(vt100::Cell, bool)> = None;
             let abs_y = r; // Absolute Y for selection is tricky with scrollback, but let's approximate
             
             // To properly do selection check, we would need absolute line number.
@@ -41,85 +41,78 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
 
             for c in 0..cols {
                 if let Some(cell) = screen.cell(r, c) {
-                    if cell.has_contents() {
-                        let new_attrs = cell.clone();
-                        // For selection:
-                        let is_selected = if let Some((sel_start, sel_end)) = app.terminal_sel {
-                            let (sy, sx) = if sel_start < sel_end { sel_start } else { sel_end };
-                            let (ey, ex) = if sel_start < sel_end { sel_end } else { sel_start };
-                            
-                            let cur_y = abs_y as usize;
-                            let cur_x = c as usize;
-                            if cur_y > sy && cur_y < ey {
-                                true
-                            } else if cur_y == sy && cur_y == ey {
-                                cur_x >= sx && cur_x <= ex
-                            } else if cur_y == sy {
-                                cur_x >= sx
-                            } else if cur_y == ey {
-                                cur_x <= ex
-                            } else {
-                                false
-                            }
+                    let new_attrs = cell.clone();
+                    let char_str = if cell.has_contents() { cell.contents() } else { " " };
+                    
+                    // For selection:
+                    let is_selected = if let Some((sel_start, sel_end)) = app.terminal_sel {
+                        let (sy, sx) = if sel_start < sel_end { sel_start } else { sel_end };
+                        let (ey, ex) = if sel_start < sel_end { sel_end } else { sel_start };
+                        
+                        let cur_y = abs_y as usize;
+                        let cur_x = c as usize;
+                        if cur_y > sy && cur_y < ey {
+                            true
+                        } else if cur_y == sy && cur_y == ey {
+                            cur_x >= sx && cur_x <= ex
+                        } else if cur_y == sy {
+                            cur_x >= sx
+                        } else if cur_y == ey {
+                            cur_x <= ex
                         } else {
                             false
-                        };
-                        
-                        // We would compare attributes and flush
-                        if let Some(ref attrs) = current_attrs {
-                            if attrs.fgcolor() != cell.fgcolor() || attrs.bgcolor() != cell.bgcolor() || attrs.bold() != cell.bold() || is_selected {
-                                // Flush current_text
-                                let mut style = ratatui::style::Style::default();
-                                if let vt100::Color::Idx(idx) = attrs.fgcolor() {
-                                    style = style.fg(ratatui::style::Color::Indexed(idx));
-                                }
-                                if let vt100::Color::Idx(idx) = attrs.bgcolor() {
-                                    style = style.bg(ratatui::style::Color::Indexed(idx));
-                                }
-                                if attrs.bold() {
-                                    style = style.add_modifier(ratatui::style::Modifier::BOLD);
-                                }
-                                spans.push(ratatui::text::Span::styled(current_text.clone(), style));
-                                current_text.clear();
-                            }
                         }
-                        
-                        current_text.push_str(cell.contents());
-                        current_attrs = Some(new_attrs);
                     } else {
-                        // Empty cell
-                        if !current_text.is_empty() {
+                        false
+                    };
+                    
+                    if let Some((ref attrs, was_selected)) = current_attrs {
+                        if attrs.fgcolor() != cell.fgcolor() || attrs.bgcolor() != cell.bgcolor() || attrs.bold() != cell.bold() || was_selected != is_selected {
+                            // Flush current_text
                             let mut style = ratatui::style::Style::default();
-                            if let Some(ref attrs) = current_attrs {
-                                if let vt100::Color::Idx(idx) = attrs.fgcolor() {
-                                    style = style.fg(ratatui::style::Color::Indexed(idx));
-                                }
-                                if let vt100::Color::Idx(idx) = attrs.bgcolor() {
-                                    style = style.bg(ratatui::style::Color::Indexed(idx));
-                                }
-                                if attrs.bold() {
-                                    style = style.add_modifier(ratatui::style::Modifier::BOLD);
-                                }
+                            match attrs.fgcolor() {
+                                vt100::Color::Idx(idx) => style = style.fg(ratatui::style::Color::Indexed(idx)),
+                                vt100::Color::Rgb(r, g, b) => style = style.fg(ratatui::style::Color::Rgb(r, g, b)),
+                                _ => {}
+                            }
+                            match attrs.bgcolor() {
+                                vt100::Color::Idx(idx) => style = style.bg(ratatui::style::Color::Indexed(idx)),
+                                vt100::Color::Rgb(r, g, b) => style = style.bg(ratatui::style::Color::Rgb(r, g, b)),
+                                _ => {}
+                            }
+                            if attrs.bold() {
+                                style = style.add_modifier(ratatui::style::Modifier::BOLD);
+                            }
+                            if was_selected {
+                                style = style.bg(ratatui::style::Color::White).fg(ratatui::style::Color::Black);
                             }
                             spans.push(ratatui::text::Span::styled(current_text.clone(), style));
                             current_text.clear();
                         }
-                        spans.push(ratatui::text::Span::raw(" "));
-                        current_attrs = None;
                     }
+                    
+                    current_text.push_str(char_str);
+                    current_attrs = Some((new_attrs, is_selected));
                 }
             }
             if !current_text.is_empty() {
                 let mut style = ratatui::style::Style::default();
-                if let Some(ref attrs) = current_attrs {
-                    if let vt100::Color::Idx(idx) = attrs.fgcolor() {
-                        style = style.fg(ratatui::style::Color::Indexed(idx));
+                if let Some((ref attrs, was_selected)) = current_attrs {
+                    match attrs.fgcolor() {
+                        vt100::Color::Idx(idx) => style = style.fg(ratatui::style::Color::Indexed(idx)),
+                        vt100::Color::Rgb(r, g, b) => style = style.fg(ratatui::style::Color::Rgb(r, g, b)),
+                        _ => {}
                     }
-                    if let vt100::Color::Idx(idx) = attrs.bgcolor() {
-                        style = style.bg(ratatui::style::Color::Indexed(idx));
+                    match attrs.bgcolor() {
+                        vt100::Color::Idx(idx) => style = style.bg(ratatui::style::Color::Indexed(idx)),
+                        vt100::Color::Rgb(r, g, b) => style = style.bg(ratatui::style::Color::Rgb(r, g, b)),
+                        _ => {}
                     }
                     if attrs.bold() {
                         style = style.add_modifier(ratatui::style::Modifier::BOLD);
+                    }
+                    if was_selected {
+                        style = style.bg(ratatui::style::Color::White).fg(ratatui::style::Color::Black);
                     }
                 }
                 spans.push(ratatui::text::Span::styled(current_text, style));
