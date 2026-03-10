@@ -26,11 +26,15 @@ use crate::app::App;
 #[command(
     long_about = "Klein is a lightweight, terminal-based text editor built in Rust. It provides an IDE-like interface using ratatui for the user interface and portable-pty for terminal integration, giving developers a keyboard-centric coding environment directly in the command line."
 )]
-struct Cli;
+struct Cli {
+    #[arg(help = "Optional file path to open on startup")]
+    file: Option<std::path::PathBuf>,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let _cli = Cli::parse();
+    let args: Vec<String> = std::env::args().map(|a| if a == "-?" { "--help".to_string() } else { a }).collect();
+    let cli = Cli::parse_from(args);
 
     // Setup terminal
     enable_raw_mode()?;
@@ -40,7 +44,7 @@ async fn main() -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     // Create app and run it
-    let mut app = App::new();
+    let mut app = App::new(cli.file);
     let res = run_app(&mut terminal, &mut app).await;
 
     // Restore terminal

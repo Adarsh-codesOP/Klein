@@ -237,11 +237,16 @@ impl Sidebar {
 
         Ok(false)
     }
+
+    pub fn refresh(&mut self) {
+        self.root.refresh();
+        self.update_flat_list();
+    }
 }
 
 impl FileNode {
     pub fn refresh(&mut self) {
-        if self.is_dir && self.expanded {
+        if self.is_dir && self.is_expanded {
             let mut new_children = Vec::new();
             if let Ok(entries) = std::fs::read_dir(&self.path) {
                 for entry in entries.flatten() {
@@ -249,12 +254,10 @@ impl FileNode {
                     let file_name = entry.file_name().to_string_lossy().to_string();
                     let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
                     
-                    let mut expanded = false;
-                    let mut old_children = None;
+                    let mut is_expanded = false;
                     if let Some(existing_children) = &self.children {
                         if let Some(existing_node) = existing_children.iter().find(|c| c.path == path) {
-                            expanded = existing_node.expanded;
-                            old_children = existing_node.children.clone();
+                            is_expanded = existing_node.is_expanded;
                         }
                     }
                     
@@ -262,11 +265,11 @@ impl FileNode {
                         path,
                         name: file_name,
                         is_dir,
-                        expanded,
-                        children: old_children,
+                        is_expanded,
+                        children: None,
                     };
                     
-                    if new_node.expanded {
+                    if new_node.is_expanded {
                         new_node.refresh();
                     }
                     new_children.push(new_node);

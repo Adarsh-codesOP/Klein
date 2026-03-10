@@ -66,29 +66,20 @@ pub struct App {
     pub terminal_sel: Option<((usize, usize), (usize, usize))>,
     pub show_quit_confirm: bool,
     pub show_unsaved_confirm: bool,
+    pub show_create_file_prompt: bool,
     pub pending_open_path: Option<PathBuf>,
     pub maximized: Maximized,
     pub save_as_state: SaveAsState,
 }
 
 impl App {
-    pub fn new() -> App {
+    pub fn new(cli_file: Option<PathBuf>) -> App {
         let config = crate::config::AppConfig::load();
 
-        // Try to respect workspace from config first, fallback to current_dir
-        let current_dir = if let Some(ws) = config.default_workspace {
-            let path = std::path::PathBuf::from(ws);
-            if path.exists() {
-                path
-            } else {
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
-            }
-        } else {
-            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
-        };
+        let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
-        App {
-            active_panel: Panel::Editor,
+        let mut app = App {
+            active_panel: Panel::Sidebar,
             show_sidebar: true,
             show_terminal: true,
             should_quit: false,
@@ -107,13 +98,27 @@ impl App {
             terminal_sel: None,
             show_quit_confirm: false,
             show_unsaved_confirm: false,
+            show_create_file_prompt: false,
             pending_open_path: None,
             maximized: Maximized::None,
             save_as_state: SaveAsState {
                 cur_dir: current_dir.clone(),
                 ..Default::default()
             },
+        };
+
+        if let Some(file) = cli_file {
+            let path = current_dir.join(&file);
+            if path.exists() {
+                app.open_in_current_tab(path);
+                app.active_panel = Panel::Editor;
+            } else {
+                app.pending_open_path = Some(path);
+                app.show_create_file_prompt = true;
+            }
         }
+
+        app
     }
 
     /// Get a reference to the editor that should be displayed.
@@ -172,18 +177,17 @@ impl App {
         }
     }
 
-    pub fn save_current_file(&mut self) -> std::io::Result<()> {
+    pub fn save_current_file(&mut self) {
         let active_tab = self.active_tab;
         let tab = &mut self.tabs[active_tab];
-        if let Some(path) = &tab.path {
-            tab.editor.save(path)?;
+        if tab.editor.path.is_some() {
+            let _ = tab.editor.save();
         }
-        Ok(())
     }
 
     pub fn try_save_or_show_save_as(&mut self, context: SaveAsContext) -> bool {
         let tab = &mut self.tabs[self.active_tab];
-        if tab.path.is_some() {
+        if tab.editor.path.is_some() {
             let _ = self.save_current_file();
             return true;
         } else {
@@ -202,11 +206,11 @@ impl App {
         }
     }
 
-    pub fn execute_save_as(&mut self) -> std::io::Result<()> {
+    pub fn execute_save_as(&mut self) {
         let path = self.save_as_state.cur_dir.join(&self.save_as_state.filename);
         let tab = &mut self.tabs[self.active_tab];
-        tab.path = Some(path);
-        let _ = self.save_current_file();
+        tab.editor.path = Some(path);
+        self.save_current_file();
         self.save_as_state.active = false;
         
         self.sidebar.refresh();
@@ -224,6 +228,5 @@ impl App {
             }
             SaveAsContext::SaveOnly => {}
         }
-        Ok(())
     }
 }
