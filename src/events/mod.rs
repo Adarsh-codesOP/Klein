@@ -63,76 +63,58 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
             }
         }
         MouseEventKind::Drag(crossterm::event::MouseButton::Left) => {
-            if app.editor().selection_start.is_none() {
-                app.editor_mut().toggle_selection();
-            }
-
-            let new_x = (mouse.column.saturating_sub(area.x)) as usize;
-
-            if mouse.row < area.y {
-                // Dragging above the editor area
-                let scroll_y = app.editor().scroll_y;
-                app.editor_mut().scroll_y = scroll_y.saturating_sub(1);
-                let scroll_y = app.editor().scroll_y;
-                app.editor_mut().cursor_y = scroll_y;
-            } else if mouse.row >= area.y + area.height {
-                // Dragging below the editor area
-                let scroll_y = app.editor().scroll_y;
-                let buf_len = app.editor().buffer.len_lines();
-                if scroll_y + (area.height as usize) < buf_len {
-                    app.editor_mut().scroll_y += 1;
+            if is_in_terminal {
+                let term_y = mouse.row.saturating_sub(term_area.y).saturating_sub(1) as usize;
+                let term_x = mouse.column.saturating_sub(term_area.x).saturating_sub(1) as usize;
+                
+                let output_raw = app.terminal.output.lock().unwrap();
+                let stripped = crate::ui::terminal::strip_ansi(&output_raw);
+                let lines_count = stripped.lines().count();
+                
+                let height = term_area.height.saturating_sub(2) as usize;
+                let max_scroll = lines_count.saturating_sub(height);
+                let scroll = app.terminal_scroll.min(max_scroll);
+                let start = lines_count.saturating_sub(height).saturating_sub(scroll);
+                
+                let abs_y = start + term_y;
+                
+                if let Some((sel_start, _)) = app.terminal_sel {
+                    app.terminal_sel = Some((sel_start, (abs_y, term_x)));
+                } else {
+                    app.terminal_sel = Some(((abs_y, term_x), (abs_y, term_x)));
                 }
-                let scroll_y = app.editor().scroll_y;
-                app.editor_mut().cursor_y = (scroll_y + area.height as usize)
-                    .saturating_sub(1)
-                    .min(buf_len.saturating_sub(1));
-            } else {
-                // Within editor area y-bounds
-                let scroll_y = app.editor().scroll_y;
-                app.editor_mut().cursor_y = (mouse.row - area.y) as usize + scroll_y;
-            }
+            } else if is_in_editor {
+                if app.editor().selection_start.is_none() {
+                    app.editor_mut().toggle_selection();
+                }
 
-            app.editor_mut().cursor_x = new_x;
-            app.editor_mut().clamp_cursor_x();
-        }
-        MouseEventKind::Down(crossterm::event::MouseButton::Left) if is_in_terminal => {
-            app.active_panel = Panel::Terminal;
-            app.terminal_sel = None; // Reset selection on new click
-            
-            let term_y = mouse.row.saturating_sub(term_area.y).saturating_sub(1) as usize;
-            let term_x = mouse.column.saturating_sub(term_area.x).saturating_sub(1) as usize;
-            
-            let output_raw = app.terminal.output.lock().unwrap();
-            let stripped = crate::ui::terminal::strip_ansi(&output_raw);
-            let lines_count = stripped.lines().count();
-            
-            let height = term_area.height.saturating_sub(2) as usize;
-            let max_scroll = lines_count.saturating_sub(height);
-            let scroll = app.terminal_scroll.min(max_scroll);
-            let start = lines_count.saturating_sub(height).saturating_sub(scroll);
-            
-            let abs_y = start + term_y;
-            app.terminal_sel = Some(((abs_y, term_x), (abs_y, term_x)));
-        }
-        MouseEventKind::Drag(crossterm::event::MouseButton::Left) if is_in_terminal => {
-            let term_y = mouse.row.saturating_sub(term_area.y).saturating_sub(1) as usize;
-            let term_x = mouse.column.saturating_sub(term_area.x).saturating_sub(1) as usize;
-            
-            let output_raw = app.terminal.output.lock().unwrap();
-            let stripped = crate::ui::terminal::strip_ansi(&output_raw);
-            let lines_count = stripped.lines().count();
-            
-            let height = term_area.height.saturating_sub(2) as usize;
-            let max_scroll = lines_count.saturating_sub(height);
-            let scroll = app.terminal_scroll.min(max_scroll);
-            let start = lines_count.saturating_sub(height).saturating_sub(scroll);
-            
-            let abs_y = start + term_y;
-            
-            if let Some((sel_start, _)) = app.terminal_sel {
-                app.terminal_sel = Some((sel_start, (abs_y, term_x)));
-            } else {
-                app.terminal_sel = Some(((abs_y, term_x), (abs_y, term_x)));
+                let new_x = (mouse.column.saturating_sub(area.x)) as usize;
+
+                if mouse.row < area.y {
+                    // Dragging above the editor area
+                    let scroll_y = app.editor().scroll_y;
+                    app.editor_mut().scroll_y = scroll_y.saturating_sub(1);
+                    let scroll_y = app.editor().scroll_y;
+                    app.editor_mut().cursor_y = scroll_y;
+                } else if mouse.row >= area.y + area.height {
+                    // Dragging below the editor area
+                    let scroll_y = app.editor().scroll_y;
+                    let buf_len = app.editor().buffer.len_lines();
+                    if scroll_y + (area.height as usize) < buf_len {
+                        app.editor_mut().scroll_y += 1;
+                    }
+                    let scroll_y = app.editor().scroll_y;
+                    app.editor_mut().cursor_y = (scroll_y + area.height as usize)
+                        .saturating_sub(1)
+                        .min(buf_len.saturating_sub(1));
+                } else {
+                    // Within editor area y-bounds
+                    let scroll_y = app.editor().scroll_y;
+                    app.editor_mut().cursor_y = (mouse.row - area.y) as usize + scroll_y;
+                }
+
+                app.editor_mut().cursor_x = new_x;
+                app.editor_mut().clamp_cursor_x();
             }
         }
         MouseEventKind::Up(crossterm::event::MouseButton::Left) => {
