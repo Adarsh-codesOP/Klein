@@ -205,6 +205,12 @@ impl Editor {
             let mut spans: Vec<ratatui::text::Span> = Vec::new();
 
             for (style, text) in highlights {
+                // Strip line terminators to prevent Ratatui from wrapping/double-spacing
+                let text = text.trim_end_matches(['\n', '\r']);
+                if text.is_empty() {
+                    continue;
+                }
+
                 let span_style = ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(
                     style.foreground.r,
                     style.foreground.g,

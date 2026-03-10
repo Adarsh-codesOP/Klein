@@ -33,7 +33,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let actual_scroll = screen.scrollback();
     let (rows, cols) = screen.size();
     
-    let terminal_lines: Vec<ratatui::text::Line<'_>> = (0..rows)
+    let mut terminal_lines: Vec<ratatui::text::Line<'_>> = (0..rows)
         .map(|r| {
             let mut spans = Vec::new();
             let mut current_text = String::new();
@@ -79,12 +79,17 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                             match attrs.fgcolor() {
                                 vt100::Color::Idx(idx) => style = style.fg(ratatui::style::Color::Indexed(idx)),
                                 vt100::Color::Rgb(r, g, b) => style = style.fg(ratatui::style::Color::Rgb(r, g, b)),
-                                _ => {}
+                                _ => {
+                                    // Default foreground for terminal segments that don't have explicit color
+                                    style = style.fg(ratatui::style::Color::White);
+                                }
                             }
                             match attrs.bgcolor() {
                                 vt100::Color::Idx(idx) => style = style.bg(ratatui::style::Color::Indexed(idx)),
                                 vt100::Color::Rgb(r, g, b) => style = style.bg(ratatui::style::Color::Rgb(r, g, b)),
-                                _ => {}
+                                _ => {
+                                    style = style.bg(ratatui::style::Color::Black);
+                                }
                             }
                             if attrs.bold() {
                                 style = style.add_modifier(ratatui::style::Modifier::BOLD);
@@ -107,12 +112,16 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                     match attrs.fgcolor() {
                         vt100::Color::Idx(idx) => style = style.fg(ratatui::style::Color::Indexed(idx)),
                         vt100::Color::Rgb(r, g, b) => style = style.fg(ratatui::style::Color::Rgb(r, g, b)),
-                        _ => {}
+                        _ => {
+                            style = style.fg(ratatui::style::Color::White);
+                        }
                     }
                     match attrs.bgcolor() {
                         vt100::Color::Idx(idx) => style = style.bg(ratatui::style::Color::Indexed(idx)),
                         vt100::Color::Rgb(r, g, b) => style = style.bg(ratatui::style::Color::Rgb(r, g, b)),
-                        _ => {}
+                        _ => {
+                            style = style.bg(ratatui::style::Color::Black);
+                        }
                     }
                     if attrs.bold() {
                         style = style.add_modifier(ratatui::style::Modifier::BOLD);
@@ -126,6 +135,11 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
             ratatui::text::Line::from(spans)
         })
         .collect();
+
+    // Pad terminal lines to full height to ensure the background is fully cleared
+    while terminal_lines.len() < term_height as usize {
+        terminal_lines.push(ratatui::text::Line::from(" ".repeat(term_width as usize)));
+    }
 
     let terminal_block = Block::default()
         .title(" Terminal ")
