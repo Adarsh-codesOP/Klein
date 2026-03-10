@@ -75,4 +75,52 @@ pub fn render(f: &mut Frame, app: &App) {
         .alignment(ratatui::layout::Alignment::Center);
         f.render_widget(paragraph, area);
     }
+
+    // Save As Dialog
+    if app.save_as_state.active {
+        let area = layout::centered_rect(60, 10, f.size());
+        f.render_widget(ratatui::widgets::Clear, area);
+        
+        let block = ratatui::widgets::Block::default()
+            .title(" Save As ")
+            .borders(ratatui::widgets::Borders::ALL)
+            .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Cyan))
+            .style(ratatui::style::Style::default().bg(ratatui::style::Color::Reset));
+        
+        let inner_area = block.inner(area);
+        f.render_widget(block, area);
+        
+        let chunks = ratatui::layout::Layout::default()
+            .direction(ratatui::layout::Direction::Vertical)
+            .margin(1)
+            .constraints([
+                ratatui::layout::Constraint::Length(2),
+                ratatui::layout::Constraint::Length(2),
+                ratatui::layout::Constraint::Length(1),
+            ])
+            .split(inner_area);
+            
+        let dir_str = format!("Directory: {}", app.save_as_state.cur_dir.display());
+        let dir_style = if !app.save_as_state.focus_filename {
+            ratatui::style::Style::default().fg(ratatui::style::Color::Black).bg(ratatui::style::Color::White)
+        } else {
+            ratatui::style::Style::default()
+        };
+        f.render_widget(ratatui::widgets::Paragraph::new(dir_str).style(dir_style), chunks[0]);
+        
+        let file_str = format!("Filename:  {}", app.save_as_state.filename);
+        let file_style = if app.save_as_state.focus_filename {
+            ratatui::style::Style::default().fg(ratatui::style::Color::Black).bg(ratatui::style::Color::White)
+        } else {
+            ratatui::style::Style::default()
+        };
+        f.render_widget(ratatui::widgets::Paragraph::new(file_str).style(file_style), chunks[1]);
+        
+        f.render_widget(
+            ratatui::widgets::Paragraph::new("Tab/Up/Down switch | Enter save | Esc cancel")
+                .style(ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray))
+                .alignment(ratatui::layout::Alignment::Center),
+            chunks[2]
+        );
+    }
 }
