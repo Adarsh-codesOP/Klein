@@ -40,9 +40,9 @@ pub fn get_editor_layout(area: Rect, show_sidebar: bool) -> Vec<Rect> {
     Layout::default()
         .direction(Direction::Horizontal)
         .constraints(if show_sidebar {
-            [Constraint::Percentage(20), Constraint::Percentage(80)]
+            [Constraint::Length(30), Constraint::Min(0)]
         } else {
-            [Constraint::Percentage(0), Constraint::Percentage(100)]
+            [Constraint::Length(0), Constraint::Min(0)]
         })
         .split(area)
         .to_vec()

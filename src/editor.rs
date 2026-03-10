@@ -271,6 +271,12 @@ impl Editor {
             lines.push(ratatui::text::Line::from(spans));
         }
 
+        // Fill remaining height with empty lines to ensure the background is fully drawn
+        // and any debris from previous frames is overwritten.
+        while lines.len() < height {
+            lines.push(ratatui::text::Line::from(" "));
+        }
+
         lines
     }
 

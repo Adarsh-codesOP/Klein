@@ -10,6 +10,10 @@ pub mod tabs;
 pub mod terminal;
 
 pub fn render(f: &mut Frame, app: &App) {
+    // Clear the entire screen once at the beginning to prevent ghosting/tearing 
+    // when layouts change or during animations/scrolling.
+    f.render_widget(ratatui::widgets::Clear, f.size());
+
     let show_terminal_layout = if app.maximized == crate::app::Maximized::Editor { false } else { app.show_terminal };
     let chunks = if app.maximized == crate::app::Maximized::Terminal {
         layout::get_maximized_terminal_layout(f.size())

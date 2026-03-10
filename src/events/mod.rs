@@ -65,7 +65,7 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
                     app.editor_mut().clear_selection();
                 }
 
-                app.editor_mut().cursor_y = new_y;
+                app.editor_mut().cursor_y = new_y.min(app.editor().buffer.len_lines().saturating_sub(1));
                 app.editor_mut().cursor_x = new_x;
                 app.editor_mut().clamp_cursor_x();
             }
