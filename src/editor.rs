@@ -317,7 +317,7 @@ impl Editor {
         }
     }
 
-    fn get_max_cursor_x(&self, line_y: usize) -> usize {
+    pub fn get_max_cursor_x(&self, line_y: usize) -> usize {
         if self.buffer.len_lines() == 0 {
             return 0;
         }
