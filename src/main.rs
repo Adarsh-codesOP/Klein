@@ -66,6 +66,25 @@ async fn run_app<B: io::Write + ratatui::backend::Backend>(
     loop {
         terminal.draw(|f| ui::render(f, app))?;
 
+        if !app.terminal_restarting {
+            let mut child_exited = false;
+            if let Ok(mut child) = app.terminal.child.lock() {
+                if let Ok(Some(_status)) = child.try_wait() {
+                    child_exited = true;
+                }
+            }
+            if child_exited {
+                app.terminal_restarting = true;
+                app.show_quit_confirm = true;
+            }
+        } else if !app.show_quit_confirm && !app.should_quit {
+            app.terminal.restart();
+            app.terminal_restarting = false;
+            app.active_panel = crate::app::Panel::Terminal;
+            app.show_terminal = true;
+            app.maximized = crate::app::Maximized::None;
+        }
+
         if event::poll(std::time::Duration::from_millis(16))? {
             let ev = event::read()?;
             events::handle_event(app, ev)?;
