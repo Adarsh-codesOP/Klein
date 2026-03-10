@@ -8,27 +8,28 @@ use ratatui::{
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
     app.terminal_area.set(area);
-    let parser_lock = app.terminal.parser.lock().unwrap();
-    let mut screen = parser_lock.screen().clone();
+    let mut screen = {
+        let parser_lock = app.terminal.parser.lock().unwrap();
+        let mut screen = parser_lock.screen().clone();
+        screen.set_scrollback(app.terminal_scroll);
+        screen
+    };
     
     // We update the terminal size to the ratatui area if needed
     let term_width = area.width.saturating_sub(2);
     let term_height = area.height.saturating_sub(2);
     if term_width > 0 && term_height > 0 {
-        if screen.size() != (term_height, term_width) {
+        let (rows, cols) = screen.size();
+        if rows != term_height || cols != term_width {
             app.terminal.resize(term_height, term_width);
-            // Re-lock to get the resized screen state
-            drop(screen);
-            drop(parser_lock);
+            // Refresh screen after resize
             let parser_lock = app.terminal.parser.lock().unwrap();
             screen = parser_lock.screen().clone();
             screen.set_scrollback(app.terminal_scroll);
         }
     }
-
-    screen.set_scrollback(app.terminal_scroll);
+    
     let actual_scroll = screen.scrollback();
-
     let (rows, cols) = screen.size();
     
     let terminal_lines: Vec<ratatui::text::Line<'_>> = (0..rows)
