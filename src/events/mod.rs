@@ -26,6 +26,12 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
         && mouse.row >= area.y
         && mouse.row < area.y + area.height;
 
+    let term_area = app.terminal_area.get();
+    let is_in_terminal = mouse.column >= term_area.x
+        && mouse.column < term_area.x + term_area.width
+        && mouse.row >= term_area.y
+        && mouse.row < term_area.y + term_area.height;
+
     match mouse.kind {
         MouseEventKind::ScrollUp => {
             if matches!(app.active_panel, Panel::Terminal) {
@@ -89,9 +95,86 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
             app.editor_mut().cursor_x = new_x;
             app.editor_mut().clamp_cursor_x();
         }
+        MouseEventKind::Down(crossterm::event::MouseButton::Left) if is_in_terminal => {
+            app.active_panel = Panel::Terminal;
+            app.terminal_sel = None; // Reset selection on new click
+            
+            let term_y = mouse.row.saturating_sub(term_area.y).saturating_sub(1) as usize;
+            let term_x = mouse.column.saturating_sub(term_area.x).saturating_sub(1) as usize;
+            
+            let output_raw = app.terminal.output.lock().unwrap();
+            let stripped = crate::ui::terminal::strip_ansi(&output_raw);
+            let lines_count = stripped.lines().count();
+            
+            let height = term_area.height.saturating_sub(2) as usize;
+            let max_scroll = lines_count.saturating_sub(height);
+            let scroll = app.terminal_scroll.min(max_scroll);
+            let start = lines_count.saturating_sub(height).saturating_sub(scroll);
+            
+            let abs_y = start + term_y;
+            app.terminal_sel = Some(((abs_y, term_x), (abs_y, term_x)));
+        }
+        MouseEventKind::Drag(crossterm::event::MouseButton::Left) if is_in_terminal => {
+            let term_y = mouse.row.saturating_sub(term_area.y).saturating_sub(1) as usize;
+            let term_x = mouse.column.saturating_sub(term_area.x).saturating_sub(1) as usize;
+            
+            let output_raw = app.terminal.output.lock().unwrap();
+            let stripped = crate::ui::terminal::strip_ansi(&output_raw);
+            let lines_count = stripped.lines().count();
+            
+            let height = term_area.height.saturating_sub(2) as usize;
+            let max_scroll = lines_count.saturating_sub(height);
+            let scroll = app.terminal_scroll.min(max_scroll);
+            let start = lines_count.saturating_sub(height).saturating_sub(scroll);
+            
+            let abs_y = start + term_y;
+            
+            if let Some((sel_start, _)) = app.terminal_sel {
+                app.terminal_sel = Some((sel_start, (abs_y, term_x)));
+            } else {
+                app.terminal_sel = Some(((abs_y, term_x), (abs_y, term_x)));
+            }
+        }
+        MouseEventKind::Up(crossterm::event::MouseButton::Left) => {
+            if app.terminal_sel.is_some() {
+                copy_terminal_selection(app);
+            }
+        }
         _ => {}
     }
     Ok(())
+}
+
+pub fn copy_terminal_selection(app: &mut App) {
+    if let Some((sel_start, sel_end)) = app.terminal_sel {
+        let (sy, sx) = if sel_start < sel_end { sel_start } else { sel_end };
+        let (ey, ex) = if sel_start < sel_end { sel_end } else { sel_start };
+        
+        let output_raw = app.terminal.output.lock().unwrap();
+        let stripped = crate::ui::terminal::strip_ansi(&output_raw);
+        let lines: Vec<&str> = stripped.lines().collect();
+        
+        let mut selected_text = String::new();
+        for y in sy..=ey {
+            if y < lines.len() {
+                let line = lines[y];
+                let chars: Vec<char> = line.chars().collect();
+                
+                let start_idx = if y == sy { sx } else { 0 };
+                let end_idx = if y == ey { ex } else { chars.len() };
+                
+                let part: String = chars.into_iter().skip(start_idx).take(end_idx.saturating_sub(start_idx)).collect();
+                selected_text.push_str(&part);
+                if y < ey {
+                    selected_text.push('\n');
+                }
+            }
+        }
+        
+        if let Some(clipboard) = &mut app.tabs[app.active_tab].editor.clipboard {
+            let _ = clipboard.set_text(selected_text);
+        }
+    }
 }
 
 fn load_preview(app: &mut App, path: std::path::PathBuf) {

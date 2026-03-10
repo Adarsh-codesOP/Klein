@@ -7,6 +7,7 @@ use ratatui::{
 };
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
+    app.terminal_area.set(area);
     let output_raw = app.terminal.output.lock().unwrap();
     let output = strip_ansi(&output_raw);
 
@@ -21,7 +22,42 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
 
     let terminal_lines: Vec<ratatui::text::Line<'_>> = lines[start..end]
         .iter()
-        .map(|l| ratatui::text::Line::from(l.to_string()))
+        .enumerate()
+        .map(|(i, l)| {
+            let abs_y = start + i;
+            let mut spans = Vec::new();
+
+            if let Some((sel_start, sel_end)) = app.terminal_sel {
+                let (sy, sx) = if sel_start < sel_end { sel_start } else { sel_end };
+                let (ey, ex) = if sel_start < sel_end { sel_end } else { sel_start };
+
+                if abs_y < sy || abs_y > ey {
+                    spans.push(ratatui::text::Span::raw(l.to_string()));
+                } else {
+                    let start_col = if abs_y == sy { sx } else { 0 };
+                    let end_col = if abs_y == ey { ex } else { l.chars().count() };
+
+                    let chars: Vec<char> = l.chars().collect();
+                    let before: String = chars.iter().take(start_col.min(chars.len())).collect();
+                    let selected: String = chars.iter().skip(start_col.min(chars.len())).take(end_col.saturating_sub(start_col)).collect();
+                    let after: String = chars.iter().skip(end_col.min(chars.len())).collect();
+
+                    if !before.is_empty() {
+                        spans.push(ratatui::text::Span::raw(before));
+                    }
+                    if !selected.is_empty() {
+                        let style = ratatui::style::Style::default().bg(ratatui::style::Color::White).fg(ratatui::style::Color::Black);
+                        spans.push(ratatui::text::Span::styled(selected, style));
+                    }
+                    if !after.is_empty() {
+                        spans.push(ratatui::text::Span::raw(after));
+                    }
+                }
+            } else {
+                spans.push(ratatui::text::Span::raw(l.to_string()));
+            }
+            ratatui::text::Line::from(spans)
+        })
         .collect();
 
     let terminal_block = Block::default()
