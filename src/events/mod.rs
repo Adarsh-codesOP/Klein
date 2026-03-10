@@ -161,6 +161,13 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
         }
     }
 
+    if key.code == KeyCode::Esc {
+        if app.maximized != crate::app::Maximized::None {
+            app.maximized = crate::app::Maximized::None;
+            return Ok(());
+        }
+    }
+
     // Global Control shortcuts
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         // Ctrl+Shift combos
@@ -187,22 +194,44 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 }
             }
             KeyCode::Char('b') => app.show_sidebar = !app.show_sidebar,
-            KeyCode::Char('`') => app.show_terminal = !app.show_terminal,
+            KeyCode::Char('j') => app.show_terminal = !app.show_terminal,
+            // Simple Ctrl+W for now (advanced save confirm flow later)
+            KeyCode::Char('w') => app.close_tab(),
             KeyCode::Char('s') => {
                 let _ = app.editor_mut().save();
             }
             KeyCode::Char('e') => {
+                if app.maximized == crate::app::Maximized::Editor {
+                    app.maximized = crate::app::Maximized::None;
+                } else {
+                    app.maximized = crate::app::Maximized::Editor;
+                }
                 app.preview = None;
                 app.active_panel = Panel::Editor;
             }
-            KeyCode::Char('r') => {
+            KeyCode::Char('f') => {
                 app.active_panel = Panel::Sidebar;
                 app.show_sidebar = true;
             }
             KeyCode::Char('t') => {
+                if app.maximized == crate::app::Maximized::Terminal {
+                    app.maximized = crate::app::Maximized::None;
+                } else {
+                    app.maximized = crate::app::Maximized::Terminal;
+                }
                 app.preview = None;
                 app.active_panel = Panel::Terminal;
                 app.show_terminal = true;
+            }
+            KeyCode::Char('d') if matches!(app.active_panel, Panel::Sidebar) => {
+                if let Some(path) = app.sidebar.page_down() {
+                    load_preview(app, path);
+                }
+            }
+            KeyCode::Char('u') if matches!(app.active_panel, Panel::Sidebar) => {
+                if let Some(path) = app.sidebar.page_up() {
+                    load_preview(app, path);
+                }
             }
             KeyCode::Char('c') => {
                 app.editor_mut().copy();
@@ -361,6 +390,33 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
 
     // Sidebar navigation
     match key.code {
+        KeyCode::Char('.') if matches!(app.active_panel, Panel::Sidebar) => {
+            app.sidebar.show_hidden = !app.sidebar.show_hidden;
+            app.sidebar.update_flat_list();
+            if app.sidebar.selected_index >= app.sidebar.flat_list.len() && !app.sidebar.flat_list.is_empty() {
+                app.sidebar.selected_index = app.sidebar.flat_list.len() - 1;
+            }
+        }
+        KeyCode::PageDown if matches!(app.active_panel, Panel::Sidebar) => {
+            if let Some(path) = app.sidebar.page_down() {
+                load_preview(app, path);
+            }
+        }
+        KeyCode::PageUp if matches!(app.active_panel, Panel::Sidebar) => {
+            if let Some(path) = app.sidebar.page_up() {
+                load_preview(app, path);
+            }
+        }
+        KeyCode::Home if matches!(app.active_panel, Panel::Sidebar) => {
+            if let Some(path) = app.sidebar.start() {
+                load_preview(app, path);
+            }
+        }
+        KeyCode::End if matches!(app.active_panel, Panel::Sidebar) => {
+            if let Some(path) = app.sidebar.end() {
+                load_preview(app, path);
+            }
+        }
         KeyCode::Down if matches!(app.active_panel, Panel::Sidebar) => {
             if let Some(path) = app.sidebar.next() {
                 load_preview(app, path);
