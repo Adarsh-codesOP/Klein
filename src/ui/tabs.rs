@@ -42,6 +42,6 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         .collect();
 
     let line = Line::from(tabs);
-    let widget = Paragraph::new(line).style(Style::default().bg(Color::Reset));
+    let widget = Paragraph::new(line).style(Style::default().bg(Color::Black));
     f.render_widget(widget, area);
 }

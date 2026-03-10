@@ -58,6 +58,7 @@ pub struct Sidebar {
     pub flat_list: Vec<(PathBuf, usize, bool)>, // (path, depth, is_dir)
     pub offset: usize,
     pub last_height: std::cell::Cell<usize>,
+    pub show_hidden: bool,
 }
 
 impl Sidebar {
@@ -70,6 +71,7 @@ impl Sidebar {
             flat_list: Vec::new(),
             offset: 0,
             last_height: std::cell::Cell::new(20),
+            show_hidden: false,
         };
         sidebar.update_flat_list();
         sidebar
@@ -79,10 +81,30 @@ impl Sidebar {
         let mut list = Vec::new();
         self.flatten(&self.root, 0, &mut list);
         self.flat_list = list;
+
+        // Clamp selection and adjust scroll
+        if !self.flat_list.is_empty() {
+            if self.selected_index >= self.flat_list.len() {
+                self.selected_index = self.flat_list.len().saturating_sub(1);
+            }
+            self.adjust_scroll();
+        } else {
+            self.selected_index = 0;
+            self.offset = 0;
+        }
     }
 
     #[allow(clippy::only_used_in_recursion)]
     fn flatten(&self, node: &FileNode, depth: usize, list: &mut Vec<(PathBuf, usize, bool)>) {
+        if !self.show_hidden
+            && node.name.starts_with('.')
+            && depth > 0
+            && node.name != "."
+            && node.name != ".."
+        {
+            return;
+        }
+
         // Skip root itself if it's the current project dir? No, let's show it or its children.
         // Usually we show children of root.
         list.push((node.path.clone(), depth, node.is_dir));
@@ -122,6 +144,57 @@ impl Sidebar {
             } else {
                 self.selected_index = self.flat_list.len() - 1;
             }
+            self.adjust_scroll();
+            let (path, _, is_dir) = &self.flat_list[self.selected_index];
+            if !*is_dir {
+                return Some(path.clone());
+            }
+        }
+        None
+    }
+
+    pub fn page_down(&mut self) -> Option<PathBuf> {
+        if !self.flat_list.is_empty() {
+            let height = self.last_height.get().saturating_sub(2);
+            self.selected_index =
+                (self.selected_index + height).min(self.flat_list.len().saturating_sub(1));
+            self.adjust_scroll();
+            let (path, _, is_dir) = &self.flat_list[self.selected_index];
+            if !*is_dir {
+                return Some(path.clone());
+            }
+        }
+        None
+    }
+
+    pub fn page_up(&mut self) -> Option<PathBuf> {
+        if !self.flat_list.is_empty() {
+            let height = self.last_height.get().saturating_sub(2);
+            self.selected_index = self.selected_index.saturating_sub(height);
+            self.adjust_scroll();
+            let (path, _, is_dir) = &self.flat_list[self.selected_index];
+            if !*is_dir {
+                return Some(path.clone());
+            }
+        }
+        None
+    }
+
+    pub fn start(&mut self) -> Option<PathBuf> {
+        if !self.flat_list.is_empty() {
+            self.selected_index = 0;
+            self.adjust_scroll();
+            let (path, _, is_dir) = &self.flat_list[self.selected_index];
+            if !*is_dir {
+                return Some(path.clone());
+            }
+        }
+        None
+    }
+
+    pub fn end(&mut self) -> Option<PathBuf> {
+        if !self.flat_list.is_empty() {
+            self.selected_index = self.flat_list.len().saturating_sub(1);
             self.adjust_scroll();
             let (path, _, is_dir) = &self.flat_list[self.selected_index];
             if !*is_dir {
@@ -180,5 +253,56 @@ impl Sidebar {
         }
 
         Ok(false)
+    }
+
+    pub fn refresh(&mut self) {
+        self.root.refresh();
+        self.update_flat_list();
+    }
+}
+
+impl FileNode {
+    pub fn refresh(&mut self) {
+        if self.is_dir && self.is_expanded {
+            let mut new_children = Vec::new();
+            if let Ok(entries) = std::fs::read_dir(&self.path) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    let file_name = entry.file_name().to_string_lossy().to_string();
+                    let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+
+                    let mut is_expanded = false;
+                    if let Some(existing_children) = &self.children {
+                        if let Some(existing_node) =
+                            existing_children.iter().find(|c| c.path == path)
+                        {
+                            is_expanded = existing_node.is_expanded;
+                        }
+                    }
+                    let mut new_node = FileNode {
+                        path,
+                        name: file_name,
+                        is_dir,
+                        is_expanded,
+                        children: None,
+                    };
+
+                    if new_node.is_expanded {
+                        new_node.refresh();
+                    }
+                    new_children.push(new_node);
+                }
+            }
+            new_children.sort_by(|a, b| {
+                if a.is_dir && !b.is_dir {
+                    std::cmp::Ordering::Less
+                } else if !a.is_dir && b.is_dir {
+                    std::cmp::Ordering::Greater
+                } else {
+                    a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                }
+            });
+            self.children = Some(new_children);
+        }
     }
 }

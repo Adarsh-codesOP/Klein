@@ -7,8 +7,16 @@ use ratatui::{
 };
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
+    f.render_widget(ratatui::widgets::Clear, area);
     let is_preview = matches!(app.active_panel, Panel::Sidebar) && app.preview.is_some();
     let editor = app.active_editor();
+
+    // Use a consistent background to prevent ghosting
+    let bg_color = if is_preview {
+        ratatui::style::Color::Rgb(15, 15, 25) // Very dark blue for preview depth
+    } else {
+        ratatui::style::Color::Black
+    };
 
     let title = if is_preview {
         format!(
@@ -34,17 +42,18 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     };
 
     let border_color = if is_preview {
-        ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray)
+        ratatui::style::Color::DarkGray
     } else if matches!(app.active_panel, Panel::Editor) {
-        ratatui::style::Style::default().fg(config::colors::EDITOR_FOCUS)
+        config::colors::EDITOR_FOCUS
     } else {
-        ratatui::style::Style::default()
+        ratatui::style::Color::Indexed(240) // Subdued gray
     };
 
     let editor_block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .border_style(border_color);
+        .border_style(ratatui::style::Style::default().fg(border_color))
+        .style(ratatui::style::Style::default().bg(bg_color));
 
     let inner_rect = editor_block.inner(area);
     f.render_widget(editor_block, area);
@@ -70,21 +79,36 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
 
     // Render Gutter (Line Numbers)
     let start_line = editor.scroll_y;
-    let end_line = (start_line + content_area.height as usize).min(editor.buffer.len_lines());
-    let mut line_numbers = String::new();
+    let num_lines = editor.buffer.len_lines();
+    let mut gutter_lines = Vec::new();
+
+    let end_line = (start_line + content_area.height as usize).min(num_lines);
     for i in start_line..end_line {
-        line_numbers.push_str(&format!("{:>width$} \n", i + 1, width = gutter_width - 1));
+        gutter_lines.push(ratatui::text::Line::from(format!(
+            "{:>width$} ",
+            i + 1,
+            width = gutter_width - 1
+        )));
     }
 
-    let gutter_widget = Paragraph::new(line_numbers)
-        .style(ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray));
+    // Pad gutter to full height
+    while gutter_lines.len() < gutter_area.height as usize {
+        gutter_lines.push(ratatui::text::Line::from(" ".repeat(gutter_width)));
+    }
+
+    let gutter_widget = Paragraph::new(gutter_lines).style(
+        ratatui::style::Style::default()
+            .fg(ratatui::style::Color::DarkGray)
+            .bg(bg_color),
+    );
     f.render_widget(gutter_widget, gutter_area);
 
     // Render Editor Content
     let highlighted_lines =
         editor.get_highlighted_lines(content_area.width as usize, content_area.height as usize);
 
-    let editor_widget = Paragraph::new(highlighted_lines);
+    let editor_widget =
+        Paragraph::new(highlighted_lines).style(ratatui::style::Style::default().bg(bg_color));
     f.render_widget(editor_widget, content_area);
 
     // Show cursor — only for the real editor, not preview

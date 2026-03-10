@@ -7,22 +7,175 @@ use ratatui::{
 };
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
-    let output_raw = app.terminal.output.lock().unwrap();
-    let output = strip_ansi(&output_raw);
+    f.render_widget(ratatui::widgets::Clear, area);
+    app.terminal_area.set(area);
+    let mut screen = {
+        let parser_lock = app.terminal.parser.lock().unwrap();
+        let mut screen = parser_lock.screen().clone();
+        screen.set_scrollback(app.terminal_scroll);
+        screen
+    };
 
-    let lines: Vec<&str> = output.lines().collect();
-    let height = area.height.saturating_sub(2) as usize;
+    // We update the terminal size to the ratatui area if needed
+    let term_width = area.width.saturating_sub(2);
+    let term_height = area.height.saturating_sub(2);
+    if term_width > 0 && term_height > 0 {
+        let (rows, cols) = screen.size();
+        if rows != term_height || cols != term_width {
+            app.terminal.resize(term_height, term_width);
+            // Refresh screen after resize
+            let parser_lock = app.terminal.parser.lock().unwrap();
+            screen = parser_lock.screen().clone();
+            screen.set_scrollback(app.terminal_scroll);
+        }
+    }
 
-    let max_scroll = lines.len().saturating_sub(height);
-    let scroll = app.terminal_scroll.min(max_scroll);
+    let actual_scroll = screen.scrollback();
+    let (rows, cols) = screen.size();
 
-    let start = lines.len().saturating_sub(height).saturating_sub(scroll);
-    let end = lines.len().saturating_sub(scroll);
+    let mut terminal_lines: Vec<ratatui::text::Line<'_>> = (0..rows)
+        .map(|r| {
+            let mut spans = Vec::new();
+            let mut current_text = String::new();
+            let mut current_attrs: Option<(vt100::Cell, bool)> = None;
+            let abs_y = r; // Absolute Y for selection is tricky with scrollback, but let's approximate
 
-    let terminal_lines: Vec<ratatui::text::Line<'_>> = lines[start..end]
-        .iter()
-        .map(|l| ratatui::text::Line::from(l.to_string()))
+            // To properly do selection check, we would need absolute line number.
+            // Since VT100 doesn't expose absolute line index easily, we will skip selection highlights
+            // inside the vt100 grid for this quick fix, or just do a simple highlight.
+            // We can check if (abs_y, c) is within app.terminal_sel.
+
+            for c in 0..cols {
+                if let Some(cell) = screen.cell(r, c) {
+                    let new_attrs = cell.clone();
+                    let char_str = if cell.has_contents() {
+                        cell.contents()
+                    } else {
+                        " "
+                    };
+
+                    // For selection:
+                    let is_selected = if let Some((sel_start, sel_end)) = app.terminal_sel {
+                        let (sy, sx) = if sel_start < sel_end {
+                            sel_start
+                        } else {
+                            sel_end
+                        };
+                        let (ey, ex) = if sel_start < sel_end {
+                            sel_end
+                        } else {
+                            sel_start
+                        };
+
+                        let cur_y = abs_y as usize;
+                        let cur_x = c as usize;
+                        if cur_y > sy && cur_y < ey {
+                            true
+                        } else if cur_y == sy && cur_y == ey {
+                            cur_x >= sx && cur_x <= ex
+                        } else if cur_y == sy {
+                            cur_x >= sx
+                        } else if cur_y == ey {
+                            cur_x <= ex
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+
+                    if let Some((ref attrs, was_selected)) = current_attrs {
+                        if attrs.fgcolor() != cell.fgcolor()
+                            || attrs.bgcolor() != cell.bgcolor()
+                            || attrs.bold() != cell.bold()
+                            || was_selected != is_selected
+                        {
+                            // Flush current_text
+                            let mut style = ratatui::style::Style::default();
+                            match attrs.fgcolor() {
+                                vt100::Color::Idx(idx) => {
+                                    style = style.fg(ratatui::style::Color::Indexed(idx))
+                                }
+                                vt100::Color::Rgb(r, g, b) => {
+                                    style = style.fg(ratatui::style::Color::Rgb(r, g, b))
+                                }
+                                _ => {
+                                    // Default foreground for terminal segments that don't have explicit color
+                                    style = style.fg(ratatui::style::Color::White);
+                                }
+                            }
+                            match attrs.bgcolor() {
+                                vt100::Color::Idx(idx) => {
+                                    style = style.bg(ratatui::style::Color::Indexed(idx))
+                                }
+                                vt100::Color::Rgb(r, g, b) => {
+                                    style = style.bg(ratatui::style::Color::Rgb(r, g, b))
+                                }
+                                _ => {
+                                    style = style.bg(ratatui::style::Color::Black);
+                                }
+                            }
+                            if attrs.bold() {
+                                style = style.add_modifier(ratatui::style::Modifier::BOLD);
+                            }
+                            if was_selected {
+                                style = style
+                                    .bg(ratatui::style::Color::White)
+                                    .fg(ratatui::style::Color::Black);
+                            }
+                            spans.push(ratatui::text::Span::styled(current_text.clone(), style));
+                            current_text.clear();
+                        }
+                    }
+
+                    current_text.push_str(char_str);
+                    current_attrs = Some((new_attrs, is_selected));
+                }
+            }
+            if !current_text.is_empty() {
+                let mut style = ratatui::style::Style::default();
+                if let Some((ref attrs, was_selected)) = current_attrs {
+                    match attrs.fgcolor() {
+                        vt100::Color::Idx(idx) => {
+                            style = style.fg(ratatui::style::Color::Indexed(idx))
+                        }
+                        vt100::Color::Rgb(r, g, b) => {
+                            style = style.fg(ratatui::style::Color::Rgb(r, g, b))
+                        }
+                        _ => {
+                            style = style.fg(ratatui::style::Color::White);
+                        }
+                    }
+                    match attrs.bgcolor() {
+                        vt100::Color::Idx(idx) => {
+                            style = style.bg(ratatui::style::Color::Indexed(idx))
+                        }
+                        vt100::Color::Rgb(r, g, b) => {
+                            style = style.bg(ratatui::style::Color::Rgb(r, g, b))
+                        }
+                        _ => {
+                            style = style.bg(ratatui::style::Color::Black);
+                        }
+                    }
+                    if attrs.bold() {
+                        style = style.add_modifier(ratatui::style::Modifier::BOLD);
+                    }
+                    if was_selected {
+                        style = style
+                            .bg(ratatui::style::Color::White)
+                            .fg(ratatui::style::Color::Black);
+                    }
+                }
+                spans.push(ratatui::text::Span::styled(current_text, style));
+            }
+            ratatui::text::Line::from(spans)
+        })
         .collect();
+
+    // Pad terminal lines to full height to ensure the background is fully cleared
+    while terminal_lines.len() < term_height as usize {
+        terminal_lines.push(ratatui::text::Line::from(" ".repeat(term_width as usize)));
+    }
 
     let terminal_block = Block::default()
         .title(" Terminal ")
@@ -31,22 +184,21 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
             ratatui::style::Style::default().fg(config::colors::TERMINAL_FOCUS)
         } else {
             ratatui::style::Style::default()
-        });
+        })
+        .style(ratatui::style::Style::default().bg(ratatui::style::Color::Black));
 
     let terminal_widget = Paragraph::new(terminal_lines).block(terminal_block);
     f.render_widget(terminal_widget, area);
 
     // Show cursor in terminal if active and not scrolled back
-    if matches!(app.active_panel, Panel::Terminal) && scroll == 0 {
-        let last_line = lines.last().copied().unwrap_or("");
+    if matches!(app.active_panel, Panel::Terminal) && actual_scroll == 0 {
+        let (r, c) = screen.cursor_position();
         let inner = Block::default().borders(Borders::ALL).inner(area);
-        f.set_cursor(
-            inner.x + last_line.len() as u16,
-            inner.y + lines.len().min(height).saturating_sub(1) as u16,
-        );
+        f.set_cursor(inner.x + c, inner.y + r);
     }
 }
 
+#[allow(dead_code)]
 pub fn strip_ansi(s: &str) -> String {
     let mut result = String::new();
     let chars: Vec<char> = s.chars().collect();
