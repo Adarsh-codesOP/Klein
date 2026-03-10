@@ -88,6 +88,26 @@ impl Editor {
         }
     }
 
+    pub fn delete_forward_char(&mut self) {
+        if self.selection_start.is_some() {
+            self.delete_selection();
+            return;
+        }
+
+        let line_idx = self.buffer.line_to_char(self.cursor_y);
+        let char_idx = line_idx + self.cursor_x;
+
+        if char_idx < self.buffer.len_chars() {
+            let mut end_idx = char_idx + 1;
+            // Handle CRLF windows newlines gracefully by deleting both parts
+            if self.buffer.char(char_idx) == '\r' && end_idx < self.buffer.len_chars() && self.buffer.char(end_idx) == '\n' {
+                end_idx += 1;
+            }
+            self.buffer.remove(char_idx..end_idx);
+            self.is_dirty = true;
+        }
+    }
+
     pub fn delete_selection(&mut self) {
         if let Some((start_y, start_x)) = self.selection_start {
             let (sy, sx, ey, ex) = if (start_y, start_x) < (self.cursor_y, self.cursor_x) {
@@ -273,6 +293,27 @@ impl Editor {
                 self.buffer.line(self.cursor_y).to_string()
             };
             let _ = clipboard.set_text(text);
+        }
+    }
+
+    pub fn cut(&mut self) {
+        self.copy();
+        if self.selection_start.is_some() {
+            self.delete_selection();
+        } else {
+            // Nothing selected: cut whole line
+            let start_char = self.buffer.line_to_char(self.cursor_y);
+            let next_line_idx = (self.cursor_y + 1).min(self.buffer.len_lines());
+            let end_char = if next_line_idx < self.buffer.len_lines() {
+                self.buffer.line_to_char(next_line_idx)
+            } else {
+                self.buffer.len_chars()
+            };
+            if start_char < end_char {
+                self.buffer.remove(start_char..end_char);
+                self.cursor_x = 0;
+                self.is_dirty = true;
+            }
         }
     }
 
