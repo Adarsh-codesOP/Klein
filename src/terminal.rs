@@ -6,7 +6,7 @@ use std::thread;
 pub struct Terminal {
     pub master_pty: Box<dyn portable_pty::MasterPty + Send>,
     pub writer: Arc<Mutex<Box<dyn Write + Send>>>,
-    pub output: Arc<Mutex<String>>,
+    pub parser: Arc<Mutex<vt100::Parser>>,
     pub child: Arc<Mutex<Box<dyn portable_pty::Child + Send + Sync>>>,
     pub cwd: std::path::PathBuf,
     pub shell: Option<String>,
@@ -100,22 +100,19 @@ impl Terminal {
         let writer = pty_pair.master.take_writer().unwrap();
         let writer_arc = Arc::new(Mutex::new(writer));
         let mut reader = pty_pair.master.try_clone_reader().unwrap();
-        let output = Arc::new(Mutex::new(String::new()));
-
-        let output_clone = Arc::clone(&output);
+        
+        let parser = Arc::new(Mutex::new(vt100::Parser::new(24, 80, 10000)));
+        let parser_clone = Arc::clone(&parser);
         let writer_clone = Arc::clone(&writer_arc);
+
         thread::spawn(move || {
             let mut buf = [0u8; 1024];
             while let Ok(n) = reader.read(&mut buf) {
                 if n == 0 {
                     break;
                 }
-                let mut out = output_clone.lock().unwrap();
-                let text = String::from_utf8_lossy(&buf[..n]);
-                if text.contains("\x1b[2J") || text.contains("\x1b[H") {
-                    out.clear();
-                }
                 
+                let text = String::from_utf8_lossy(&buf[..n]);
                 // DA Query Response for shells like Fish
                 if text.contains("\x1b[c") || text.contains("\x1b[0c") {
                     if let Ok(mut w) = writer_clone.lock() {
@@ -124,25 +121,15 @@ impl Terminal {
                     }
                 }
                 
-                out.push_str(&text);
-                // Limit output buffer size
-                if out.len() > 10000 {
-                    let split_idx = out.len() - 5000;
-                    // Find a safe UTF-8 boundary
-                    let safe_idx = out
-                        .char_indices()
-                        .map(|(i, _)| i)
-                        .find(|&i| i >= split_idx)
-                        .unwrap_or(out.len());
-                    *out = out[safe_idx..].to_string();
-                }
+                let mut p = parser_clone.lock().unwrap();
+                p.process(&buf[..n]);
             }
         });
 
         Terminal {
             master_pty: pty_pair.master,
             writer: writer_arc,
-            output,
+            parser,
             child: Arc::new(Mutex::new(child)),
             cwd: cwd.clone(),
             shell: preferred_shell.clone(),
