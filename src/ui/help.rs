@@ -19,7 +19,7 @@ pub fn render_hint(f: &mut Frame, area: Rect) {
     f.render_widget(hint, area);
 }
 
-pub fn render(f: &mut Frame, area: Rect) {
+pub fn render(f: &mut Frame, area: Rect, app: &crate::app::App) {
     let block = Block::default()
         .title(config::HELP_TITLE)
         .title_alignment(ratatui::layout::Alignment::Center)
@@ -34,7 +34,8 @@ pub fn render(f: &mut Frame, area: Rect) {
     let help_text = config::HELP_TEXT;
     let help_paragraph = Paragraph::new(help_text)
         .block(block)
-        .style(ratatui::style::Style::default().fg(ratatui::style::Color::White));
+        .style(ratatui::style::Style::default().fg(ratatui::style::Color::White))
+        .scroll((app.help_scroll as u16, 0));
 
     f.render_widget(help_paragraph, area);
 }

@@ -41,7 +41,7 @@ pub fn render(f: &mut Frame, app: &App) {
     status_bar::render(f, chunks[4], app);
 
     if app.show_help {
-        help::render(f, f.size());
+        help::render(f, f.size(), app);
     }
 
     // Quit confirm dialog

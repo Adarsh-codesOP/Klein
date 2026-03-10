@@ -244,6 +244,33 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
         }
     }
 
+    if app.show_help {
+        match key.code {
+            KeyCode::Esc => {
+                app.show_help = false;
+                app.help_scroll = 0;
+            }
+            KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.show_help = false;
+                app.help_scroll = 0;
+            }
+            KeyCode::Down => {
+                app.help_scroll = app.help_scroll.saturating_add(1);
+            }
+            KeyCode::Up => {
+                app.help_scroll = app.help_scroll.saturating_sub(1);
+            }
+            KeyCode::PageDown => {
+                app.help_scroll = app.help_scroll.saturating_add(10);
+            }
+            KeyCode::PageUp => {
+                app.help_scroll = app.help_scroll.saturating_sub(10);
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     if key.code == KeyCode::Esc {
         if app.maximized != crate::app::Maximized::None {
             app.maximized = crate::app::Maximized::None;
