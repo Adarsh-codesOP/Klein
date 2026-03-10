@@ -6,6 +6,14 @@ use syntect::easy::HighlightLines;
 use syntect::highlighting::ThemeSet;
 use syntect::parsing::SyntaxSet;
 
+#[derive(Clone)]
+pub struct UndoState {
+    pub buffer: Rope,
+    pub cursor_x: usize,
+    pub cursor_y: usize,
+    pub selection_start: Option<(usize, usize)>,
+}
+
 pub struct Editor {
     pub buffer: Rope,
     pub path: Option<PathBuf>,
@@ -16,6 +24,7 @@ pub struct Editor {
     pub theme_set: ThemeSet,
     pub selection_start: Option<(usize, usize)>,
     pub is_dirty: bool,
+    pub undo_stack: Vec<UndoState>,
 }
 
 impl Editor {
@@ -30,6 +39,29 @@ impl Editor {
             theme_set: ThemeSet::load_defaults(),
             selection_start: None,
             is_dirty: false,
+            undo_stack: Vec::new(),
+        }
+    }
+
+    pub fn save_undo_state(&mut self) {
+        self.undo_stack.push(UndoState {
+            buffer: self.buffer.clone(),
+            cursor_x: self.cursor_x,
+            cursor_y: self.cursor_y,
+            selection_start: self.selection_start,
+        });
+        if self.undo_stack.len() > 200 {
+            self.undo_stack.remove(0);
+        }
+    }
+
+    pub fn undo(&mut self) {
+        if let Some(state) = self.undo_stack.pop() {
+            self.buffer = state.buffer;
+            self.cursor_x = state.cursor_x;
+            self.cursor_y = state.cursor_y;
+            self.selection_start = state.selection_start;
+            self.is_dirty = true;
         }
     }
 
@@ -42,6 +74,7 @@ impl Editor {
         self.scroll_y = 0;
         self.is_dirty = false;
         self.selection_start = None;
+        self.undo_stack.clear();
         Ok(())
     }
 
@@ -54,6 +87,7 @@ impl Editor {
     }
 
     pub fn insert_char(&mut self, c: char) {
+        self.save_undo_state();
         let line_idx = self.buffer.line_to_char(self.cursor_y);
         let char_idx = line_idx + self.cursor_x;
         self.buffer.insert_char(char_idx, c);
@@ -63,8 +97,9 @@ impl Editor {
     }
 
     pub fn delete_char(&mut self) {
+        self.save_undo_state();
         if self.selection_start.is_some() {
-            self.delete_selection();
+            self.delete_selection_internal();
             return;
         }
 
@@ -87,8 +122,9 @@ impl Editor {
     }
 
     pub fn delete_forward_char(&mut self) {
+        self.save_undo_state();
         if self.selection_start.is_some() {
-            self.delete_selection();
+            self.delete_selection_internal();
             return;
         }
 
@@ -107,6 +143,13 @@ impl Editor {
     }
 
     pub fn delete_selection(&mut self) {
+        if self.selection_start.is_some() {
+            self.save_undo_state();
+            self.delete_selection_internal();
+        }
+    }
+
+    fn delete_selection_internal(&mut self) {
         if let Some((start_y, start_x)) = self.selection_start {
             let (sy, sx, ey, ex) = if (start_y, start_x) < (self.cursor_y, self.cursor_x) {
                 (start_y, start_x, self.cursor_y, self.cursor_x)
@@ -159,54 +202,71 @@ impl Editor {
                 .unwrap_or_default();
 
             let mut current_char_in_line = 0;
-            let spans: Vec<ratatui::text::Span> = highlights
-                .into_iter()
-                .map(|(style, text)| {
-                    let mut span_style =
-                        ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(
-                            style.foreground.r,
-                            style.foreground.g,
-                            style.foreground.b,
-                        ));
+            let mut spans: Vec<ratatui::text::Span> = Vec::new();
 
-                    // Check for selection
-                    if let Some((start_y, start_x)) = self.selection_start {
-                        let (sy, sx, ey, ex) =
-                            if (start_y, start_x) < (self.cursor_y, self.cursor_x) {
-                                (start_y, start_x, self.cursor_y, self.cursor_x)
-                            } else {
-                                (self.cursor_y, self.cursor_x, start_y, start_x)
-                            };
+            for (style, text) in highlights {
+                let span_style = ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(
+                    style.foreground.r,
+                    style.foreground.g,
+                    style.foreground.b,
+                ));
 
-                        let text_len = text.chars().count();
-                        let span_range_start = current_char_in_line;
-                        let span_range_end = current_char_in_line + text_len;
+                if let Some((start_y, start_x)) = self.selection_start {
+                    let (sy, sx, ey, ex) = if (start_y, start_x) < (self.cursor_y, self.cursor_x) {
+                        (start_y, start_x, self.cursor_y, self.cursor_x)
+                    } else {
+                        (self.cursor_y, self.cursor_x, start_y, start_x)
+                    };
 
-                        let line_idx = i;
+                    let line_idx = i;
+                    let mut current_segment = String::new();
+                    let mut current_is_selected = false;
 
-                        let is_selected = if line_idx > sy && line_idx < ey {
+                    for (idx, c) in text.chars().enumerate() {
+                        let char_pos = current_char_in_line + idx;
+                        let is_char_selected = if line_idx > sy && line_idx < ey {
                             true
                         } else if line_idx == sy && line_idx == ey {
-                            span_range_start < ex && span_range_end > sx
+                            char_pos >= sx && char_pos < ex
                         } else if line_idx == sy {
-                            span_range_end > sx
+                            char_pos >= sx
                         } else if line_idx == ey {
-                            span_range_start < ex
+                            char_pos < ex
                         } else {
                             false
                         };
 
-                        if is_selected {
-                            span_style = span_style
+                        if idx == 0 {
+                            current_is_selected = is_char_selected;
+                        } else if is_char_selected != current_is_selected {
+                            let mut s_style = span_style;
+                            if current_is_selected {
+                                s_style = s_style
+                                    .bg(ratatui::style::Color::Yellow)
+                                    .fg(ratatui::style::Color::Black);
+                            }
+                            spans.push(ratatui::text::Span::styled(current_segment.clone(), s_style));
+                            current_segment.clear();
+                            current_is_selected = is_char_selected;
+                        }
+                        current_segment.push(c);
+                    }
+
+                    if !current_segment.is_empty() {
+                        let mut s_style = span_style;
+                        if current_is_selected {
+                            s_style = s_style
                                 .bg(ratatui::style::Color::Yellow)
                                 .fg(ratatui::style::Color::Black);
                         }
-                        current_char_in_line += text_len;
+                        spans.push(ratatui::text::Span::styled(current_segment, s_style));
                     }
-
-                    ratatui::text::Span::styled(text.to_string(), span_style)
-                })
-                .collect();
+                    current_char_in_line += text.chars().count();
+                } else {
+                    current_char_in_line += text.chars().count();
+                    spans.push(ratatui::text::Span::styled(text.to_string(), span_style));
+                }
+            }
 
             lines.push(ratatui::text::Line::from(spans));
         }
@@ -263,10 +323,13 @@ impl Editor {
     }
 
     pub fn insert_tab(&mut self) {
-        self.insert_char(' ');
-        self.insert_char(' ');
-        self.insert_char(' ');
-        self.insert_char(' ');
+        self.save_undo_state();
+        let line_idx = self.buffer.line_to_char(self.cursor_y);
+        let char_idx = line_idx + self.cursor_x;
+        self.buffer.insert(char_idx, "    ");
+        self.cursor_x += 4;
+        self.is_dirty = true;
+        self.selection_start = None;
     }
 
     pub fn select_all(&mut self) {
@@ -295,9 +358,10 @@ impl Editor {
     }
 
     pub fn cut(&mut self, clipboard: &mut Option<arboard::Clipboard>) {
+        self.save_undo_state();
         self.copy(clipboard);
         if self.selection_start.is_some() {
-            self.delete_selection();
+            self.delete_selection_internal();
         } else {
             // Nothing selected: cut whole line
             let start_char = self.buffer.line_to_char(self.cursor_y);
@@ -324,8 +388,9 @@ impl Editor {
     }
 
     pub fn insert_paste(&mut self, text: &str, height: usize) {
+        self.save_undo_state();
         if self.selection_start.is_some() {
-            self.delete_selection();
+            self.delete_selection_internal();
         }
 
         let line_idx = self.buffer.line_to_char(self.cursor_y);

@@ -360,6 +360,9 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     app.should_quit = true;
                 }
             }
+            KeyCode::Char('z') => {
+                app.editor_mut().undo();
+            }
             KeyCode::Char('b') => app.show_sidebar = !app.show_sidebar,
             KeyCode::Char('j') => app.show_terminal = !app.show_terminal,
             // Simple Ctrl+W for now (advanced save confirm flow later)
