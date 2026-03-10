@@ -6,11 +6,12 @@ use ratatui::{
 };
 
 pub fn render_hint(f: &mut Frame, area: Rect) {
-    let hint_text = " [Ctrl+H] Help Overlay ";
+    let hint_text = " ^S Save │ ^Q Quit │ ^E Editor │ ^F Sidebar │ ^T Terminal │ ^B Toggle Sidebar │ ^J Toggle Terminal │ ^H Help ";
     let hint = Paragraph::new(hint_text)
         .style(
             ratatui::style::Style::default()
-                .fg(ratatui::style::Color::DarkGray)
+                .fg(ratatui::style::Color::White)
+                .add_modifier(ratatui::style::Modifier::BOLD)
                 .bg(ratatui::style::Color::Reset),
         ) // Very subtle gray on black
         .alignment(ratatui::layout::Alignment::Center);

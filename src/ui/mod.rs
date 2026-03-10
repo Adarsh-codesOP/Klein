@@ -10,28 +10,31 @@ pub mod tabs;
 pub mod terminal;
 
 pub fn render(f: &mut Frame, app: &App) {
-    let chunks = layout::get_main_layout(f.size(), app.show_terminal);
-    // chunks[0] = help hint
-    // chunks[1] = tab bar
-    // chunks[2] = main workspace
-    // chunks[3] = terminal
-    // chunks[4] = status bar
+    let show_terminal_layout = if app.maximized == crate::app::Maximized::Editor { false } else { app.show_terminal };
+    let chunks = if app.maximized == crate::app::Maximized::Terminal {
+        layout::get_maximized_terminal_layout(f.size())
+    } else {
+        layout::get_main_layout(f.size(), show_terminal_layout)
+    };
 
     // Render the subtle help hint tab at the very top
     help::render_hint(f, chunks[0]);
 
-    // Render tab bar
-    tabs::render(f, chunks[1], app);
+    if app.maximized != crate::app::Maximized::Terminal {
+        // Render tab bar
+        tabs::render(f, chunks[1], app);
 
-    let main_chunks = layout::get_editor_layout(chunks[2], app.show_sidebar);
+        let show_sidebar = if app.maximized == crate::app::Maximized::Editor { false } else { app.show_sidebar };
+        let main_chunks = layout::get_editor_layout(chunks[2], show_sidebar);
 
-    if app.show_sidebar {
-        sidebar::render(f, main_chunks[0], app);
+        if show_sidebar {
+            sidebar::render(f, main_chunks[0], app);
+        }
+
+        editor::render(f, main_chunks[1], app);
     }
 
-    editor::render(f, main_chunks[1], app);
-
-    if app.show_terminal {
+    if app.maximized == crate::app::Maximized::Terminal || show_terminal_layout {
         terminal::render(f, chunks[3], app);
     }
 
