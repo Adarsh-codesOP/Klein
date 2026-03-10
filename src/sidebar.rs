@@ -58,6 +58,7 @@ pub struct Sidebar {
     pub flat_list: Vec<(PathBuf, usize, bool)>, // (path, depth, is_dir)
     pub offset: usize,
     pub last_height: std::cell::Cell<usize>,
+    pub show_hidden: bool,
 }
 
 impl Sidebar {
@@ -70,6 +71,7 @@ impl Sidebar {
             flat_list: Vec::new(),
             offset: 0,
             last_height: std::cell::Cell::new(20),
+            show_hidden: false,
         };
         sidebar.update_flat_list();
         sidebar
@@ -83,6 +85,10 @@ impl Sidebar {
 
     #[allow(clippy::only_used_in_recursion)]
     fn flatten(&self, node: &FileNode, depth: usize, list: &mut Vec<(PathBuf, usize, bool)>) {
+        if !self.show_hidden && node.name.starts_with('.') && depth > 0 && node.name != "." && node.name != ".." {
+            return;
+        }
+
         // Skip root itself if it's the current project dir? No, let's show it or its children.
         // Usually we show children of root.
         list.push((node.path.clone(), depth, node.is_dir));
@@ -122,6 +128,56 @@ impl Sidebar {
             } else {
                 self.selected_index = self.flat_list.len() - 1;
             }
+            self.adjust_scroll();
+            let (path, _, is_dir) = &self.flat_list[self.selected_index];
+            if !*is_dir {
+                return Some(path.clone());
+            }
+        }
+        None
+    }
+
+    pub fn page_down(&mut self) -> Option<PathBuf> {
+        if !self.flat_list.is_empty() {
+            let height = self.last_height.get().saturating_sub(2);
+            self.selected_index = (self.selected_index + height).min(self.flat_list.len().saturating_sub(1));
+            self.adjust_scroll();
+            let (path, _, is_dir) = &self.flat_list[self.selected_index];
+            if !*is_dir {
+                return Some(path.clone());
+            }
+        }
+        None
+    }
+
+    pub fn page_up(&mut self) -> Option<PathBuf> {
+        if !self.flat_list.is_empty() {
+            let height = self.last_height.get().saturating_sub(2);
+            self.selected_index = self.selected_index.saturating_sub(height);
+            self.adjust_scroll();
+            let (path, _, is_dir) = &self.flat_list[self.selected_index];
+            if !*is_dir {
+                return Some(path.clone());
+            }
+        }
+        None
+    }
+
+    pub fn start(&mut self) -> Option<PathBuf> {
+        if !self.flat_list.is_empty() {
+            self.selected_index = 0;
+            self.adjust_scroll();
+            let (path, _, is_dir) = &self.flat_list[self.selected_index];
+            if !*is_dir {
+                return Some(path.clone());
+            }
+        }
+        None
+    }
+
+    pub fn end(&mut self) -> Option<PathBuf> {
+        if !self.flat_list.is_empty() {
+            self.selected_index = self.flat_list.len().saturating_sub(1);
             self.adjust_scroll();
             let (path, _, is_dir) = &self.flat_list[self.selected_index];
             if !*is_dir {
