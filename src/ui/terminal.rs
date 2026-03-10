@@ -7,6 +7,7 @@ use ratatui::{
 };
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
+    f.render_widget(ratatui::widgets::Clear, area);
     app.terminal_area.set(area);
     let mut screen = {
         let parser_lock = app.terminal.parser.lock().unwrap();

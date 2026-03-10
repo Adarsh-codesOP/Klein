@@ -7,6 +7,7 @@ use ratatui::{
 };
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
+    f.render_widget(ratatui::widgets::Clear, area);
     let is_preview = matches!(app.active_panel, Panel::Sidebar) && app.preview.is_some();
     let editor = app.active_editor();
 

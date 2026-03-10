@@ -149,6 +149,11 @@ pub fn copy_terminal_selection(app: &mut App) {
 }
 
 fn load_preview(app: &mut App, path: std::path::PathBuf) {
+    if let Some(preview) = &app.preview {
+        if preview.path.as_ref() == Some(&path) {
+            return;
+        }
+    }
     let mut preview_editor = crate::editor::Editor::new();
     let _ = preview_editor.open(path);
     app.preview = Some(preview_editor);

@@ -81,6 +81,17 @@ impl Sidebar {
         let mut list = Vec::new();
         self.flatten(&self.root, 0, &mut list);
         self.flat_list = list;
+        
+        // Clamp selection and adjust scroll
+        if !self.flat_list.is_empty() {
+            if self.selected_index >= self.flat_list.len() {
+                self.selected_index = self.flat_list.len().saturating_sub(1);
+            }
+            self.adjust_scroll();
+        } else {
+            self.selected_index = 0;
+            self.offset = 0;
+        }
     }
 
     #[allow(clippy::only_used_in_recursion)]

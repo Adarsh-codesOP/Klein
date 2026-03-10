@@ -7,6 +7,7 @@ use ratatui::{
 };
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
+    f.render_widget(ratatui::widgets::Clear, area);
     let mut list_items = Vec::new();
     let height = area.height.saturating_sub(2) as usize;
     let offset = app.sidebar.offset;
