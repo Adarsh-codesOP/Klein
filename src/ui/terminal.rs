@@ -16,9 +16,13 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let term_height = area.height.saturating_sub(2);
     if term_width > 0 && term_height > 0 {
         if screen.size() != (term_height, term_width) {
-            // Note: In a real app we would resize the PTY here using master_pty.resize().
-            // For now we just resize the parser screen to match the layout.
-            screen.set_size(term_height, term_width);
+            app.terminal.resize(term_height, term_width);
+            // Re-lock to get the resized screen state
+            drop(screen);
+            drop(parser_lock);
+            let parser_lock = app.terminal.parser.lock().unwrap();
+            screen = parser_lock.screen().clone();
+            screen.set_scrollback(app.terminal_scroll);
         }
     }
 

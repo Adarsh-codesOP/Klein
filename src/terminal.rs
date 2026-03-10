@@ -158,4 +158,16 @@ impl Terminal {
             let _ = w.flush(); // Crucial for PTY responsiveness
         }
     }
+
+    pub fn resize(&self, rows: u16, cols: u16) {
+        let _ = self.master_pty.resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        });
+        if let Ok(mut p) = self.parser.lock() {
+            p.set_size(rows, cols);
+        }
+    }
 }

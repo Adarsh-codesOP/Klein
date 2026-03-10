@@ -8,7 +8,11 @@ use ratatui::{
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let mut list_items = Vec::new();
-    for (i, (path, depth, is_dir)) in app.sidebar.flat_list.iter().enumerate() {
+    let height = area.height.saturating_sub(2) as usize;
+    let offset = app.sidebar.offset;
+    let visible_slice = app.sidebar.flat_list.iter().enumerate().skip(offset).take(height);
+
+    for (i, (path, depth, is_dir)) in visible_slice {
         let prefix = "  ".repeat(*depth);
         let icon = if *is_dir { "📁 " } else { "📄 " };
         let name = path
@@ -44,8 +48,6 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         });
 
     app.sidebar.last_height.set(area.height as usize);
-    let sidebar_widget = Paragraph::new(list_items)
-        .block(sidebar_block)
-        .scroll((app.sidebar.offset as u16, 0));
+    let sidebar_widget = Paragraph::new(list_items).block(sidebar_block);
     f.render_widget(sidebar_widget, area);
 }
