@@ -14,6 +14,14 @@ pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
         Event::Mouse(mouse) => {
             handle_mouse_event(app, mouse)?;
         }
+        Event::Paste(text) => {
+            if matches!(app.active_panel, Panel::Editor) {
+                let h = app.last_editor_height.get();
+                app.insert_paste(&text, h);
+            } else if matches!(app.active_panel, Panel::Terminal) {
+                app.terminal.write(&text);
+            }
+        }
         _ => {}
     }
     Ok(())
@@ -153,7 +161,7 @@ pub fn copy_terminal_selection(app: &mut App) {
             }
         }
         
-        if let Some(clipboard) = &mut app.tabs[app.active_tab].editor.clipboard {
+        if let Some(clipboard) = &mut app.clipboard {
             let _ = clipboard.set_text(selected_text);
         }
     }
@@ -393,11 +401,11 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 }
             }
             KeyCode::Char('c') => {
-                app.editor_mut().copy();
+                app.copy_selection();
             }
             KeyCode::Char('v') => {
                 let h = app.last_editor_height.get();
-                app.editor_mut().paste(h);
+                app.paste_clipboard(h);
             }
             KeyCode::Char('a') => {
                 app.editor_mut().select_all();
@@ -518,13 +526,13 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 return Ok(());
             }
             KeyCode::Char('c') if app.editor().selection_start.is_some() => {
-                app.editor_mut().copy();
+                app.copy_selection();
                 app.editor_mut().clear_selection();
                 return Ok(());
             }
             KeyCode::Char('v') if app.editor().selection_start.is_some() => {
                 let h = app.last_editor_height.get();
-                app.editor_mut().paste(h);
+                app.paste_clipboard(h);
                 return Ok(());
             }
             KeyCode::Home => {
@@ -587,7 +595,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 return Ok(());
             }
             KeyCode::Char('x') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                app.editor_mut().cut();
+                app.cut_selection();
                 return Ok(());
             }
             KeyCode::Backspace => {

@@ -318,30 +318,34 @@ impl Editor {
     pub fn paste(&mut self, clipboard: &mut Option<arboard::Clipboard>, height: usize) {
         if let Some(clipboard) = clipboard {
             if let Ok(text) = clipboard.get_text() {
-                if self.selection_start.is_some() {
-                    self.delete_selection();
-                }
-
-                let line_idx = self.buffer.line_to_char(self.cursor_y);
-                let char_idx = line_idx + self.cursor_x;
-                self.buffer.insert(char_idx, &text);
-
-                // Update cursor after paste
-                let text_rope = Rope::from_str(&text);
-                if text_rope.len_lines() > 1 {
-                    self.cursor_y += text_rope.len_lines() - 1;
-                    self.cursor_x = text_rope.line(text_rope.len_lines() - 1).len_chars();
-                } else {
-                    self.cursor_x += text.len();
-                }
-                self.is_dirty = true;
-                self.clamp_cursor_x();
-
-                // Ensure the cursor (at the end of the paste) is visible.
-                // This naturally pushes the view down for large pastes, showing the text.
-                self.ensure_cursor_visible(height);
+                self.insert_paste(&text, height);
             }
         }
+    }
+
+    pub fn insert_paste(&mut self, text: &str, height: usize) {
+        if self.selection_start.is_some() {
+            self.delete_selection();
+        }
+
+        let line_idx = self.buffer.line_to_char(self.cursor_y);
+        let char_idx = line_idx + self.cursor_x;
+        self.buffer.insert(char_idx, text);
+
+        // Update cursor after paste
+        let text_rope = Rope::from_str(text);
+        if text_rope.len_lines() > 1 {
+            self.cursor_y += text_rope.len_lines() - 1;
+            self.cursor_x = text_rope.line(text_rope.len_lines() - 1).len_chars();
+        } else {
+            self.cursor_x += text.len();
+        }
+        self.is_dirty = true;
+        self.clamp_cursor_x();
+
+        // Ensure the cursor (at the end of the paste) is visible.
+        // This naturally pushes the view down for large pastes, showing the text.
+        self.ensure_cursor_visible(height);
     }
 
     pub fn ensure_cursor_visible(&mut self, height: usize) {

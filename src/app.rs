@@ -145,6 +145,28 @@ impl App {
         &mut self.tabs[self.active_tab].editor
     }
 
+    pub fn copy_selection(&mut self) {
+        let mut cb = self.clipboard.take();
+        self.editor_mut().copy(&mut cb);
+        self.clipboard = cb;
+    }
+
+    pub fn cut_selection(&mut self) {
+        let mut cb = self.clipboard.take();
+        self.editor_mut().cut(&mut cb);
+        self.clipboard = cb;
+    }
+
+    pub fn paste_clipboard(&mut self, height: usize) {
+        let mut cb = self.clipboard.take();
+        self.editor_mut().paste(&mut cb, height);
+        self.clipboard = cb;
+    }
+
+    pub fn insert_paste(&mut self, text: &str, height: usize) {
+        self.editor_mut().insert_paste(text, height);
+    }
+
     /// Open a file in a new tab (always creates a new tab)
     pub fn open_in_new_tab(&mut self, path: PathBuf) {
         let mut tab = TabState::new();
