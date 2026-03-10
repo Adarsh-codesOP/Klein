@@ -10,8 +10,7 @@ pub mod tabs;
 pub mod terminal;
 
 pub fn render(f: &mut Frame, app: &App) {
-    // Clear the entire screen once at the beginning to prevent ghosting/tearing
-    // when layouts change or during animations/scrolling.
+
     f.render_widget(ratatui::widgets::Clear, f.size());
 
     let show_terminal_layout = if app.maximized == crate::app::Maximized::Editor {
@@ -90,29 +89,30 @@ pub fn render(f: &mut Frame, app: &App) {
 
     // Save As Dialog
     if app.save_as_state.active {
-        let area = layout::centered_rect(60, 10, f.size());
+        let area = layout::centered_rect(60, 25, f.size());
         f.render_widget(ratatui::widgets::Clear, area);
 
         let block = ratatui::widgets::Block::default()
             .title(" Save As ")
             .borders(ratatui::widgets::Borders::ALL)
+            .border_type(ratatui::widgets::BorderType::Rounded)
             .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Cyan))
-            .style(ratatui::style::Style::default().bg(ratatui::style::Color::Reset));
+            .style(ratatui::style::Style::default().bg(ratatui::style::Color::Black));
 
         let inner_area = block.inner(area);
         f.render_widget(block, area);
 
         let chunks = ratatui::layout::Layout::default()
             .direction(ratatui::layout::Direction::Vertical)
-            .margin(1)
             .constraints([
-                ratatui::layout::Constraint::Length(2),
-                ratatui::layout::Constraint::Length(2),
                 ratatui::layout::Constraint::Length(1),
+                ratatui::layout::Constraint::Length(1),
+                ratatui::layout::Constraint::Length(1),
+                ratatui::layout::Constraint::Min(0), // Spacer
             ])
             .split(inner_area);
 
-        let dir_str = format!("Directory: {}", app.save_as_state.cur_dir.display());
+        let dir_str = format!("Dir:  {}", app.save_as_state.cur_dir.display());
         let dir_style = if !app.save_as_state.focus_filename {
             ratatui::style::Style::default()
                 .fg(ratatui::style::Color::Black)
@@ -125,7 +125,18 @@ pub fn render(f: &mut Frame, app: &App) {
             chunks[0],
         );
 
-        let file_str = format!("Filename:  {}", app.save_as_state.filename);
+        let file_str_base = if app.save_as_state.filename.is_empty() {
+            "".to_string()
+        } else {
+            app.save_as_state.filename.clone()
+        };
+
+        let file_display = if app.save_as_state.focus_filename {
+            format!("File: {}_", file_str_base) // Visual cursor
+        } else {
+            format!("File: {}", file_str_base)
+        };
+
         let file_style = if app.save_as_state.focus_filename {
             ratatui::style::Style::default()
                 .fg(ratatui::style::Color::Black)
@@ -133,13 +144,23 @@ pub fn render(f: &mut Frame, app: &App) {
         } else {
             ratatui::style::Style::default()
         };
+
+        // For long filenames, we want to show the end of the string (where typing happens)
+        let inner_width = chunks[1].width as usize;
+        let file_para_content = if file_display.chars().count() > inner_width && inner_width > 1 {
+            let skip_count = file_display.chars().count() - (inner_width - 1);
+            format!("…{}", file_display.chars().skip(skip_count).collect::<String>())
+        } else {
+            file_display
+        };
+
         f.render_widget(
-            ratatui::widgets::Paragraph::new(file_str).style(file_style),
+            ratatui::widgets::Paragraph::new(file_para_content).style(file_style),
             chunks[1],
         );
 
         f.render_widget(
-            ratatui::widgets::Paragraph::new("Tab/Up/Down switch | Enter save | Esc cancel")
+            ratatui::widgets::Paragraph::new("Tab/Up/Down switches field | Enter saves | Esc cancels")
                 .style(ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray))
                 .alignment(ratatui::layout::Alignment::Center),
             chunks[2],

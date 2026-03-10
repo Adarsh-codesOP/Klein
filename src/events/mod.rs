@@ -195,10 +195,28 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             KeyCode::Backspace => {
                 if app.save_as_state.focus_filename {
                     app.save_as_state.filename.pop();
+                    app.save_as_state.is_edited = true;
+                }
+            }
+            KeyCode::Delete => {
+                // For a simple text field, delete can behave like backspace if we don't track cursor pos
+                if app.save_as_state.focus_filename {
+                    app.save_as_state.filename.pop();
+                    app.save_as_state.is_edited = true;
+                }
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if app.save_as_state.focus_filename {
+                    app.save_as_state.filename.clear();
+                    app.save_as_state.is_edited = true;
                 }
             }
             KeyCode::Char(c) => {
-                if app.save_as_state.focus_filename {
+                if app.save_as_state.focus_filename && !key.modifiers.contains(KeyModifiers::CONTROL) && !key.modifiers.contains(KeyModifiers::ALT) {
+                    if !app.save_as_state.is_edited {
+                        app.save_as_state.filename.clear();
+                        app.save_as_state.is_edited = true;
+                    }
                     app.save_as_state.filename.push(c);
                 }
             }

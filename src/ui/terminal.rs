@@ -198,6 +198,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     }
 }
 
+#[allow(dead_code)]
 pub fn strip_ansi(s: &str) -> String {
     let mut result = String::new();
     let chars: Vec<char> = s.chars().collect();

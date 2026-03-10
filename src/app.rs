@@ -25,6 +25,7 @@ pub struct SaveAsState {
     pub cur_dir: PathBuf,
     pub focus_filename: bool,
     pub context: SaveAsContext,
+    pub is_edited: bool,
 }
 
 impl Default for SaveAsState {
@@ -35,6 +36,7 @@ impl Default for SaveAsState {
             cur_dir: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             focus_filename: true,
             context: SaveAsContext::SaveOnly,
+            is_edited: false,
         }
     }
 }
@@ -223,6 +225,7 @@ impl App {
 
             self.save_as_state.filename = proposed_name;
             self.save_as_state.focus_filename = true;
+            self.save_as_state.is_edited = false;
             false
         }
     }
