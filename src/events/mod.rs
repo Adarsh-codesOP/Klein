@@ -267,6 +267,32 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
         }
     }
 
+    // Handle create file prompt
+    if app.show_create_file_prompt {
+        match key.code {
+            KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
+                if let Some(path) = app.pending_open_path.take() {
+                    if let Some(parent) = path.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    if std::fs::File::create(&path).is_ok() {
+                        app.open_in_current_tab(path);
+                        app.active_panel = Panel::Editor;
+                    }
+                }
+                app.show_create_file_prompt = false;
+                return Ok(());
+            }
+            KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc | KeyCode::Char('c') | KeyCode::Char('C') => {
+                app.pending_open_path = None;
+                app.show_create_file_prompt = false;
+                app.active_panel = Panel::Sidebar;
+                return Ok(());
+            }
+            _ => return Ok(()),
+        }
+    }
+
     if app.show_help {
         match key.code {
             KeyCode::Esc => {

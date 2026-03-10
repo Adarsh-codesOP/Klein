@@ -123,4 +123,22 @@ pub fn render(f: &mut Frame, app: &App) {
             chunks[2]
         );
     }
+
+    // Create File Prompt Dialog
+    if app.show_create_file_prompt {
+        if let Some(path) = &app.pending_open_path {
+            let area = layout::centered_rect(50, 10, f.size());
+            f.render_widget(ratatui::widgets::Clear, area);
+            let block = ratatui::widgets::Block::default()
+                .title(" File Not Found ")
+                .borders(ratatui::widgets::Borders::ALL)
+                .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Yellow))
+                .style(ratatui::style::Style::default().bg(ratatui::style::Color::Reset));
+            let text = format!("File does not exist:\n{}\n\nCreate it? (y/n)", path.display());
+            let paragraph = ratatui::widgets::Paragraph::new(text)
+                .block(block)
+                .alignment(ratatui::layout::Alignment::Center);
+            f.render_widget(paragraph, area);
+        }
+    }
 }
