@@ -4,9 +4,12 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 pub struct Terminal {
-    pub _pty_pair: PtyPair,
-    pub writer: Box<dyn Write + Send>,
+    pub master_pty: Box<dyn portable_pty::MasterPty + Send>,
+    pub writer: Arc<Mutex<Box<dyn Write + Send>>>,
     pub output: Arc<Mutex<String>>,
+    pub child: Arc<Mutex<Box<dyn portable_pty::Child + Send + Sync>>>,
+    pub cwd: std::path::PathBuf,
+    pub shell: Option<String>,
 }
 
 impl Terminal {
@@ -87,14 +90,20 @@ impl Terminal {
         let mut cmd = CommandBuilder::new(shell_path);
         cmd.args(&args);
         cmd.env("TERM", "xterm-256color");
+        cmd.env("COLORTERM", "truecolor");
         cmd.cwd(cwd);
-        let _child = pty_pair.slave.spawn_command(cmd).unwrap();
+        let child = pty_pair.slave.spawn_command(cmd).unwrap();
+        
+        // Drop slave proactively to ensure EOF reaches master when child exits
+        drop(pty_pair.slave);
 
         let writer = pty_pair.master.take_writer().unwrap();
+        let writer_arc = Arc::new(Mutex::new(writer));
         let mut reader = pty_pair.master.try_clone_reader().unwrap();
         let output = Arc::new(Mutex::new(String::new()));
 
         let output_clone = Arc::clone(&output);
+        let writer_clone = Arc::clone(&writer_arc);
         thread::spawn(move || {
             let mut buf = [0u8; 1024];
             while let Ok(n) = reader.read(&mut buf) {
@@ -106,6 +115,15 @@ impl Terminal {
                 if text.contains("\x1b[2J") || text.contains("\x1b[H") {
                     out.clear();
                 }
+                
+                // DA Query Response for shells like Fish
+                if text.contains("\x1b[c") || text.contains("\x1b[0c") {
+                    if let Ok(mut w) = writer_clone.lock() {
+                        let _ = w.write_all(b"\x1b[?62;22c");
+                        let _ = w.flush();
+                    }
+                }
+                
                 out.push_str(&text);
                 // Limit output buffer size
                 if out.len() > 10000 {
@@ -122,14 +140,23 @@ impl Terminal {
         });
 
         Terminal {
-            _pty_pair: pty_pair,
-            writer,
+            master_pty: pty_pair.master,
+            writer: writer_arc,
             output,
+            child: Arc::new(Mutex::new(child)),
+            cwd: cwd.clone(),
+            shell: preferred_shell.clone(),
         }
     }
 
+    pub fn restart(&mut self) {
+        *self = Terminal::new(self.cwd.clone(), self.shell.clone());
+    }
+
     pub fn write(&mut self, data: &str) {
-        let _ = self.writer.write_all(data.as_bytes());
-        let _ = self.writer.flush(); // Crucial for PTY responsiveness
+        if let Ok(mut w) = self.writer.lock() {
+            let _ = w.write_all(data.as_bytes());
+            let _ = w.flush(); // Crucial for PTY responsiveness
+        }
     }
 }
