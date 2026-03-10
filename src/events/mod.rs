@@ -75,22 +75,18 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
                 let term_y = mouse.row.saturating_sub(term_area.y).saturating_sub(1) as usize;
                 let term_x = mouse.column.saturating_sub(term_area.x).saturating_sub(1) as usize;
                 
-                let output_raw = app.terminal.output.lock().unwrap();
-                let stripped = crate::ui::terminal::strip_ansi(&output_raw);
-                let lines_count = stripped.lines().count();
-                
-                let height = term_area.height.saturating_sub(2) as usize;
-                let max_scroll = lines_count.saturating_sub(height);
-                let scroll = app.terminal_scroll.min(max_scroll);
-                let start = lines_count.saturating_sub(height).saturating_sub(scroll);
-                
-                let abs_y = start + term_y;
+                // For simplicity, we just use term_y as the absolute Y within the grid
+                // This means selection highlights will be restricted to the active screen view.
+                let abs_y = term_y;
                 
                 if let Some((sel_start, _)) = app.terminal_sel {
                     app.terminal_sel = Some((sel_start, (abs_y, term_x)));
                 } else {
                     app.terminal_sel = Some(((abs_y, term_x), (abs_y, term_x)));
                 }
+                
+                // Copy selection immediately on drag like most modern terminals
+                copy_terminal_selection(app);
             } else if is_in_editor {
                 if app.editor().selection_start.is_none() {
                     app.editor_mut().toggle_selection();
@@ -140,26 +136,11 @@ pub fn copy_terminal_selection(app: &mut App) {
         let (sy, sx) = if sel_start < sel_end { sel_start } else { sel_end };
         let (ey, ex) = if sel_start < sel_end { sel_end } else { sel_start };
         
-        let output_raw = app.terminal.output.lock().unwrap();
-        let stripped = crate::ui::terminal::strip_ansi(&output_raw);
-        let lines: Vec<&str> = stripped.lines().collect();
+        let parser_lock = app.terminal.parser.lock().unwrap();
+        let mut screen = parser_lock.screen().clone();
+        screen.set_scrollback(app.terminal_scroll);
         
-        let mut selected_text = String::new();
-        for y in sy..=ey {
-            if y < lines.len() {
-                let line = lines[y];
-                let chars: Vec<char> = line.chars().collect();
-                
-                let start_idx = if y == sy { sx } else { 0 };
-                let end_idx = if y == ey { ex } else { chars.len() };
-                
-                let part: String = chars.into_iter().skip(start_idx).take(end_idx.saturating_sub(start_idx)).collect();
-                selected_text.push_str(&part);
-                if y < ey {
-                    selected_text.push('\n');
-                }
-            }
-        }
+        let selected_text = screen.contents_between(sy as u16, sx as u16, ey as u16, ex as u16);
         
         if let Some(clipboard) = &mut app.clipboard {
             let _ = clipboard.set_text(selected_text);
@@ -459,10 +440,20 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Delete => app.terminal.write("\x1b[3~"),
             KeyCode::Up => {
-                app.terminal_scroll = app.terminal_scroll.saturating_add(1);
+                if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    app.terminal_scroll = app.terminal_scroll.saturating_add(1);
+                } else {
+                    app.terminal_scroll = 0;
+                    app.terminal.write("\x1b[A");
+                }
             }
             KeyCode::Down => {
-                app.terminal_scroll = app.terminal_scroll.saturating_sub(1);
+                if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    app.terminal_scroll = app.terminal_scroll.saturating_sub(1);
+                } else {
+                    app.terminal_scroll = 0;
+                    app.terminal.write("\x1b[B");
+                }
             }
             KeyCode::Right => app.terminal.write("\x1b[C"),
             KeyCode::Left => app.terminal.write("\x1b[D"),
