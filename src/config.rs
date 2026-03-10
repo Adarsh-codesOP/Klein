@@ -1,36 +1,40 @@
 pub const APP_TITLE: &str = " Klein IDE ";
 pub const HELP_TITLE: &str = " HELP COMMANDS ";
 pub const HELP_TEXT: &str = r#"
---- GENERAL NAVIGATION ---
-[Ctrl + Arrows] Switch Panels
-[Up/Down/Left/Right] Move Cursor (Editor)
-[Up/Down] Scroll Viewport (Terminal)
-[Enter] Expand Folder (Sidebar) / New Line (Editor)
+--- SIDEBAR / FILE TREE ---
+[.] Toggle Hidden Files
+[Ctrl+D / PgDn] Page Down
+[Ctrl+U / PgUp] Page Up
+[Home / End] Jump to Top/Bottom
+[Enter] Open File / Toggle Folder
+
+--- EDITOR ---
+[Home / End] Start/End of Line
+[Ctrl+Home / Ctrl+End] Top/Bottom of File
+[PgUp / PgDn] Scroll Page
+[Delete] Forward Delete / Delete Selection
+[Shift+Arrows] Extend Selection
+[Ctrl+X] Cut Line / Selection
+[Ctrl+C / Ctrl+V] Copy / Paste
+[Ctrl+A] Select All
+[Ctrl+Z] Undo
+
+--- FILE MANAGEMENT ---
+[Ctrl+W] Close Current File
+[Ctrl+S] Save Current File
+[Ctrl+Shift+Z] Next Tab
+[Ctrl+Shift+X] Close Current Tab
 
 --- FOCUS CONTROL ---
-[Ctrl + R] Focus Explorer (Sidebar)
-[Ctrl + E] Focus Editor
-[Ctrl + T] Focus Terminal
-[Ctrl + B] Toggle Sidebar Visibility
-[Ctrl + `] Toggle Terminal Visibility
-
---- TAB MANAGEMENT ---
-[Ctrl + Shift + Z] Next Tab
-[Ctrl + Shift + X] Close Current Tab
-
---- FILE OPERATIONS ---
-[Ctrl + S] Save Current File
-[Ctrl + Q] Quit Application
-
---- EDITOR FEATURES ---
-[Ctrl + C] Copy Selection
-[Ctrl + V] Paste
-[Ctrl + A] Select All
-[Ctrl + Shift + Up/Down] Multiline Selection
-[Backspace] Delete Character
+[Ctrl+F] Focus Sidebar
+[Ctrl+E] Focus Editor
+[Ctrl+T] Focus Terminal
+[Ctrl+B] Toggle Sidebar Visibility
+[Ctrl+J] Toggle Terminal Visibility
+[Esc] Restore Standard Layout / Close Overlays
 
 --- HELP ---
-[Ctrl + H] Toggle this help overlay
+[Ctrl+H / Esc] Toggle Help Overlay
 "#;
 
 pub mod colors {
