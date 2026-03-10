@@ -11,6 +11,13 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let is_preview = matches!(app.active_panel, Panel::Sidebar) && app.preview.is_some();
     let editor = app.active_editor();
 
+    // Use a consistent background to prevent ghosting
+    let bg_color = if is_preview {
+        ratatui::style::Color::Rgb(15, 15, 25) // Very dark blue for preview depth
+    } else {
+        ratatui::style::Color::Black
+    };
+
     let title = if is_preview {
         format!(
             " [PREVIEW] {} ",
@@ -35,18 +42,18 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     };
 
     let border_color = if is_preview {
-        ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray)
+        ratatui::style::Color::DarkGray
     } else if matches!(app.active_panel, Panel::Editor) {
-        ratatui::style::Style::default().fg(config::colors::EDITOR_FOCUS)
+        config::colors::EDITOR_FOCUS
     } else {
-        ratatui::style::Style::default()
+        ratatui::style::Color::Indexed(240) // Subdued gray
     };
 
     let editor_block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .border_style(border_color)
-        .style(ratatui::style::Style::default().bg(ratatui::style::Color::Black));
+        .border_style(ratatui::style::Style::default().fg(border_color))
+        .style(ratatui::style::Style::default().bg(bg_color));
 
     let inner_rect = editor_block.inner(area);
     f.render_widget(editor_block, area);
@@ -88,7 +95,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let gutter_widget = Paragraph::new(gutter_lines)
         .style(ratatui::style::Style::default()
             .fg(ratatui::style::Color::DarkGray)
-            .bg(ratatui::style::Color::Black));
+            .bg(bg_color));
     f.render_widget(gutter_widget, gutter_area);
 
     // Render Editor Content
@@ -96,7 +103,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         editor.get_highlighted_lines(content_area.width as usize, content_area.height as usize);
 
     let editor_widget = Paragraph::new(highlighted_lines)
-        .style(ratatui::style::Style::default().bg(ratatui::style::Color::Black));
+        .style(ratatui::style::Style::default().bg(bg_color));
     f.render_widget(editor_widget, content_area);
 
     // Show cursor — only for the real editor, not preview

@@ -12,8 +12,8 @@ pub fn render_hint(f: &mut Frame, area: Rect) {
             ratatui::style::Style::default()
                 .fg(ratatui::style::Color::White)
                 .add_modifier(ratatui::style::Modifier::BOLD)
-                .bg(ratatui::style::Color::Reset),
-        ) // Very subtle gray on black
+                .bg(ratatui::style::Color::Black),
+        ) // Black background for top hint bar
         .alignment(ratatui::layout::Alignment::Center);
 
     f.render_widget(hint, area);
@@ -26,7 +26,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &crate::app::App) {
         .borders(Borders::ALL)
         .border_type(ratatui::widgets::BorderType::Double) // Distinct double border
         .border_style(ratatui::style::Style::default().fg(config::colors::HELP_BORDER))
-        .style(ratatui::style::Style::default().bg(ratatui::style::Color::Reset));
+        .style(ratatui::style::Style::default().bg(ratatui::style::Color::Black));
 
     let area = crate::ui::layout::centered_rect(65, 75, area);
     f.render_widget(Clear, area); // Clear the area before rendering the popup
