@@ -134,7 +134,10 @@ impl Editor {
         if char_idx < self.buffer.len_chars() {
             let mut end_idx = char_idx + 1;
             // Handle CRLF windows newlines gracefully by deleting both parts
-            if self.buffer.char(char_idx) == '\r' && end_idx < self.buffer.len_chars() && self.buffer.char(end_idx) == '\n' {
+            if self.buffer.char(char_idx) == '\r'
+                && end_idx < self.buffer.len_chars()
+                && self.buffer.char(end_idx) == '\n'
+            {
                 end_idx += 1;
             }
             self.buffer.remove(char_idx..end_idx);
@@ -142,6 +145,7 @@ impl Editor {
         }
     }
 
+    #[allow(dead_code)]
     pub fn delete_selection(&mut self) {
         if self.selection_start.is_some() {
             self.save_undo_state();
@@ -251,7 +255,10 @@ impl Editor {
                                     .bg(ratatui::style::Color::Yellow)
                                     .fg(ratatui::style::Color::Black);
                             }
-                            spans.push(ratatui::text::Span::styled(current_segment.clone(), s_style));
+                            spans.push(ratatui::text::Span::styled(
+                                current_segment.clone(),
+                                s_style,
+                            ));
                             current_segment.clear();
                             current_is_selected = is_char_selected;
                         }

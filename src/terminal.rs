@@ -40,7 +40,7 @@ impl Terminal {
                     ""
                 };
 
-                let mut cmd = std::process::Command::new(&shell);
+                let mut cmd = std::process::Command::new(shell);
                 cmd.arg(test_arg);
                 if !test_arg2.is_empty() {
                     cmd.arg(test_arg2);
@@ -93,14 +93,14 @@ impl Terminal {
         cmd.env("COLORTERM", "truecolor");
         cmd.cwd(&cwd);
         let child = pty_pair.slave.spawn_command(cmd).unwrap();
-        
+
         // Drop slave proactively to ensure EOF reaches master when child exits
         drop(pty_pair.slave);
 
         let writer = pty_pair.master.take_writer().unwrap();
         let writer_arc = Arc::new(Mutex::new(writer));
         let mut reader = pty_pair.master.try_clone_reader().unwrap();
-        
+
         let parser = Arc::new(Mutex::new(vt100::Parser::new(24, 80, 10000)));
         let parser_clone = Arc::clone(&parser);
         let writer_clone = Arc::clone(&writer_arc);
@@ -111,18 +111,17 @@ impl Terminal {
                 if n == 0 {
                     break;
                 }
-                
+
                 let text = String::from_utf8_lossy(&buf[..n]);
                 // DA Query Response for shells like Fish
                 if text.contains("\x1b[c") || text.contains("\x1b[0c") {
-                    if let Ok(mut w) = writer_clone.lock() {
-                        let _ = w.write_all(b"\x1b[?62;22c");
-                        let _ = w.flush();
-                    }
+                    let mut w = writer_clone.lock().unwrap();
+                    let _ = w.write_all(b"\x1b[?62;1;2;3;4;6;7;8;9c");
+                    let _ = w.flush();
                 }
-                
+
                 let mut p = parser_clone.lock().unwrap();
-                
+
                 // Many shells on Windows/Portable-PTY fail to emit \r with \n in raw mode.
                 // We inject \r before \n if missing to prevent staircasing in the VT100 grid.
                 let mut processed = Vec::with_capacity(n * 2);
@@ -133,7 +132,7 @@ impl Terminal {
                     }
                     processed.push(b);
                 }
-                
+
                 p.process(&processed);
             }
         });

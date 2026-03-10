@@ -15,7 +15,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         screen.set_scrollback(app.terminal_scroll);
         screen
     };
-    
+
     // We update the terminal size to the ratatui area if needed
     let term_width = area.width.saturating_sub(2);
     let term_height = area.height.saturating_sub(2);
@@ -29,17 +29,17 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
             screen.set_scrollback(app.terminal_scroll);
         }
     }
-    
+
     let actual_scroll = screen.scrollback();
     let (rows, cols) = screen.size();
-    
+
     let mut terminal_lines: Vec<ratatui::text::Line<'_>> = (0..rows)
         .map(|r| {
             let mut spans = Vec::new();
             let mut current_text = String::new();
             let mut current_attrs: Option<(vt100::Cell, bool)> = None;
             let abs_y = r; // Absolute Y for selection is tricky with scrollback, but let's approximate
-            
+
             // To properly do selection check, we would need absolute line number.
             // Since VT100 doesn't expose absolute line index easily, we will skip selection highlights
             // inside the vt100 grid for this quick fix, or just do a simple highlight.
@@ -48,13 +48,25 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
             for c in 0..cols {
                 if let Some(cell) = screen.cell(r, c) {
                     let new_attrs = cell.clone();
-                    let char_str = if cell.has_contents() { cell.contents() } else { " " };
-                    
+                    let char_str = if cell.has_contents() {
+                        cell.contents()
+                    } else {
+                        " "
+                    };
+
                     // For selection:
                     let is_selected = if let Some((sel_start, sel_end)) = app.terminal_sel {
-                        let (sy, sx) = if sel_start < sel_end { sel_start } else { sel_end };
-                        let (ey, ex) = if sel_start < sel_end { sel_end } else { sel_start };
-                        
+                        let (sy, sx) = if sel_start < sel_end {
+                            sel_start
+                        } else {
+                            sel_end
+                        };
+                        let (ey, ex) = if sel_start < sel_end {
+                            sel_end
+                        } else {
+                            sel_start
+                        };
+
                         let cur_y = abs_y as usize;
                         let cur_x = c as usize;
                         if cur_y > sy && cur_y < ey {
@@ -71,22 +83,34 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                     } else {
                         false
                     };
-                    
+
                     if let Some((ref attrs, was_selected)) = current_attrs {
-                        if attrs.fgcolor() != cell.fgcolor() || attrs.bgcolor() != cell.bgcolor() || attrs.bold() != cell.bold() || was_selected != is_selected {
+                        if attrs.fgcolor() != cell.fgcolor()
+                            || attrs.bgcolor() != cell.bgcolor()
+                            || attrs.bold() != cell.bold()
+                            || was_selected != is_selected
+                        {
                             // Flush current_text
                             let mut style = ratatui::style::Style::default();
                             match attrs.fgcolor() {
-                                vt100::Color::Idx(idx) => style = style.fg(ratatui::style::Color::Indexed(idx)),
-                                vt100::Color::Rgb(r, g, b) => style = style.fg(ratatui::style::Color::Rgb(r, g, b)),
+                                vt100::Color::Idx(idx) => {
+                                    style = style.fg(ratatui::style::Color::Indexed(idx))
+                                }
+                                vt100::Color::Rgb(r, g, b) => {
+                                    style = style.fg(ratatui::style::Color::Rgb(r, g, b))
+                                }
                                 _ => {
                                     // Default foreground for terminal segments that don't have explicit color
                                     style = style.fg(ratatui::style::Color::White);
                                 }
                             }
                             match attrs.bgcolor() {
-                                vt100::Color::Idx(idx) => style = style.bg(ratatui::style::Color::Indexed(idx)),
-                                vt100::Color::Rgb(r, g, b) => style = style.bg(ratatui::style::Color::Rgb(r, g, b)),
+                                vt100::Color::Idx(idx) => {
+                                    style = style.bg(ratatui::style::Color::Indexed(idx))
+                                }
+                                vt100::Color::Rgb(r, g, b) => {
+                                    style = style.bg(ratatui::style::Color::Rgb(r, g, b))
+                                }
                                 _ => {
                                     style = style.bg(ratatui::style::Color::Black);
                                 }
@@ -95,13 +119,15 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                                 style = style.add_modifier(ratatui::style::Modifier::BOLD);
                             }
                             if was_selected {
-                                style = style.bg(ratatui::style::Color::White).fg(ratatui::style::Color::Black);
+                                style = style
+                                    .bg(ratatui::style::Color::White)
+                                    .fg(ratatui::style::Color::Black);
                             }
                             spans.push(ratatui::text::Span::styled(current_text.clone(), style));
                             current_text.clear();
                         }
                     }
-                    
+
                     current_text.push_str(char_str);
                     current_attrs = Some((new_attrs, is_selected));
                 }
@@ -110,15 +136,23 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                 let mut style = ratatui::style::Style::default();
                 if let Some((ref attrs, was_selected)) = current_attrs {
                     match attrs.fgcolor() {
-                        vt100::Color::Idx(idx) => style = style.fg(ratatui::style::Color::Indexed(idx)),
-                        vt100::Color::Rgb(r, g, b) => style = style.fg(ratatui::style::Color::Rgb(r, g, b)),
+                        vt100::Color::Idx(idx) => {
+                            style = style.fg(ratatui::style::Color::Indexed(idx))
+                        }
+                        vt100::Color::Rgb(r, g, b) => {
+                            style = style.fg(ratatui::style::Color::Rgb(r, g, b))
+                        }
                         _ => {
                             style = style.fg(ratatui::style::Color::White);
                         }
                     }
                     match attrs.bgcolor() {
-                        vt100::Color::Idx(idx) => style = style.bg(ratatui::style::Color::Indexed(idx)),
-                        vt100::Color::Rgb(r, g, b) => style = style.bg(ratatui::style::Color::Rgb(r, g, b)),
+                        vt100::Color::Idx(idx) => {
+                            style = style.bg(ratatui::style::Color::Indexed(idx))
+                        }
+                        vt100::Color::Rgb(r, g, b) => {
+                            style = style.bg(ratatui::style::Color::Rgb(r, g, b))
+                        }
                         _ => {
                             style = style.bg(ratatui::style::Color::Black);
                         }
@@ -127,7 +161,9 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                         style = style.add_modifier(ratatui::style::Modifier::BOLD);
                     }
                     if was_selected {
-                        style = style.bg(ratatui::style::Color::White).fg(ratatui::style::Color::Black);
+                        style = style
+                            .bg(ratatui::style::Color::White)
+                            .fg(ratatui::style::Color::Black);
                     }
                 }
                 spans.push(ratatui::text::Span::styled(current_text, style));
@@ -158,10 +194,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     if matches!(app.active_panel, Panel::Terminal) && actual_scroll == 0 {
         let (r, c) = screen.cursor_position();
         let inner = Block::default().borders(Borders::ALL).inner(area);
-        f.set_cursor(
-            inner.x + c,
-            inner.y + r,
-        );
+        f.set_cursor(inner.x + c, inner.y + r);
     }
 }
 

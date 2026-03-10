@@ -212,33 +212,33 @@ impl App {
     pub fn try_save_or_show_save_as(&mut self, context: SaveAsContext) -> bool {
         let tab = &mut self.tabs[self.active_tab];
         if tab.editor.path.is_some() {
-            let _ = self.save_current_file();
-            return true;
+            self.save_current_file();
+            true
         } else {
             self.save_as_state.active = true;
             self.save_as_state.context = context;
-            
-            let mut counter = 1;
-            let mut proposed_name = format!("Untitled-{}.txt", counter);
-            while self.save_as_state.cur_dir.join(&proposed_name).exists() {
-                counter += 1;
-                proposed_name = format!("Untitled-{}.txt", counter);
-            }
+
+            let now = chrono::Local::now();
+            let proposed_name = now.format("untitled-%d-%m-%y-%H%M%S.txt").to_string();
+
             self.save_as_state.filename = proposed_name;
             self.save_as_state.focus_filename = true;
-            return false;
+            false
         }
     }
 
     pub fn execute_save_as(&mut self) {
-        let path = self.save_as_state.cur_dir.join(&self.save_as_state.filename);
+        let path = self
+            .save_as_state
+            .cur_dir
+            .join(&self.save_as_state.filename);
         let tab = &mut self.tabs[self.active_tab];
         tab.editor.path = Some(path);
         self.save_current_file();
         self.save_as_state.active = false;
-        
+
         self.sidebar.refresh();
-        
+
         match self.save_as_state.context.clone() {
             SaveAsContext::QuitAfter => {
                 self.should_quit = true;

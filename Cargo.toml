@@ -24,3 +24,4 @@ directories = "5.0"
 toml = "1.0.4"
 clap = { version = "4.0", features = ["derive"] }
 vt100 = "0.16.2"
+chrono = "0.4"

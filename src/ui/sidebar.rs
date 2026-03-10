@@ -11,7 +11,13 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let mut list_items = Vec::new();
     let height = area.height.saturating_sub(2) as usize;
     let offset = app.sidebar.offset;
-    let visible_slice = app.sidebar.flat_list.iter().enumerate().skip(offset).take(height);
+    let visible_slice = app
+        .sidebar
+        .flat_list
+        .iter()
+        .enumerate()
+        .skip(offset)
+        .take(height);
 
     for (i, (path, depth, is_dir)) in visible_slice {
         let prefix = "  ".repeat(*depth);

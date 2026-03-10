@@ -1,7 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
 use crossterm::{
-    event::{self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture},
+    event::{
+        self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -33,7 +35,9 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().map(|a| if a == "-?" { "--help".to_string() } else { a }).collect();
+    let args: Vec<String> = std::env::args()
+        .map(|a| if a == "-?" { "--help".to_string() } else { a })
+        .collect();
     let cli = Cli::parse_from(args);
 
     let clipboard = arboard::Clipboard::new().ok();

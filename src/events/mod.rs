@@ -65,7 +65,8 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
                     app.editor_mut().clear_selection();
                 }
 
-                app.editor_mut().cursor_y = new_y.min(app.editor().buffer.len_lines().saturating_sub(1));
+                app.editor_mut().cursor_y =
+                    new_y.min(app.editor().buffer.len_lines().saturating_sub(1));
                 app.editor_mut().cursor_x = new_x;
                 app.editor_mut().clamp_cursor_x();
             }
@@ -74,17 +75,17 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
             if is_in_terminal {
                 let term_y = mouse.row.saturating_sub(term_area.y).saturating_sub(1) as usize;
                 let term_x = mouse.column.saturating_sub(term_area.x).saturating_sub(1) as usize;
-                
+
                 // For simplicity, we just use term_y as the absolute Y within the grid
                 // This means selection highlights will be restricted to the active screen view.
                 let abs_y = term_y;
-                
+
                 if let Some((sel_start, _)) = app.terminal_sel {
                     app.terminal_sel = Some((sel_start, (abs_y, term_x)));
                 } else {
                     app.terminal_sel = Some(((abs_y, term_x), (abs_y, term_x)));
                 }
-                
+
                 // Copy selection immediately on drag like most modern terminals
                 copy_terminal_selection(app);
             } else if is_in_editor {
@@ -115,7 +116,8 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
                     // Within editor area y-bounds
                     let scroll_y = app.editor().scroll_y;
                     let target_y = (mouse.row - area.y) as usize + scroll_y;
-                    app.editor_mut().cursor_y = target_y.min(app.editor().buffer.len_lines().saturating_sub(1));
+                    app.editor_mut().cursor_y =
+                        target_y.min(app.editor().buffer.len_lines().saturating_sub(1));
                 }
 
                 app.editor_mut().cursor_x = new_x;
@@ -134,15 +136,23 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
 
 pub fn copy_terminal_selection(app: &mut App) {
     if let Some((sel_start, sel_end)) = app.terminal_sel {
-        let (sy, sx) = if sel_start < sel_end { sel_start } else { sel_end };
-        let (ey, ex) = if sel_start < sel_end { sel_end } else { sel_start };
-        
+        let (sy, sx) = if sel_start < sel_end {
+            sel_start
+        } else {
+            sel_end
+        };
+        let (ey, ex) = if sel_start < sel_end {
+            sel_end
+        } else {
+            sel_start
+        };
+
         let parser_lock = app.terminal.parser.lock().unwrap();
         let mut screen = parser_lock.screen().clone();
         screen.set_scrollback(app.terminal_scroll);
-        
+
         let selected_text = screen.contents_between(sy as u16, sx as u16, ey as u16, ex as u16);
-        
+
         if let Some(clipboard) = &mut app.clipboard {
             let _ = clipboard.set_text(selected_text);
         }
@@ -177,7 +187,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.save_as_state.active = false;
             }
             KeyCode::Enter => {
-                let _ = app.execute_save_as();
+                app.execute_save_as();
             }
             KeyCode::Tab | KeyCode::Up | KeyCode::Down => {
                 app.save_as_state.focus_filename = !app.save_as_state.focus_filename;
@@ -228,7 +238,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 } else {
                     crate::app::SaveAsContext::CloseTabAfter
                 };
-                
+
                 if app.try_save_or_show_save_as(ctx.clone()) {
                     match ctx {
                         crate::app::SaveAsContext::SwitchFileAfter(p) => {
@@ -278,7 +288,11 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.show_create_file_prompt = false;
                 return Ok(());
             }
-            KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc | KeyCode::Char('c') | KeyCode::Char('C') => {
+            KeyCode::Char('n')
+            | KeyCode::Char('N')
+            | KeyCode::Esc
+            | KeyCode::Char('c')
+            | KeyCode::Char('C') => {
                 app.pending_open_path = None;
                 app.show_create_file_prompt = false;
                 app.active_panel = Panel::Sidebar;
@@ -315,11 +329,9 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
         return Ok(());
     }
 
-    if key.code == KeyCode::Esc {
-        if app.maximized != crate::app::Maximized::None {
-            app.maximized = crate::app::Maximized::None;
-            return Ok(());
-        }
+    if key.code == KeyCode::Esc && app.maximized != crate::app::Maximized::None {
+        app.maximized = crate::app::Maximized::None;
+        return Ok(());
     }
 
     // Global Control shortcuts
@@ -450,8 +462,15 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     app.terminal_scroll = app.terminal_scroll.saturating_add(1);
                 } else {
                     app.terminal_scroll = 0;
-                    let app_cursor = app.terminal.parser.lock().unwrap().screen().application_cursor();
-                    app.terminal.write(if app_cursor { "\x1bOA" } else { "\x1b[A" });
+                    let app_cursor = app
+                        .terminal
+                        .parser
+                        .lock()
+                        .unwrap()
+                        .screen()
+                        .application_cursor();
+                    app.terminal
+                        .write(if app_cursor { "\x1bOA" } else { "\x1b[A" });
                 }
             }
             KeyCode::Down => {
@@ -459,17 +478,38 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     app.terminal_scroll = app.terminal_scroll.saturating_sub(1);
                 } else {
                     app.terminal_scroll = 0;
-                    let app_cursor = app.terminal.parser.lock().unwrap().screen().application_cursor();
-                    app.terminal.write(if app_cursor { "\x1bOB" } else { "\x1b[B" });
+                    let app_cursor = app
+                        .terminal
+                        .parser
+                        .lock()
+                        .unwrap()
+                        .screen()
+                        .application_cursor();
+                    app.terminal
+                        .write(if app_cursor { "\x1bOB" } else { "\x1b[B" });
                 }
             }
             KeyCode::Right => {
-                let app_cursor = app.terminal.parser.lock().unwrap().screen().application_cursor();
-                app.terminal.write(if app_cursor { "\x1bOC" } else { "\x1b[C" });
+                let app_cursor = app
+                    .terminal
+                    .parser
+                    .lock()
+                    .unwrap()
+                    .screen()
+                    .application_cursor();
+                app.terminal
+                    .write(if app_cursor { "\x1bOC" } else { "\x1b[C" });
             }
             KeyCode::Left => {
-                let app_cursor = app.terminal.parser.lock().unwrap().screen().application_cursor();
-                app.terminal.write(if app_cursor { "\x1bOD" } else { "\x1b[D" });
+                let app_cursor = app
+                    .terminal
+                    .parser
+                    .lock()
+                    .unwrap()
+                    .screen()
+                    .application_cursor();
+                app.terminal
+                    .write(if app_cursor { "\x1bOD" } else { "\x1b[D" });
             }
             KeyCode::PageUp => {
                 if key.modifiers.contains(KeyModifiers::SHIFT) {
@@ -631,7 +671,9 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
         KeyCode::Char('.') if matches!(app.active_panel, Panel::Sidebar) => {
             app.sidebar.show_hidden = !app.sidebar.show_hidden;
             app.sidebar.update_flat_list();
-            if app.sidebar.selected_index >= app.sidebar.flat_list.len() && !app.sidebar.flat_list.is_empty() {
+            if app.sidebar.selected_index >= app.sidebar.flat_list.len()
+                && !app.sidebar.flat_list.is_empty()
+            {
                 app.sidebar.selected_index = app.sidebar.flat_list.len() - 1;
             }
         }

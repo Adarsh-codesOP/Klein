@@ -10,11 +10,15 @@ pub mod tabs;
 pub mod terminal;
 
 pub fn render(f: &mut Frame, app: &App) {
-    // Clear the entire screen once at the beginning to prevent ghosting/tearing 
+    // Clear the entire screen once at the beginning to prevent ghosting/tearing
     // when layouts change or during animations/scrolling.
     f.render_widget(ratatui::widgets::Clear, f.size());
 
-    let show_terminal_layout = if app.maximized == crate::app::Maximized::Editor { false } else { app.show_terminal };
+    let show_terminal_layout = if app.maximized == crate::app::Maximized::Editor {
+        false
+    } else {
+        app.show_terminal
+    };
     let chunks = if app.maximized == crate::app::Maximized::Terminal {
         layout::get_maximized_terminal_layout(f.size())
     } else {
@@ -28,7 +32,11 @@ pub fn render(f: &mut Frame, app: &App) {
         // Render tab bar
         tabs::render(f, chunks[1], app);
 
-        let show_sidebar = if app.maximized == crate::app::Maximized::Editor { false } else { app.show_sidebar };
+        let show_sidebar = if app.maximized == crate::app::Maximized::Editor {
+            false
+        } else {
+            app.show_sidebar
+        };
         let main_chunks = layout::get_editor_layout(chunks[2], show_sidebar);
 
         if show_sidebar {
@@ -84,16 +92,16 @@ pub fn render(f: &mut Frame, app: &App) {
     if app.save_as_state.active {
         let area = layout::centered_rect(60, 10, f.size());
         f.render_widget(ratatui::widgets::Clear, area);
-        
+
         let block = ratatui::widgets::Block::default()
             .title(" Save As ")
             .borders(ratatui::widgets::Borders::ALL)
             .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Cyan))
             .style(ratatui::style::Style::default().bg(ratatui::style::Color::Reset));
-        
+
         let inner_area = block.inner(area);
         f.render_widget(block, area);
-        
+
         let chunks = ratatui::layout::Layout::default()
             .direction(ratatui::layout::Direction::Vertical)
             .margin(1)
@@ -103,28 +111,38 @@ pub fn render(f: &mut Frame, app: &App) {
                 ratatui::layout::Constraint::Length(1),
             ])
             .split(inner_area);
-            
+
         let dir_str = format!("Directory: {}", app.save_as_state.cur_dir.display());
         let dir_style = if !app.save_as_state.focus_filename {
-            ratatui::style::Style::default().fg(ratatui::style::Color::Black).bg(ratatui::style::Color::White)
+            ratatui::style::Style::default()
+                .fg(ratatui::style::Color::Black)
+                .bg(ratatui::style::Color::White)
         } else {
             ratatui::style::Style::default()
         };
-        f.render_widget(ratatui::widgets::Paragraph::new(dir_str).style(dir_style), chunks[0]);
-        
+        f.render_widget(
+            ratatui::widgets::Paragraph::new(dir_str).style(dir_style),
+            chunks[0],
+        );
+
         let file_str = format!("Filename:  {}", app.save_as_state.filename);
         let file_style = if app.save_as_state.focus_filename {
-            ratatui::style::Style::default().fg(ratatui::style::Color::Black).bg(ratatui::style::Color::White)
+            ratatui::style::Style::default()
+                .fg(ratatui::style::Color::Black)
+                .bg(ratatui::style::Color::White)
         } else {
             ratatui::style::Style::default()
         };
-        f.render_widget(ratatui::widgets::Paragraph::new(file_str).style(file_style), chunks[1]);
-        
+        f.render_widget(
+            ratatui::widgets::Paragraph::new(file_str).style(file_style),
+            chunks[1],
+        );
+
         f.render_widget(
             ratatui::widgets::Paragraph::new("Tab/Up/Down switch | Enter save | Esc cancel")
                 .style(ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray))
                 .alignment(ratatui::layout::Alignment::Center),
-            chunks[2]
+            chunks[2],
         );
     }
 
@@ -138,7 +156,10 @@ pub fn render(f: &mut Frame, app: &App) {
                 .borders(ratatui::widgets::Borders::ALL)
                 .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Yellow))
                 .style(ratatui::style::Style::default().bg(ratatui::style::Color::Reset));
-            let text = format!("File does not exist:\n{}\n\nCreate it? (y/n)", path.display());
+            let text = format!(
+                "File does not exist:\n{}\n\nCreate it? (y/n)",
+                path.display()
+            );
             let paragraph = ratatui::widgets::Paragraph::new(text)
                 .block(block)
                 .alignment(ratatui::layout::Alignment::Center);

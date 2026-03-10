@@ -81,7 +81,7 @@ impl Sidebar {
         let mut list = Vec::new();
         self.flatten(&self.root, 0, &mut list);
         self.flat_list = list;
-        
+
         // Clamp selection and adjust scroll
         if !self.flat_list.is_empty() {
             if self.selected_index >= self.flat_list.len() {
@@ -96,7 +96,12 @@ impl Sidebar {
 
     #[allow(clippy::only_used_in_recursion)]
     fn flatten(&self, node: &FileNode, depth: usize, list: &mut Vec<(PathBuf, usize, bool)>) {
-        if !self.show_hidden && node.name.starts_with('.') && depth > 0 && node.name != "." && node.name != ".." {
+        if !self.show_hidden
+            && node.name.starts_with('.')
+            && depth > 0
+            && node.name != "."
+            && node.name != ".."
+        {
             return;
         }
 
@@ -151,7 +156,8 @@ impl Sidebar {
     pub fn page_down(&mut self) -> Option<PathBuf> {
         if !self.flat_list.is_empty() {
             let height = self.last_height.get().saturating_sub(2);
-            self.selected_index = (self.selected_index + height).min(self.flat_list.len().saturating_sub(1));
+            self.selected_index =
+                (self.selected_index + height).min(self.flat_list.len().saturating_sub(1));
             self.adjust_scroll();
             let (path, _, is_dir) = &self.flat_list[self.selected_index];
             if !*is_dir {
@@ -264,14 +270,15 @@ impl FileNode {
                     let path = entry.path();
                     let file_name = entry.file_name().to_string_lossy().to_string();
                     let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
-                    
+
                     let mut is_expanded = false;
                     if let Some(existing_children) = &self.children {
-                        if let Some(existing_node) = existing_children.iter().find(|c| c.path == path) {
+                        if let Some(existing_node) =
+                            existing_children.iter().find(|c| c.path == path)
+                        {
                             is_expanded = existing_node.is_expanded;
                         }
                     }
-                    
                     let mut new_node = FileNode {
                         path,
                         name: file_name,
@@ -279,7 +286,7 @@ impl FileNode {
                         is_expanded,
                         children: None,
                     };
-                    
+
                     if new_node.is_expanded {
                         new_node.refresh();
                     }

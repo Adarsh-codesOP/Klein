@@ -53,6 +53,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct AppConfig {
+    #[allow(dead_code)]
     pub default_workspace: Option<String>,
     pub shell: Option<String>,
 }
