@@ -114,7 +114,8 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
                 } else {
                     // Within editor area y-bounds
                     let scroll_y = app.editor().scroll_y;
-                    app.editor_mut().cursor_y = (mouse.row - area.y) as usize + scroll_y;
+                    let target_y = (mouse.row - area.y) as usize + scroll_y;
+                    app.editor_mut().cursor_y = target_y.min(app.editor().buffer.len_lines().saturating_sub(1));
                 }
 
                 app.editor_mut().cursor_x = new_x;

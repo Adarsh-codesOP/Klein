@@ -46,7 +46,8 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
             ratatui::style::Style::default().fg(config::colors::EXPLORER_FOCUS)
         } else {
             ratatui::style::Style::default()
-        });
+        })
+        .style(ratatui::style::Style::default().bg(ratatui::style::Color::Black));
 
     app.sidebar.last_height.set(area.height as usize);
     let sidebar_widget = Paragraph::new(list_items).block(sidebar_block);

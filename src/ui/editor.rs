@@ -45,7 +45,8 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let editor_block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .border_style(border_color);
+        .border_style(border_color)
+        .style(ratatui::style::Style::default().bg(ratatui::style::Color::Black));
 
     let inner_rect = editor_block.inner(area);
     f.render_widget(editor_block, area);

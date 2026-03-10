@@ -134,7 +134,8 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
             ratatui::style::Style::default().fg(config::colors::TERMINAL_FOCUS)
         } else {
             ratatui::style::Style::default()
-        });
+        })
+        .style(ratatui::style::Style::default().bg(ratatui::style::Color::Black));
 
     let terminal_widget = Paragraph::new(terminal_lines).block(terminal_block);
     f.render_widget(terminal_widget, area);
