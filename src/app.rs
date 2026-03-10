@@ -11,11 +11,12 @@ pub enum Panel {
     Terminal,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SaveAsContext {
     SaveOnly,
     QuitAfter,
     CloseTabAfter,
+    SwitchFileAfter(PathBuf),
 }
 
 pub struct SaveAsState {
