@@ -11,6 +11,13 @@ pub enum Panel {
     Terminal,
 }
 
+#[derive(PartialEq, Clone, Copy, Debug)]
+pub enum Maximized {
+    None,
+    Editor,
+    Terminal,
+}
+
 pub struct App {
     pub active_panel: Panel,
     pub show_sidebar: bool,
@@ -28,6 +35,7 @@ pub struct App {
     pub show_quit_confirm: bool,
     pub show_unsaved_confirm: bool,
     pub pending_open_path: Option<PathBuf>,
+    pub maximized: Maximized,
 }
 
 impl App {
@@ -63,6 +71,7 @@ impl App {
             show_quit_confirm: false,
             show_unsaved_confirm: false,
             pending_open_path: None,
+            maximized: Maximized::None,
         }
     }
 
