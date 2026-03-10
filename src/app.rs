@@ -70,10 +70,11 @@ pub struct App {
     pub pending_open_path: Option<PathBuf>,
     pub maximized: Maximized,
     pub save_as_state: SaveAsState,
+    pub clipboard: Option<arboard::Clipboard>,
 }
 
 impl App {
-    pub fn new(cli_file: Option<PathBuf>) -> App {
+    pub fn new(cli_file: Option<PathBuf>, clipboard: Option<arboard::Clipboard>) -> App {
         let config = crate::config::AppConfig::load();
 
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
@@ -105,6 +106,7 @@ impl App {
                 cur_dir: current_dir.clone(),
                 ..Default::default()
             },
+            clipboard,
         };
 
         if let Some(file) = cli_file {

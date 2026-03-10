@@ -14,7 +14,6 @@ pub struct Editor {
     pub scroll_y: usize,
     pub syntax_set: SyntaxSet,
     pub theme_set: ThemeSet,
-    pub clipboard: Option<arboard::Clipboard>,
     pub selection_start: Option<(usize, usize)>,
     pub is_dirty: bool,
 }
@@ -29,7 +28,6 @@ impl Editor {
             scroll_y: 0,
             syntax_set: SyntaxSet::load_defaults_newlines(),
             theme_set: ThemeSet::load_defaults(),
-            clipboard: arboard::Clipboard::new().ok(),
             selection_start: None,
             is_dirty: false,
         }
@@ -278,8 +276,8 @@ impl Editor {
         self.cursor_x = self.get_max_cursor_x(last_line);
     }
 
-    pub fn copy(&mut self) {
-        if let Some(clipboard) = &mut self.clipboard {
+    pub fn copy(&mut self, clipboard: &mut Option<arboard::Clipboard>) {
+        if let Some(clipboard) = clipboard {
             let text = if let Some((start_y, start_x)) = self.selection_start {
                 let (sy, sx, ey, ex) = if (start_y, start_x) < (self.cursor_y, self.cursor_x) {
                     (start_y, start_x, self.cursor_y, self.cursor_x)
@@ -296,8 +294,8 @@ impl Editor {
         }
     }
 
-    pub fn cut(&mut self) {
-        self.copy();
+    pub fn cut(&mut self, clipboard: &mut Option<arboard::Clipboard>) {
+        self.copy(clipboard);
         if self.selection_start.is_some() {
             self.delete_selection();
         } else {
@@ -317,8 +315,8 @@ impl Editor {
         }
     }
 
-    pub fn paste(&mut self, height: usize) {
-        if let Some(clipboard) = &mut self.clipboard {
+    pub fn paste(&mut self, clipboard: &mut Option<arboard::Clipboard>, height: usize) {
+        if let Some(clipboard) = clipboard {
             if let Ok(text) = clipboard.get_text() {
                 if self.selection_start.is_some() {
                     self.delete_selection();

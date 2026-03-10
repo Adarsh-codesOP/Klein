@@ -36,6 +36,8 @@ async fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().map(|a| if a == "-?" { "--help".to_string() } else { a }).collect();
     let cli = Cli::parse_from(args);
 
+    let clipboard = arboard::Clipboard::new().ok();
+
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -44,7 +46,7 @@ async fn main() -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     // Create app and run it
-    let mut app = App::new(cli.file);
+    let mut app = App::new(cli.file, clipboard);
     let res = run_app(&mut terminal, &mut app).await;
 
     // Restore terminal
