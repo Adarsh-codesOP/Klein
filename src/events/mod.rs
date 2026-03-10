@@ -293,8 +293,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     }
 
     if matches!(app.active_panel, Panel::Editor) {
-        let is_selecting = key.modifiers.contains(KeyModifiers::CONTROL)
-            && key.modifiers.contains(KeyModifiers::SHIFT);
+        let is_selecting = key.modifiers.contains(KeyModifiers::SHIFT);
 
         match key.code {
             KeyCode::Down => {
