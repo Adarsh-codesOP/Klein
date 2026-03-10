@@ -20,6 +20,22 @@ pub fn get_main_layout(area: Rect, show_terminal: bool) -> Vec<Rect> {
         .to_vec()
 }
 
+pub fn get_maximized_terminal_layout(area: Rect) -> Vec<Rect> {
+    let constraints = vec![
+        Constraint::Length(1), // Help Hint Tab
+        Constraint::Length(0), // Tab Bar hidden
+        Constraint::Length(0), // Main workspace hidden
+        Constraint::Fill(1),   // Terminal fills
+        Constraint::Length(1), // Status Bar
+    ];
+
+    Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(area)
+        .to_vec()
+}
+
 pub fn get_editor_layout(area: Rect, show_sidebar: bool) -> Vec<Rect> {
     Layout::default()
         .direction(Direction::Horizontal)
