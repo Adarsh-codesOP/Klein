@@ -11,6 +11,33 @@ pub enum Panel {
     Terminal,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum SaveAsContext {
+    SaveOnly,
+    QuitAfter,
+    CloseTabAfter,
+}
+
+pub struct SaveAsState {
+    pub active: bool,
+    pub filename: String,
+    pub cur_dir: PathBuf,
+    pub focus_filename: bool,
+    pub context: SaveAsContext,
+}
+
+impl Default for SaveAsState {
+    fn default() -> Self {
+        Self {
+            active: false,
+            filename: String::new(),
+            cur_dir: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            focus_filename: true,
+            context: SaveAsContext::SaveOnly,
+        }
+    }
+}
+
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Maximized {
     None,
@@ -81,6 +108,10 @@ impl App {
             show_unsaved_confirm: false,
             pending_open_path: None,
             maximized: Maximized::None,
+            save_as_state: SaveAsState {
+                cur_dir: current_dir.clone(),
+                ..Default::default()
+            },
         }
     }
 
