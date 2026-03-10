@@ -35,11 +35,12 @@ pub struct App {
     pub terminal_scroll: usize,
     pub terminal_restarting: bool,
     pub terminal_area: Cell<ratatui::layout::Rect>,
-    pub terminal_sel: Option<((u16, u16), (u16, u16))>,
+    pub terminal_sel: Option<((usize, usize), (usize, usize))>,
     pub show_quit_confirm: bool,
     pub show_unsaved_confirm: bool,
     pub pending_open_path: Option<PathBuf>,
     pub maximized: Maximized,
+    pub save_as_state: SaveAsState,
 }
 
 impl App {
