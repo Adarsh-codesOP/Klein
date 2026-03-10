@@ -228,10 +228,23 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     if app.show_unsaved_confirm {
         match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => {
-                let _ = app.editor_mut().save();
-                if let Some(path) = app.pending_open_path.take() {
-                    app.open_in_new_tab(path);
-                    app.active_panel = Panel::Editor;
+                let ctx = if let Some(path) = app.pending_open_path.take() {
+                    crate::app::SaveAsContext::SwitchFileAfter(path)
+                } else {
+                    crate::app::SaveAsContext::CloseTabAfter
+                };
+                
+                if app.try_save_or_show_save_as(ctx.clone()) {
+                    match ctx {
+                        crate::app::SaveAsContext::SwitchFileAfter(p) => {
+                            app.open_in_new_tab(p);
+                            app.active_panel = Panel::Editor;
+                        }
+                        crate::app::SaveAsContext::CloseTabAfter => {
+                            app.close_tab();
+                        }
+                        _ => {}
+                    }
                 }
                 app.show_unsaved_confirm = false;
                 return Ok(());
