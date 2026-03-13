@@ -175,12 +175,97 @@ fn open_tab_from_path(app: &mut App, path: std::path::PathBuf) {
         app.pending_open_path = Some(path);
         app.show_unsaved_confirm = true;
     } else {
-        app.open_in_new_tab(path);
+        app.open_file(path);
         app.active_panel = Panel::Editor;
     }
 }
 
 fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    if app.picker.active {
+        match key.code {
+            KeyCode::Esc => {
+                app.picker.active = false;
+            }
+            KeyCode::Enter => {
+                if let Some(res) = app.picker.results.get(app.picker.selected_index) {
+                    let path = res.path.clone();
+                    let line = res.line;
+                    app.picker.active = false;
+                    
+                    // Open the file
+                    app.open_file(path);
+                    app.active_panel = Panel::Editor;
+                    
+                    if let Some(l) = line {
+                        let h = app.last_editor_height.get();
+                        app.editor_mut().cursor_y = l;
+                        app.editor_mut().ensure_cursor_visible(h);
+                    }
+                }
+            }
+            KeyCode::Up => {
+                if app.picker.selected_index > 0 {
+                    app.picker.selected_index -= 1;
+                } else if !app.picker.results.is_empty() {
+                    app.picker.selected_index = app.picker.results.len() - 1;
+                }
+                // Update scroll
+                if app.picker.selected_index < app.picker.scroll {
+                    app.picker.scroll = app.picker.selected_index;
+                } else if app.picker.selected_index >= app.picker.scroll + 15 { // basic scroll
+                     app.picker.scroll = app.picker.selected_index.saturating_sub(14);
+                }
+            }
+            KeyCode::Down => {
+                if !app.picker.results.is_empty() {
+                    app.picker.selected_index = (app.picker.selected_index + 1) % app.picker.results.len();
+                }
+                // Update scroll
+                if app.picker.selected_index < app.picker.scroll {
+                    app.picker.scroll = app.picker.selected_index;
+                } else if app.picker.selected_index >= app.picker.scroll + 15 {
+                    app.picker.scroll = app.picker.selected_index.saturating_sub(14);
+                }
+            }
+            KeyCode::Backspace => {
+                app.picker.query.pop();
+                // Trigger reactive search
+                match app.picker.mode {
+                    crate::search::SearchMode::File => {
+                        app.picker.results = crate::search::run_file_search(&app.picker.query);
+                    }
+                    crate::search::SearchMode::Grep => {
+                        app.picker.results = crate::search::run_grep(&app.picker.query);
+                    }
+                }
+                app.picker.selected_index = 0;
+                app.picker.scroll = 0;
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.picker.query.clear();
+                app.picker.results.clear();
+                app.picker.selected_index = 0;
+                app.picker.scroll = 0;
+            }
+            KeyCode::Char(c) => {
+                app.picker.query.push(c);
+                // Trigger reactive search
+                match app.picker.mode {
+                    crate::search::SearchMode::File => {
+                        app.picker.results = crate::search::run_file_search(&app.picker.query);
+                    }
+                    crate::search::SearchMode::Grep => {
+                        app.picker.results = crate::search::run_grep(&app.picker.query);
+                    }
+                }
+                app.picker.selected_index = 0;
+                app.picker.scroll = 0;
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     if app.save_as_state.active {
         match key.code {
             KeyCode::Esc => {
@@ -368,11 +453,27 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     app.close_tab();
                     return Ok(());
                 }
+                KeyCode::Char('f') | KeyCode::Char('F') => {
+                    app.picker.active = true;
+                    app.picker.mode = crate::search::SearchMode::Grep;
+                    app.picker.query.clear();
+                    app.picker.results.clear();
+                    return Ok(());
+                }
                 _ => {}
             }
         }
 
         match key.code {
+            KeyCode::Char('p') => {
+                app.picker.active = true;
+                app.picker.mode = crate::search::SearchMode::File;
+                app.picker.query.clear();
+                app.picker.results = crate::search::run_file_search("");
+                app.picker.selected_index = 0;
+                app.picker.scroll = 0;
+                return Ok(());
+            }
             KeyCode::Char('q') => {
                 if app.tabs.iter().any(|t| t.editor.is_dirty) {
                     app.show_quit_confirm = true;

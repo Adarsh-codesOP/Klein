@@ -4,6 +4,7 @@ use ratatui::Frame;
 pub mod editor;
 pub mod help;
 pub mod layout;
+pub mod picker;
 pub mod sidebar;
 pub mod status_bar;
 pub mod tabs;
@@ -190,5 +191,9 @@ pub fn render(f: &mut Frame, app: &App) {
                 .alignment(ratatui::layout::Alignment::Center);
             f.render_widget(paragraph, area);
         }
+    }
+
+    if app.picker.active {
+        picker::render(f, app);
     }
 }

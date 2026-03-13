@@ -72,6 +72,7 @@ pub struct App {
     pub pending_open_path: Option<PathBuf>,
     pub maximized: Maximized,
     pub save_as_state: SaveAsState,
+    pub picker: crate::search::PickerState,
     pub clipboard: Option<arboard::Clipboard>,
 }
 
@@ -108,6 +109,7 @@ impl App {
                 cur_dir: current_dir.clone(),
                 ..Default::default()
             },
+            picker: crate::search::PickerState::default(),
             clipboard,
         };
 
@@ -167,6 +169,22 @@ impl App {
 
     pub fn insert_paste(&mut self, text: &str, height: usize) {
         self.editor_mut().insert_paste(text, height);
+    }
+
+    /// Find a tab with the given path
+    pub fn find_tab_by_path(&self, path: &std::path::Path) -> Option<usize> {
+        self.tabs.iter().position(|t| {
+            t.editor.path.as_ref().map(|p| p == path).unwrap_or(false)
+        })
+    }
+
+    /// Open a file: switch to it if open, otherwise open in new tab
+    pub fn open_file(&mut self, path: PathBuf) {
+        if let Some(idx) = self.find_tab_by_path(&path) {
+            self.active_tab = idx;
+        } else {
+            self.open_in_new_tab(path);
+        }
     }
 
     /// Open a file in a new tab (always creates a new tab)
