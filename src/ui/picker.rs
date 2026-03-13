@@ -54,8 +54,23 @@ pub fn render(f: &mut Frame, app: &App) {
     let info_para = Paragraph::new(info).style(Style::default().fg(Color::DarkGray));
     f.render_widget(info_para, chunks[1]);
 
-    // List results
+    // List results and Preview
     let visible_height = chunks[2].height as usize;
+    
+    let main_split = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(40), // List
+            Constraint::Percentage(60), // Preview
+        ])
+        .split(chunks[2]);
+
+    // Draw a vertical separator
+    let separator_block = Block::default()
+        .borders(Borders::LEFT)
+        .border_style(Style::default().fg(Color::Rgb(40, 40, 50)));
+    f.render_widget(separator_block, main_split[1]);
+
     let items: Vec<ListItem> = app
         .picker
         .results
@@ -81,27 +96,11 @@ pub fn render(f: &mut Frame, app: &App) {
                 Style::default().fg(if is_selected { Color::White } else { Color::Gray }).add_modifier(Modifier::BOLD)
             ));
 
-            // Directory / Context
-            if let Some(parent) = res.path.parent() {
-                 line_spans.push(Span::styled(
-                    format!("  ({})", parent.display()),
-                    Style::default().fg(Color::DarkGray)
-                ));
-            }
-
-            // Grep location & content
+            // Grep location (small)
             if let Some(l) = res.line {
                 line_spans.push(Span::styled(
                     format!(" :{}", l + 1),
                     Style::default().fg(Color::Yellow)
-                ));
-            }
-
-            if !res.content.is_empty() {
-                line_spans.push(Span::raw("  "));
-                line_spans.push(Span::styled(
-                    res.content.clone(),
-                    Style::default().fg(if is_selected { Color::White } else { Color::DarkGray })
                 ));
             }
 
@@ -116,5 +115,37 @@ pub fn render(f: &mut Frame, app: &App) {
         .collect();
 
     let list = List::new(items);
-    f.render_widget(list, chunks[2]);
+    f.render_widget(list, main_split[0]);
+
+    // Render Preview Panel
+    if let Some(preview_lines) = &app.picker.preview {
+        let preview_inner = Rect {
+            x: main_split[1].x + 2,
+            y: main_split[1].y,
+            width: main_split[1].width.saturating_sub(2),
+            height: main_split[1].height,
+        };
+
+        let mut spans = Vec::new();
+        for (i, line) in preview_lines.iter().enumerate() {
+            let style = if line.starts_with('>') {
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Gray)
+            };
+            spans.push(Line::from(Span::styled(line.clone(), style)));
+        }
+        
+        let preview_para = Paragraph::new(spans)
+            .block(Block::default()
+                .title(" Preview ")
+                .title_style(Style::default().fg(Color::DarkGray)));
+        f.render_widget(preview_para, preview_inner);
+    } else {
+        let no_preview = Paragraph::new("\n\n   No preview available")
+            .style(Style::default().fg(Color::DarkGray));
+        f.render_widget(no_preview, main_split[1]);
+    }
 }
+
+use ratatui::layout::Rect;

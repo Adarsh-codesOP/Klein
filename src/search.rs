@@ -22,6 +22,7 @@ pub struct PickerState {
     pub results: Vec<SearchResult>,
     pub selected_index: usize,
     pub scroll: usize,
+    pub preview: Option<Vec<String>>,
 }
 
 impl Default for PickerState {
@@ -33,6 +34,7 @@ impl Default for PickerState {
             results: Vec::new(),
             selected_index: 0,
             scroll: 0,
+            preview: None,
         }
     }
 }
@@ -132,5 +134,36 @@ pub fn run_file_search(query: &str) -> Vec<SearchResult> {
         }
     } else {
         Vec::new()
+    }
+}
+
+pub fn load_preview_lines(path: &std::path::Path, line: usize, radius: usize) -> Option<Vec<String>> {
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    let file = File::open(path).ok()?;
+    let reader = BufReader::new(file);
+    let start = line.saturating_sub(radius);
+    let end = line + radius;
+
+    let lines: Vec<String> = reader
+        .lines()
+        .enumerate()
+        .skip(start)
+        .take(end - start + 1)
+        .filter_map(|(i, l)| {
+            let content = l.unwrap_or_default();
+            if i == line {
+                Some(format!("> {}", content))
+            } else {
+                Some(format!("  {}", content))
+            }
+        })
+        .collect();
+
+    if lines.is_empty() {
+        None
+    } else {
+        Some(lines)
     }
 }

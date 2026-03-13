@@ -180,17 +180,28 @@ fn open_tab_from_path(app: &mut App, path: std::path::PathBuf) {
     }
 }
 
+fn trigger_picker_preview(app: &mut App) {
+    if let Some(res) = app.picker.results.get(app.picker.selected_index) {
+        let line = res.line.unwrap_or(0);
+        app.picker.preview = crate::search::load_preview_lines(&res.path, line, 8);
+    } else {
+        app.picker.preview = None;
+    }
+}
+
 fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     if app.picker.active {
         match key.code {
             KeyCode::Esc => {
                 app.picker.active = false;
+                app.picker.preview = None;
             }
             KeyCode::Enter => {
                 if let Some(res) = app.picker.results.get(app.picker.selected_index) {
                     let path = res.path.clone();
                     let line = res.line;
                     app.picker.active = false;
+                    app.picker.preview = None;
                     
                     // Open the file
                     app.open_file(path);
@@ -215,6 +226,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 } else if app.picker.selected_index >= app.picker.scroll + 15 { // basic scroll
                      app.picker.scroll = app.picker.selected_index.saturating_sub(14);
                 }
+                trigger_picker_preview(app);
             }
             KeyCode::Down => {
                 if !app.picker.results.is_empty() {
@@ -226,6 +238,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 } else if app.picker.selected_index >= app.picker.scroll + 15 {
                     app.picker.scroll = app.picker.selected_index.saturating_sub(14);
                 }
+                trigger_picker_preview(app);
             }
             KeyCode::Backspace => {
                 app.picker.query.pop();
@@ -240,12 +253,14 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 }
                 app.picker.selected_index = 0;
                 app.picker.scroll = 0;
+                trigger_picker_preview(app);
             }
             KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 app.picker.query.clear();
                 app.picker.results.clear();
                 app.picker.selected_index = 0;
                 app.picker.scroll = 0;
+                app.picker.preview = None;
             }
             KeyCode::Char(c) => {
                 app.picker.query.push(c);
@@ -260,6 +275,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 }
                 app.picker.selected_index = 0;
                 app.picker.scroll = 0;
+                trigger_picker_preview(app);
             }
             _ => {}
         }
@@ -453,18 +469,20 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     app.close_tab();
                     return Ok(());
                 }
-                KeyCode::Char('f') | KeyCode::Char('F') => {
-                    app.picker.active = true;
-                    app.picker.mode = crate::search::SearchMode::Grep;
-                    app.picker.query.clear();
-                    app.picker.results.clear();
-                    return Ok(());
-                }
                 _ => {}
             }
         }
 
         match key.code {
+            KeyCode::Char('g') => {
+                app.picker.active = true;
+                app.picker.mode = crate::search::SearchMode::Grep;
+                app.picker.query.clear();
+                app.picker.results.clear();
+                app.picker.selected_index = 0;
+                app.picker.scroll = 0;
+                return Ok(());
+            }
             KeyCode::Char('p') => {
                 app.picker.active = true;
                 app.picker.mode = crate::search::SearchMode::File;

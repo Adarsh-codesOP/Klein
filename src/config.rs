@@ -21,7 +21,7 @@ pub const HELP_TEXT: &str = r#"
 
 --- FILE MANAGEMENT ---
 [Ctrl+P] Find File (fzf)
-[Ctrl+Shift+F] Project Search (rg)
+[Ctrl+G] Project Search (rg)
 [Ctrl+W] Close Current File
 [Ctrl+S] Save Current File
 [Ctrl+Shift+Z] Next Tab
