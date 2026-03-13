@@ -705,7 +705,7 @@ dependencies = [
 
 [[package]]
 name = "klein"
-version = "0.2.5"
+version = "0.3.5"
 dependencies = [
  "anyhow",
  "arboard",
