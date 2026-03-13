@@ -127,7 +127,7 @@ pub fn render(f: &mut Frame, app: &App) {
         };
 
         let mut spans = Vec::new();
-        for (i, line) in preview_lines.iter().enumerate() {
+        for (_i, line) in preview_lines.iter().enumerate() {
             let style = if line.starts_with('>') {
                 Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
             } else {

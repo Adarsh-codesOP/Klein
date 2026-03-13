@@ -110,7 +110,7 @@ struct SearchSink<'a> {
 impl<'a> Sink for SearchSink<'a> {
     type Error = std::io::Error;
 
-    fn line(&mut self, _searcher: &Searcher, line: &SinkMatch<'_>) -> Result<bool, Self::Error> {
+    fn matched(&mut self, _searcher: &Searcher, line: &SinkMatch<'_>) -> Result<bool, Self::Error> {
         let content = String::from_utf8_lossy(line.bytes()).trim().to_string();
         self.results.push(SearchResult {
             path: self.path.to_path_buf(),
