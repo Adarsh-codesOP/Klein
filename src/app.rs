@@ -173,9 +173,9 @@ impl App {
 
     /// Find a tab with the given path
     pub fn find_tab_by_path(&self, path: &std::path::Path) -> Option<usize> {
-        self.tabs.iter().position(|t| {
-            t.editor.path.as_ref().map(|p| p == path).unwrap_or(false)
-        })
+        self.tabs
+            .iter()
+            .position(|t| t.editor.path.as_ref().map(|p| p == path).unwrap_or(false))
     }
 
     /// Open a file: switch to it if open, otherwise open in new tab

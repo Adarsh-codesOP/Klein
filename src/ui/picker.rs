@@ -43,20 +43,33 @@ pub fn render(f: &mut Frame, app: &App) {
 
     // Prompt with query
     let prompt_spans = vec![
-        Span::styled("  ❯ ", Style::default().fg(title_color).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "  ❯ ",
+            Style::default()
+                .fg(title_color)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(&app.picker.query, Style::default().fg(Color::White)),
-        Span::styled("█", Style::default().fg(title_color).add_modifier(Modifier::SLOW_BLINK)),
+        Span::styled(
+            "█",
+            Style::default()
+                .fg(title_color)
+                .add_modifier(Modifier::SLOW_BLINK),
+        ),
     ];
     f.render_widget(Paragraph::new(Line::from(prompt_spans)), chunks[0]);
 
     // Info line
-    let info = format!("  {} results   ↑/↓ navigate   Enter select   Esc cancel", app.picker.results.len());
+    let info = format!(
+        "  {} results   ↑/↓ navigate   Enter select   Esc cancel",
+        app.picker.results.len()
+    );
     let info_para = Paragraph::new(info).style(Style::default().fg(Color::DarkGray));
     f.render_widget(info_para, chunks[1]);
 
     // List results and Preview
     let visible_height = chunks[2].height as usize;
-    
+
     let main_split = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -86,21 +99,31 @@ pub fn render(f: &mut Frame, app: &App) {
             line_spans.push(Span::raw("  "));
 
             // Icon
-            let icon = if app.picker.mode == SearchMode::File { " " } else { " " };
+            let icon = if app.picker.mode == SearchMode::File {
+                " "
+            } else {
+                " "
+            };
             line_spans.push(Span::styled(icon, Style::default().fg(title_color)));
 
             // Filename
             let file_name = res.path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
             line_spans.push(Span::styled(
                 file_name.to_string(),
-                Style::default().fg(if is_selected { Color::White } else { Color::Gray }).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(if is_selected {
+                        Color::White
+                    } else {
+                        Color::Gray
+                    })
+                    .add_modifier(Modifier::BOLD),
             ));
 
             // Grep location (small)
             if let Some(l) = res.line {
                 line_spans.push(Span::styled(
                     format!(" :{}", l + 1),
-                    Style::default().fg(Color::Yellow)
+                    Style::default().fg(Color::Yellow),
                 ));
             }
 
@@ -127,19 +150,22 @@ pub fn render(f: &mut Frame, app: &App) {
         };
 
         let mut spans = Vec::new();
-        for (_i, line) in preview_lines.iter().enumerate() {
+        for line in preview_lines.iter() {
             let style = if line.starts_with('>') {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::Gray)
             };
             spans.push(Line::from(Span::styled(line.clone(), style)));
         }
-        
-        let preview_para = Paragraph::new(spans)
-            .block(Block::default()
+
+        let preview_para = Paragraph::new(spans).block(
+            Block::default()
                 .title(" Preview ")
-                .title_style(Style::default().fg(Color::DarkGray)));
+                .title_style(Style::default().fg(Color::DarkGray)),
+        );
         f.render_widget(preview_para, preview_inner);
     } else {
         let no_preview = Paragraph::new("\n\n   No preview available")

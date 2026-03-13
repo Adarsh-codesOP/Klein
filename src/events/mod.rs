@@ -202,11 +202,11 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     let line = res.line;
                     app.picker.active = false;
                     app.picker.preview = None;
-                    
+
                     // Open the file
                     app.open_file(path);
                     app.active_panel = Panel::Editor;
-                    
+
                     if let Some(l) = line {
                         let h = app.last_editor_height.get();
                         app.editor_mut().cursor_y = l;
@@ -223,14 +223,16 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 // Update scroll
                 if app.picker.selected_index < app.picker.scroll {
                     app.picker.scroll = app.picker.selected_index;
-                } else if app.picker.selected_index >= app.picker.scroll + 15 { // basic scroll
-                     app.picker.scroll = app.picker.selected_index.saturating_sub(14);
+                } else if app.picker.selected_index >= app.picker.scroll + 15 {
+                    // basic scroll
+                    app.picker.scroll = app.picker.selected_index.saturating_sub(14);
                 }
                 trigger_picker_preview(app);
             }
             KeyCode::Down => {
                 if !app.picker.results.is_empty() {
-                    app.picker.selected_index = (app.picker.selected_index + 1) % app.picker.results.len();
+                    app.picker.selected_index =
+                        (app.picker.selected_index + 1) % app.picker.results.len();
                 }
                 // Update scroll
                 if app.picker.selected_index < app.picker.scroll {

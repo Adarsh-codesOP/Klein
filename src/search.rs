@@ -1,10 +1,10 @@
-use std::path::{Path, PathBuf};
-use ignore::{WalkBuilder, WalkState};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
-use grep_searcher::{Searcher, Sink, SinkMatch};
 use grep_regex::RegexMatcher;
+use grep_searcher::{Searcher, Sink, SinkMatch};
+use ignore::{WalkBuilder, WalkState};
 use rayon::prelude::*;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -17,8 +17,6 @@ pub enum SearchMode {
 pub struct SearchResult {
     pub path: PathBuf,
     pub line: Option<usize>,
-    pub column: Option<usize>,
-    pub content: String,
 }
 
 pub struct PickerState {
@@ -55,34 +53,36 @@ pub fn run_grep(query: &str) -> Vec<SearchResult> {
     };
 
     let results = Arc::new(Mutex::new(Vec::new()));
-    
+
     // Create a parallel walker
     let walker = WalkBuilder::new("./")
-        .hidden(true)       // Skip .git and hidden folders
-        .git_ignore(true)   // Respect .gitignore
+        .hidden(true) // Skip .git and hidden folders
+        .git_ignore(true) // Respect .gitignore
         .build_parallel();
 
     walker.run(|| {
         let results = results.clone();
         let matcher = matcher.clone();
         let mut searcher = Searcher::new();
-        
+
         Box::new(move |result| {
-            let Ok(entry) = result else { return WalkState::Continue; };
+            let Ok(entry) = result else {
+                return WalkState::Continue;
+            };
             if !entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
                 return WalkState::Continue;
             }
 
             let path = entry.path().to_path_buf();
             let mut local_results = Vec::new();
-            
+
             let _ = searcher.search_path(
                 &matcher,
                 &path,
                 SearchSink {
                     path: &path,
                     results: &mut local_results,
-                }
+                },
             );
 
             if !local_results.is_empty() {
@@ -92,7 +92,7 @@ pub fn run_grep(query: &str) -> Vec<SearchResult> {
                     return WalkState::Quit;
                 }
             }
-            
+
             WalkState::Continue
         })
     });
@@ -111,12 +111,9 @@ impl<'a> Sink for SearchSink<'a> {
     type Error = std::io::Error;
 
     fn matched(&mut self, _searcher: &Searcher, line: &SinkMatch<'_>) -> Result<bool, Self::Error> {
-        let content = String::from_utf8_lossy(line.bytes()).trim().to_string();
         self.results.push(SearchResult {
             path: self.path.to_path_buf(),
             line: Some(line.line_number().unwrap_or(1).saturating_sub(1) as usize),
-            column: None,
-            content,
         });
         Ok(true)
     }
@@ -124,11 +121,11 @@ impl<'a> Sink for SearchSink<'a> {
 
 pub fn run_file_search(query: &str) -> Vec<SearchResult> {
     let matcher = SkimMatcherV2::default();
-    
+
     // Step 1: Walk files (efficiently skip hidden and gitignored)
     let walker = WalkBuilder::new("./")
-        .hidden(true)       // IMPORTANT: This prevents .git objects from appearing
-        .git_ignore(true)   // Respect .gitignore
+        .hidden(true) // IMPORTANT: This prevents .git objects from appearing
+        .git_ignore(true) // Respect .gitignore
         .build();
 
     let mut file_paths = Vec::new();
@@ -137,19 +134,17 @@ pub fn run_file_search(query: &str) -> Vec<SearchResult> {
         if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
             file_paths.push(entry.path().to_path_buf());
         }
-        if file_paths.len() > 10000 { break; } // Limit for UI sanity
+        if file_paths.len() > 10000 {
+            break;
+        } // Limit for UI sanity
     }
 
     if query.is_empty() {
-        return file_paths.into_iter().take(1000).map(|path| {
-            let path_str = path.to_string_lossy().to_string();
-            SearchResult {
-                path,
-                line: None,
-                column: None,
-                content: path_str,
-            }
-        }).collect();
+        return file_paths
+            .into_iter()
+            .take(1000)
+            .map(|path| SearchResult { path, line: None })
+            .collect();
     }
 
     // Step 2: Fuzzy Match in parallel using Rayon
@@ -157,20 +152,15 @@ pub fn run_file_search(query: &str) -> Vec<SearchResult> {
         .into_par_iter()
         .filter_map(|path| {
             let path_str = path.to_string_lossy().to_string();
-            matcher.fuzzy_match(&path_str, query).map(|score| {
-                (score, SearchResult {
-                    path,
-                    line: None,
-                    column: None,
-                    content: path_str,
-                })
-            })
+            matcher
+                .fuzzy_match(&path_str, query)
+                .map(|score| (score, SearchResult { path, line: None }))
         })
         .collect();
 
     // Step 3: Sort by score
     scored_files.par_sort_by(|a, b| b.0.cmp(&a.0));
-    
+
     scored_files.into_iter().take(1000).map(|f| f.1).collect()
 }
 
@@ -188,12 +178,12 @@ pub fn load_preview_lines(path: &Path, line: usize, radius: usize) -> Option<Vec
         .enumerate()
         .skip(start)
         .take(end - start + 1)
-        .filter_map(|(i, l)| {
+        .map(|(i, l)| {
             let content = l.unwrap_or_default();
             if i == line {
-                Some(format!("> {}", content))
+                format!("> {}", content)
             } else {
-                Some(format!("  {}", content))
+                format!("  {}", content)
             }
         })
         .collect();
