@@ -20,6 +20,8 @@ pub const HELP_TEXT: &str = r#"
 [Ctrl+Z] Undo
 
 --- FILE MANAGEMENT ---
+[Ctrl+P] Find File (fzf)
+[Ctrl+G] Project Search (rg)
 [Ctrl+W] Close Current File
 [Ctrl+S] Save Current File
 [Ctrl+Shift+Z] Next Tab

@@ -14,6 +14,7 @@ mod app;
 mod config;
 mod editor;
 mod events;
+mod search;
 mod sidebar;
 mod tabs;
 mod terminal;
