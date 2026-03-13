@@ -1,5 +1,11 @@
-use std::path::PathBuf;
-use std::process::Command;
+use std::path::{Path, PathBuf};
+use ignore::{WalkBuilder, WalkState};
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
+use grep_searcher::{Searcher, Sink, SinkMatch};
+use grep_regex::RegexMatcher;
+use rayon::prelude::*;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SearchMode {
@@ -44,100 +50,131 @@ pub fn run_grep(query: &str) -> Vec<SearchResult> {
         return Vec::new();
     }
 
-    let output = Command::new("rg")
-        .arg("--line-number")
-        .arg("--column")
-        .arg("--color")
-        .arg("never")
-        .arg("--no-heading")
-        .arg("--smart-case")
-        .arg(query)
-        .output();
+    let Ok(matcher) = RegexMatcher::new_line_matcher(&format!("(?i){}", query)) else {
+        return Vec::new();
+    };
 
-    if let Ok(output) = output {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        stdout
-            .lines()
-            .filter_map(|line| {
-                let parts: Vec<&str> = line.splitn(4, ':').collect();
-                if parts.len() >= 3 {
-                    let path = PathBuf::from(parts[0]);
-                    let line_num = parts[1].parse::<usize>().ok()?.saturating_sub(1);
-                    let col_num = parts[2].parse::<usize>().ok()?.saturating_sub(1);
-                    let content = parts.get(3).unwrap_or(&"").trim().to_string();
-                    Some(SearchResult {
-                        path,
-                        line: Some(line_num),
-                        column: Some(col_num),
-                        content,
-                    })
-                } else {
-                    None
+    let results = Arc::new(Mutex::new(Vec::new()));
+    
+    // Create a parallel walker
+    let walker = WalkBuilder::new("./")
+        .hidden(true)       // Skip .git and hidden folders
+        .git_ignore(true)   // Respect .gitignore
+        .build_parallel();
+
+    walker.run(|| {
+        let results = results.clone();
+        let matcher = matcher.clone();
+        let mut searcher = Searcher::new();
+        
+        Box::new(move |result| {
+            let Ok(entry) = result else { return WalkState::Continue; };
+            if !entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
+                return WalkState::Continue;
+            }
+
+            let path = entry.path().to_path_buf();
+            let mut local_results = Vec::new();
+            
+            let _ = searcher.search_path(
+                &matcher,
+                &path,
+                SearchSink {
+                    path: &path,
+                    results: &mut local_results,
                 }
-            })
-            .collect()
-    } else {
-        Vec::new()
+            );
+
+            if !local_results.is_empty() {
+                let mut global = results.lock().unwrap();
+                global.extend(local_results);
+                if global.len() > 2000 {
+                    return WalkState::Quit;
+                }
+            }
+            
+            WalkState::Continue
+        })
+    });
+
+    let mut final_results = Arc::try_unwrap(results).unwrap().into_inner().unwrap();
+    final_results.truncate(2000);
+    final_results
+}
+
+struct SearchSink<'a> {
+    path: &'a Path,
+    results: &'a mut Vec<SearchResult>,
+}
+
+impl<'a> Sink for SearchSink<'a> {
+    type Error = std::io::Error;
+
+    fn line(&mut self, _searcher: &Searcher, line: &SinkMatch<'_>) -> Result<bool, Self::Error> {
+        let content = String::from_utf8_lossy(line.bytes()).trim().to_string();
+        self.results.push(SearchResult {
+            path: self.path.to_path_buf(),
+            line: Some(line.line_number().unwrap_or(1).saturating_sub(1) as usize),
+            column: None,
+            content,
+        });
+        Ok(true)
     }
 }
 
 pub fn run_file_search(query: &str) -> Vec<SearchResult> {
-    let rg_output = Command::new("rg").arg("--files").output();
+    let matcher = SkimMatcherV2::default();
+    
+    // Step 1: Walk files (efficiently skip hidden and gitignored)
+    let walker = WalkBuilder::new("./")
+        .hidden(true)       // IMPORTANT: This prevents .git objects from appearing
+        .git_ignore(true)   // Respect .gitignore
+        .build();
 
-    if let Ok(rg_output) = rg_output {
-        let files = String::from_utf8_lossy(&rg_output.stdout);
-
-        if query.is_empty() {
-            return files
-                .lines()
-                .map(|f| SearchResult {
-                    path: PathBuf::from(f),
-                    line: None,
-                    column: None,
-                    content: f.to_string(),
-                })
-                .collect();
+    let mut file_paths = Vec::new();
+    for result in walker {
+        let Ok(entry) = result else { continue };
+        if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
+            file_paths.push(entry.path().to_path_buf());
         }
-
-        let mut child = if let Ok(c) = Command::new("fzf")
-            .arg("-f")
-            .arg(query)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .spawn()
-        {
-            c
-        } else {
-            return Vec::new();
-        };
-
-        {
-            use std::io::Write;
-            if let Some(mut stdin) = child.stdin.take() {
-                let _ = stdin.write_all(files.as_bytes());
-            }
-        }
-
-        if let Ok(output) = child.wait_with_output() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            stdout
-                .lines()
-                .map(|f| SearchResult {
-                    path: PathBuf::from(f),
-                    line: None,
-                    column: None,
-                    content: f.to_string(),
-                })
-                .collect()
-        } else {
-            Vec::new()
-        }
-    } else {
-        Vec::new()
+        if file_paths.len() > 10000 { break; } // Limit for UI sanity
     }
+
+    if query.is_empty() {
+        return file_paths.into_iter().take(1000).map(|path| {
+            let path_str = path.to_string_lossy().to_string();
+            SearchResult {
+                path,
+                line: None,
+                column: None,
+                content: path_str,
+            }
+        }).collect();
+    }
+
+    // Step 2: Fuzzy Match in parallel using Rayon
+    let mut scored_files: Vec<(i64, SearchResult)> = file_paths
+        .into_par_iter()
+        .filter_map(|path| {
+            let path_str = path.to_string_lossy().to_string();
+            matcher.fuzzy_match(&path_str, query).map(|score| {
+                (score, SearchResult {
+                    path,
+                    line: None,
+                    column: None,
+                    content: path_str,
+                })
+            })
+        })
+        .collect();
+
+    // Step 3: Sort by score
+    scored_files.par_sort_by(|a, b| b.0.cmp(&a.0));
+    
+    scored_files.into_iter().take(1000).map(|f| f.1).collect()
 }
 
-pub fn load_preview_lines(path: &std::path::Path, line: usize, radius: usize) -> Option<Vec<String>> {
+pub fn load_preview_lines(path: &Path, line: usize, radius: usize) -> Option<Vec<String>> {
     use std::fs::File;
     use std::io::{BufRead, BufReader};
 
