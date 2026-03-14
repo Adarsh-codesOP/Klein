@@ -1011,13 +1011,15 @@ impl Editor {
             }
         } else {
             for i in 0..node.child_count() {
-                self.walk_line_highlights(
-                    node.child(i).unwrap(),
-                    line_start,
-                    line_end,
-                    current_byte,
-                    spans,
-                );
+                if let Some(child) = node.child(i) {
+                    self.walk_line_highlights(
+                        child,
+                        line_start,
+                        line_end,
+                        current_byte,
+                        spans,
+                    );
+                }
             }
         }
     }

@@ -656,18 +656,19 @@ impl App {
             None => return,
         };
 
-        let mut params_obj = params.as_object().unwrap().clone();
-        params_obj.insert(
-            "context".to_string(),
-            serde_json::json!({ "includeDeclaration": true }),
-        );
-        let params_with_context = serde_json::Value::Object(params_obj);
+        if let Some(mut params_obj) = params.as_object().cloned() {
+            params_obj.insert(
+                "context".to_string(),
+                serde_json::json!({ "includeDeclaration": true }),
+            );
+            let params_with_context = serde_json::Value::Object(params_obj);
 
-        let tx = self.event_tx.clone();
-        tokio::spawn(async move {
-            let response = handle.send_request("textDocument/references", params_with_context).await.ok();
-            let _ = tx.send(crate::events::klein_event::KleinEvent::ReferencesResponse(response, path));
-        });
+            let tx = self.event_tx.clone();
+            tokio::spawn(async move {
+                let response = handle.send_request("textDocument/references", params_with_context).await.ok();
+                let _ = tx.send(crate::events::klein_event::KleinEvent::ReferencesResponse(response, path));
+            });
+        }
     }
 
     pub fn handle_references_response(&mut self, response: Option<serde_json::Value>, _path: std::path::PathBuf) {
@@ -813,16 +814,19 @@ impl App {
             None => return,
         };
 
-        let mut params_obj = params.as_object().unwrap().clone();
-        params_obj.insert("newName".to_string(), serde_json::Value::String(state.new_name.clone()));
-        let params_with_name = serde_json::Value::Object(params_obj);
+        let new_name = state.new_name.clone(); // Clone new_name for the async block
 
-        let tx = self.event_tx.clone();
-        let path_clone = state.path.clone();
-        tokio::spawn(async move {
-            let response = handle.send_request("textDocument/rename", params_with_name).await.ok();
-            let _ = tx.send(crate::events::klein_event::KleinEvent::RenameResponse(response, path_clone, state.new_name));
-        });
+        if let Some(mut params_obj) = params.as_object().cloned() {
+            params_obj.insert("newName".to_string(), serde_json::Value::String(new_name.clone()));
+            let params_with_name = serde_json::Value::Object(params_obj);
+
+            let tx = self.event_tx.clone();
+            let path_clone = state.path.clone();
+            tokio::spawn(async move {
+                let response = handle.send_request("textDocument/rename", params_with_name).await.ok();
+                let _ = tx.send(crate::events::klein_event::KleinEvent::RenameResponse(response, path_clone, new_name));
+            });
+        }
     }
 
     pub fn handle_rename_response(&mut self, response: Option<serde_json::Value>, _path: std::path::PathBuf, _new_name: String) {
@@ -944,29 +948,38 @@ impl App {
             None => return,
         };
 
-        let mut params_obj = params.as_object().unwrap().clone();
-        let range = params_obj.get("position").unwrap().clone();
-        params_obj.insert(
-            "range".to_string(),
-            serde_json::json!({
-                "start": range,
-                "end": range,
-            }),
-        );
-        params_obj.remove("position");
-        params_obj.insert(
-            "context".to_string(),
-            serde_json::json!({
-                "diagnostics": []
-            }),
-        );
-        let action_params = serde_json::Value::Object(params_obj);
+        if let Some(mut params_obj) = params.as_object().cloned() {
+            if let Some(range) = params_obj.get("position").cloned() {
+                params_obj.insert(
+                    "range".to_string(),
+                    serde_json::json!({
+                        "start": range,
+                        "end": range,
+                    }),
+                );
+                params_obj.remove("position");
+                params_obj.insert(
+                    "context".to_string(),
+                    serde_json::json!({
+                        "diagnostics": []
+                    }),
+                );
+                let action_params = serde_json::Value::Object(params_obj);
 
-        let tx = self.event_tx.clone();
-        tokio::spawn(async move {
-            let response = handle.send_request("textDocument/codeAction", action_params).await.ok();
-            let _ = tx.send(crate::events::klein_event::KleinEvent::CodeActionResponse(response, path, (line, col)));
-        });
+                let tx = self.event_tx.clone();
+                tokio::spawn(async move {
+                    let response = handle
+                        .send_request("textDocument/codeAction", action_params)
+                        .await
+                        .ok();
+                    let _ = tx.send(crate::events::klein_event::KleinEvent::CodeActionResponse(
+                        response,
+                        path,
+                        (line, col),
+                    ));
+                });
+            }
+        }
     }
 
     pub fn handle_code_action_response(&mut self, response: Option<serde_json::Value>, path: std::path::PathBuf, pos: (usize, usize)) {
