@@ -222,7 +222,7 @@ impl App {
 
     pub fn open_in_new_tab(&mut self, path: PathBuf) {
         let mut tab = TabState::new();
-        let _ = tab.editor.open(path);
+        let _ = tab.editor.open(path, &self.ts_manager);
         self.lsp_did_open_for_editor(&tab.editor);
         self.tabs.push(tab);
         self.active_tab = self.tabs.len() - 1;
@@ -230,7 +230,9 @@ impl App {
 
     #[allow(dead_code)]
     pub fn open_in_current_tab(&mut self, path: PathBuf) {
-        let _ = self.tabs[self.active_tab].editor.open(path);
+        let _ = self.tabs[self.active_tab]
+            .editor
+            .open(path, &self.ts_manager);
         let (p, content) = {
             let editor = &self.tabs[self.active_tab].editor;
             (editor.path.clone(), editor.buffer.to_string())

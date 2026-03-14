@@ -245,7 +245,7 @@ fn load_preview(app: &mut App, path: std::path::PathBuf) {
         }
     }
     let mut preview_editor = crate::editor::Editor::new();
-    let _ = preview_editor.open(path);
+    let _ = preview_editor.open(path, &app.ts_manager);
     app.preview = Some(preview_editor);
 }
 
@@ -811,6 +811,15 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
 
         match key.code {
             KeyCode::Down => {
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    if key.modifiers.contains(KeyModifiers::SHIFT) {
+                        app.editor_mut().move_block(true);
+                        schedule_document_sync(app);
+                        return Ok(());
+                    }
+                    app.editor_mut().shrink_selection();
+                    return Ok(());
+                }
                 if is_selecting {
                     app.editor_mut().toggle_selection();
                 } else {
@@ -823,6 +832,15 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 return Ok(());
             }
             KeyCode::Up => {
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    if key.modifiers.contains(KeyModifiers::SHIFT) {
+                        app.editor_mut().move_block(false);
+                        schedule_document_sync(app);
+                        return Ok(());
+                    }
+                    app.editor_mut().expand_selection();
+                    return Ok(());
+                }
                 if is_selecting {
                     app.editor_mut().toggle_selection();
                 } else {
@@ -834,6 +852,11 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 return Ok(());
             }
             KeyCode::Left => {
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    app.editor_mut().swap_nodes(false);
+                    schedule_document_sync(app);
+                    return Ok(());
+                }
                 app.editor_mut().clear_selection();
                 app.editor_mut().move_cursor_left();
                 app.lsp_state.hover = None;
@@ -841,6 +864,11 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 return Ok(());
             }
             KeyCode::Right => {
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    app.editor_mut().swap_nodes(true);
+                    schedule_document_sync(app);
+                    return Ok(());
+                }
                 app.editor_mut().clear_selection();
                 app.editor_mut().move_cursor_right();
                 app.lsp_state.hover = None;
