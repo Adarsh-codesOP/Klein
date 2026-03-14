@@ -82,6 +82,12 @@ fn schedule_hover(app: &mut App) {
         );
     }
 }
+<<<<<<< Updated upstream
+=======
+
+
+
+>>>>>>> Stashed changes
 pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
     match event {
         Event::Key(key) => {
@@ -889,7 +895,11 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             KeyCode::Backspace => {
                 app.editor_mut().delete_char();
                 schedule_document_sync(app);
+<<<<<<< Updated upstream
                 app.lsp_state.completion = None; // Close completion on backspace for now
+=======
+                app.lsp_state.completion = None;
+>>>>>>> Stashed changes
                 app.lsp_state.hover = None;
                 return Ok(());
             }

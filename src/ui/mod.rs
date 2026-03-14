@@ -198,6 +198,7 @@ pub fn render(f: &mut Frame, app: &App) {
     if app.picker.active {
         picker::render(f, app);
     }
+<<<<<<< Updated upstream
     }
         hover::render(f, app);
     if app.lsp_state.hover.is_some() {
@@ -206,4 +207,14 @@ pub fn render(f: &mut Frame, app: &App) {
     if app.lsp_state.completion.is_some() {
     }
 
+=======
+
+    if app.lsp_state.completion.is_some() {
+        completion::render(f, app);
+    }
+
+    if app.lsp_state.hover.is_some() {
+        hover::render(f, app);
+    }
+>>>>>>> Stashed changes
 }
