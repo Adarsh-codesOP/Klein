@@ -191,6 +191,13 @@ fn trigger_picker_preview(app: &mut App) {
 }
 
 fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    // 1. If completion popup is open, it gets first dibs
+    if app.lsp_state.completion.is_some() {
+        if handle_completion_keys(app, key)? {
+            return Ok(());
+        }
+    }
+
     if app.picker.active {
         match key.code {
             KeyCode::Esc => {
@@ -785,14 +792,22 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Delete => {
                 app.editor_mut().delete_forward_char();
+                schedule_document_sync(app);
                 return Ok(());
             }
             KeyCode::Char('x') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 app.cut_selection();
+                schedule_document_sync(app);
                 return Ok(());
             }
             KeyCode::Backspace => {
                 app.editor_mut().delete_char();
+                schedule_document_sync(app);
+                app.lsp_state.completion = None; // Close completion on backspace for now
+                return Ok(());
+            }
+            KeyCode::Char(' ') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                schedule_completion(app);
                 return Ok(());
             }
             KeyCode::Enter => {
@@ -801,10 +816,15 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.editor_mut().cursor_x = 0;
                 let h = app.last_editor_height.get();
                 app.editor_mut().ensure_cursor_visible(h);
+                schedule_document_sync(app);
                 return Ok(());
             }
             KeyCode::Char(c) => {
                 app.editor_mut().insert_char(c);
+                schedule_document_sync(app);
+                if c == '.' || c == ':' {
+                    schedule_completion(app);
+                }
                 return Ok(());
             }
             _ => {}
@@ -863,4 +883,46 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+fn handle_completion_keys(app: &mut App, key: KeyEvent) -> io::Result<bool> {
+    let mut state = match app.lsp_state.completion.take() {
+        Some(s) => s,
+        None => return Ok(false),
+    };
+
+    let mut handled = true;
+    match key.code {
+        KeyCode::Esc => {
+            // Already taken out of state, so it closes.
+        }
+        KeyCode::Up => {
+            if state.selected_index > 0 {
+                state.selected_index -= 1;
+            } else {
+                state.selected_index = state.items.len().saturating_sub(1);
+            }
+            app.lsp_state.completion = Some(state);
+        }
+        KeyCode::Down => {
+            if !state.items.is_empty() && state.selected_index < state.items.len() - 1 {
+                state.selected_index += 1;
+            } else {
+                state.selected_index = 0;
+            }
+            app.lsp_state.completion = Some(state);
+        }
+        KeyCode::Enter | KeyCode::Tab => {
+            if let Some(item) = state.items.get(state.selected_index) {
+                app.editor_mut().insert_paste(&item.insert_text, 0);
+                schedule_document_sync(app);
+            }
+        }
+        _ => {
+            app.lsp_state.completion = Some(state);
+            handled = false;
+        }
+    }
+
+    Ok(handled)
 }
