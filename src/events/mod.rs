@@ -18,6 +18,7 @@ pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
             if matches!(app.active_panel, Panel::Editor) {
                 let h = app.last_editor_height.get();
                 app.insert_paste(&text, h);
+                schedule_document_sync(app);
             } else if matches!(app.active_panel, Panel::Terminal) {
                 app.terminal.write(&text);
             }
@@ -503,6 +504,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Char('z') => {
                 app.editor_mut().undo();
+                schedule_document_sync(app);
             }
             KeyCode::Char('b') => app.show_sidebar = !app.show_sidebar,
             KeyCode::Char('j') => app.show_terminal = !app.show_terminal,
@@ -713,6 +715,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Tab => {
                 app.editor_mut().insert_tab();
+                schedule_document_sync(app);
                 return Ok(());
             }
             KeyCode::Char('c') if app.editor().selection_start.is_some() => {

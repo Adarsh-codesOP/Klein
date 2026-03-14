@@ -205,18 +205,24 @@ impl App {
         }
     }
 
-    /// Open a file in a new tab (always creates a new tab)
     pub fn open_in_new_tab(&mut self, path: PathBuf) {
         let mut tab = TabState::new();
         let _ = tab.editor.open(path);
+        self.lsp_did_open_for_editor(&tab.editor);
         self.tabs.push(tab);
         self.active_tab = self.tabs.len() - 1;
     }
 
-    /// Open a file in the current tab (replaces current editor state)
     #[allow(dead_code)]
     pub fn open_in_current_tab(&mut self, path: PathBuf) {
         let _ = self.tabs[self.active_tab].editor.open(path);
+        let (p, content) = {
+            let editor = &self.tabs[self.active_tab].editor;
+            (editor.path.clone(), editor.buffer.to_string())
+        };
+        if let Some(path) = p {
+            self.lsp_manager.notify_did_open(&path, &content);
+        }
     }
 
     /// Switch to the next tab (wraps around)
@@ -226,10 +232,13 @@ impl App {
         }
     }
 
-    /// Close the active tab. Switches to adjacent tab.
     pub fn close_tab(&mut self) {
+        // Send didClose before removing
+        if let Some(path) = self.tabs[self.active_tab].editor.path.clone() {
+            self.lsp_manager.notify_did_close(&path);
+        }
+
         if self.tabs.len() == 1 {
-            // Don't close the last tab; just clear it
             self.tabs[0] = TabState::new();
             return;
         }
@@ -244,6 +253,9 @@ impl App {
         let tab = &mut self.tabs[active_tab];
         if tab.editor.path.is_some() {
             let _ = tab.editor.save();
+            if let Some(path) = tab.editor.path.clone() {
+                self.lsp_manager.notify_did_save(&path);
+            }
         }
     }
 
@@ -290,6 +302,87 @@ impl App {
                 self.active_panel = Panel::Editor;
             }
             SaveAsContext::SaveOnly => {}
+        }
+    }
+
+    // ─── LSP helpers ───────────────────────────────────────────────
+
+    fn lsp_did_open_for_editor(&mut self, editor: &Editor) {
+        if let Some(path) = &editor.path {
+            // Trigger server start
+            let _ = self.event_tx.send(KleinEvent::InitLsp(path.clone()));
+
+            // Send didOpen (will be ignored by manager if server not yet started,
+            // but that's okay because InitLsp handler will send didOpen once ready).
+            let content = editor.buffer.to_string();
+            self.lsp_manager.notify_did_open(path, &content);
+        }
+    }
+
+    pub fn notify_lsp_did_change(&mut self) {
+        let (path, content) = {
+            let editor = &self.tabs[self.active_tab].editor;
+            if let Some(path) = editor.path.clone() {
+                (path, editor.buffer.to_string())
+            } else {
+                return;
+            }
+        };
+        self.lsp_manager.notify_did_change(&path, &content);
+    }
+
+    pub fn notify_lsp_did_open_for_path(&mut self, path: &std::path::Path) {
+        // Find if this path is open in any tab
+        for tab in &self.tabs {
+            if let Some(p) = &tab.editor.path {
+                if p == path {
+                    let content = tab.editor.buffer.to_string();
+                    self.lsp_manager.notify_did_open(path, &content);
+                    return;
+                }
+            }
+        }
+    }
+
+    pub async fn trigger_completion(&mut self) {
+        let (path, line, col, buffer) = {
+            let editor = &self.tabs[self.active_tab].editor;
+            match &editor.path {
+                Some(p) => (p.clone(), editor.cursor_y, editor.cursor_x, editor.buffer.clone()),
+                None => return,
+            }
+        };
+
+        log::debug!("requesting completions at Ln {}, Col {}", line + 1, col + 1);
+        let response = match self.lsp_manager.request_completion(&path, line, col, &buffer).await {
+            Some(r) => r,
+            None => return,
+        };
+
+        // Parse response (can be Array or List)
+        let items: Vec<crate::lsp::types::KleinCompletion> = match serde_json::from_value::<lsp_types::CompletionResponse>(response) {
+            Ok(lsp_types::CompletionResponse::Array(arr)) => {
+                arr.into_iter().map(|i| crate::lsp::router::to_klein_completion(&i)).collect()
+            }
+            Ok(lsp_types::CompletionResponse::List(list)) => {
+                list.items.into_iter().map(|i| crate::lsp::router::to_klein_completion(&i)).collect()
+            }
+            Err(e) => {
+                log::error!("failed to parse completion response: {}", e);
+                Vec::new()
+            }
+        };
+
+        if !items.is_empty() {
+            log::info!("received {} completion items", items.len());
+            self.lsp_state.completion = Some(crate::lsp::types::CompletionState {
+                items,
+                selected_index: 0,
+                scroll: 0,
+                trigger_position: (line, col),
+            });
+        } else {
+            self.lsp_state.completion = None;
         }
     }
 }
