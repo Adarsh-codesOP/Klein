@@ -669,15 +669,21 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Char('c') => {
                 app.copy_selection();
+                return Ok(());
             }
             KeyCode::Char('v') => {
                 let h = app.last_editor_height.get();
                 app.paste_clipboard(h);
+                return Ok(());
             }
             KeyCode::Char('a') => {
                 app.editor_mut().select_all();
+                return Ok(());
             }
-            KeyCode::Char('h') => app.show_help = !app.show_help,
+            KeyCode::Char('h') => {
+                app.show_help = !app.show_help;
+                return Ok(());
+            }
             KeyCode::Right | KeyCode::Left => {
                 app.active_panel = match app.active_panel {
                     Panel::Sidebar => Panel::Editor,

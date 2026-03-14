@@ -210,4 +210,3 @@ pub struct LspState {
     /// Active rename operation, if any.
     pub rename: Option<RenameState>,
 }
-

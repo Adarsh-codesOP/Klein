@@ -37,6 +37,14 @@ pub const HELP_TEXT: &str = r#"
 
 --- HELP ---
 [Ctrl+H / Esc] Toggle Help Overlay
+
+--- LSP COMMANDS ---
+[Ctrl+Space] Trigger Autocompletion
+[Alt+G, then d] Go to Definition
+[Alt+G, then r] Find References
+[Alt+G, then n] Rename Symbol under Cursor
+[Alt+F] Format Document
+[Alt+Enter] Code Actions / Quick Fix
 "#;
 
 pub mod colors {

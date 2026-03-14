@@ -124,7 +124,6 @@ impl LspManager {
         Ok(())
     }
 
-   
     pub fn notify_did_open(&mut self, path: &Path, content: &str) {
         let lang_id = match self.registry.language_id_for_file(path) {
             Some(id) => id.to_string(),
