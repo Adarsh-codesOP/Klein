@@ -57,6 +57,7 @@ pub fn handle_timer_event(app: &mut App, kind: klein_event::TimerKind) {
 
 fn schedule_document_sync(app: &mut App) {
     if let Some(ref mut tm) = app.timer_manager {
+        log::warn!("LSP: scheduling document sync timer");
         tm.schedule(
             klein_event::TimerKind::DocumentSync,
             std::time::Duration::from_millis(150),
@@ -66,6 +67,7 @@ fn schedule_document_sync(app: &mut App) {
 
 fn schedule_completion(app: &mut App) {
     if let Some(ref mut tm) = app.timer_manager {
+        log::warn!("LSP: scheduling completion timer");
         tm.schedule(
             klein_event::TimerKind::CompletionTrigger,
             std::time::Duration::from_millis(50),
@@ -985,10 +987,12 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 return Ok(());
             }
             KeyCode::Char(c) => {
+                log::warn!("LSP: KeyCode::Char('{}') pressed", c);
                 app.editor_mut().insert_char(c);
                 schedule_document_sync(app);
                 app.lsp_state.hover = None;
                 if c == '.' || c == ':' || app.lsp_state.completion.is_some() {
+                    log::warn!("LSP: Triggering schedule_completion for '{}'", c);
                     schedule_completion(app);
                 }
                 return Ok(());

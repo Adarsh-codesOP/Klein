@@ -47,6 +47,7 @@ impl ActorHandle {
         params: serde_json::Value,
     ) -> Result<serde_json::Value, String> {
         let (response_tx, response_rx) = oneshot::channel();
+        log::warn!("[{}] Sending request: {}", self.server_name, method);
         self.tx
             .send(ActorMessage::Request {
                 method: method.to_string(),
@@ -61,6 +62,7 @@ impl ActorHandle {
     }
 
     pub fn send_notification(&self, method: &str, params: serde_json::Value) -> Result<(), String> {
+        log::warn!("[{}] Sending notification: {}", self.server_name, method);
         self.tx
             .send(ActorMessage::Notification {
                 method: method.to_string(),
@@ -173,7 +175,7 @@ async fn actor_loop(
                         let _ = stdin.flush().await;
 
                         pending.insert(id, response_tx);
-                        log::info!("[{}] → request #{}: {} | params: {}", server_name, id, method, params);
+                        log::warn!("[{}] → request #{}: {} | params: {}", server_name, id, method, params);
                     }
 
                     Some(ActorMessage::Notification { method, params }) => {
@@ -189,7 +191,7 @@ async fn actor_loop(
                             break;
                         }
                         let _ = stdin.flush().await;
-                        log::info!("[{}] → notification: {} | params: {}", server_name, method, params);
+                        log::warn!("[{}] → notification: {} | params: {}", server_name, method, params);
                     }
 
                     Some(ActorMessage::Cancel { id }) => {
@@ -289,7 +291,7 @@ fn handle_server_message(
                     .get("result")
                     .cloned()
                     .unwrap_or(serde_json::Value::Null);
-                log::info!("[{}] ← response #{}: ok | result: {}", server_name, id, result);
+                log::warn!("[{}] ← response #{}: ok | result: {}", server_name, id, result);
                 let _ = tx.send(Ok(result));
             }
         } else {

@@ -341,16 +341,22 @@ impl App {
     }
 
     pub fn notify_lsp_did_open_for_path(&mut self, path: &std::path::Path) {
+        log::warn!("LSP: notify_lsp_did_open_for_path called for {}", path.display());
         // Find if this path is open in any tab
-        for tab in &self.tabs {
+        for (i, tab) in self.tabs.iter().enumerate() {
             if let Some(p) = &tab.editor.path {
+                log::warn!("LSP: Checking tab {}, tab path: {}", i, p.display());
                 if p == path {
                     let content = tab.editor.buffer.to_string();
+                    log::warn!("LSP: Found matching tab {}, sending didOpen", i);
                     self.lsp_manager.notify_did_open(path, &content);
                     return;
                 }
+            } else {
+                log::warn!("LSP: Tab {} has no path", i);
             }
         }
+        log::warn!("LSP: No matching tab found for {}", path.display());
     }
 
     pub fn trigger_completion(&mut self) {
@@ -367,7 +373,7 @@ impl App {
             }
         };
 
-        log::info!("requesting completions at Ln {}, Col {}", line + 1, col + 1);
+        log::warn!("LSP: requesting completions for {} at Ln {}, Col {}", path.display(), line + 1, col + 1);
         
         let handle = match self.lsp_manager.server_handle_for_file(&path) {
             Some(h) => h.clone(),
@@ -449,7 +455,7 @@ impl App {
         };
 
         if !items.is_empty() {
-            log::info!("received {} filtered completion items for prefix", items.len());
+            log::warn!("LSP: received {} filtered completion items", items.len());
             self.lsp_state.completion = Some(crate::lsp::types::CompletionState {
                 items,
                 selected_index: 0,
@@ -457,6 +463,7 @@ impl App {
                 trigger_position,
             });
         } else {
+            log::warn!("LSP: no completion items found");
             self.lsp_state.completion = None;
         }
     }
