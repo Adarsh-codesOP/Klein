@@ -151,7 +151,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
             let cursor_screen_y = real_editor.cursor_y - real_editor.scroll_y;
             if cursor_screen_y < content_area.height as usize {
                 f.set_cursor(
-                    content_area.x + real_editor.cursor_x as u16,
+                    content_area.x + real_editor.get_cursor_screen_column() as u16,
                     content_area.y + cursor_screen_y as u16,
                 );
             }

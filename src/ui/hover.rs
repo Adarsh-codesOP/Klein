@@ -21,7 +21,7 @@ pub fn render(f: &mut Frame, app: &App) {
 
     // Calculate cursor screen position
     let cursor_screen_y = editor.cursor_y.saturating_sub(editor.scroll_y);
-    let cursor_screen_x = editor.cursor_x;
+    let cursor_screen_x = editor.get_cursor_screen_column();
 
     // The popup should appear above the cursor if possible, else below
     let width = 60.min(f.size().width.saturating_sub(editor_area.x + 4));
@@ -39,10 +39,23 @@ pub fn render(f: &mut Frame, app: &App) {
         y = editor_area.y + cursor_screen_y as u16 + 1;
     }
 
+    // Safety: check if coordinates are within total frame bounds
+    if x >= f.size().width {
+        return; // Don't even try to render if x is off-screen
+    }
+    if y >= f.size().height {
+        y = f.size().height.saturating_sub(height + 1);
+    }
+
     // Shift left if too close to right edge
     let mut final_x = x;
     if final_x + width > f.size().width {
         final_x = f.size().width.saturating_sub(width);
+    }
+
+    // Final safety check: ensuring Rect dimensions are valid (width/height >= 1)
+    if width < 2 || height < 2 {
+        return;
     }
 
     let area = Rect::new(final_x, y, width, height);

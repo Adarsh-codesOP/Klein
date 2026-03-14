@@ -22,11 +22,19 @@ pub fn render(f: &mut Frame, app: &App) {
 
     // Calculate cursor screen position
     let cursor_screen_y = editor.cursor_y.saturating_sub(editor.scroll_y);
-    let cursor_screen_x = editor.cursor_x;
+    let cursor_screen_x = editor.get_cursor_screen_column();
 
     // The popup should appear below the cursor
     let mut x = editor_area.x + cursor_screen_x as u16;
     let mut y = editor_area.y + cursor_screen_y as u16 + 1;
+
+    // Safety: check if coordinates are within total frame bounds
+    if x >= f.size().width {
+        x = f.size().width.saturating_sub(1);
+    }
+    if y >= f.size().height {
+        y = f.size().height.saturating_sub(1);
+    }
 
     let width = 40.min(f.size().width.saturating_sub(x));
     let height = 10.min(f.size().height.saturating_sub(y));
@@ -39,6 +47,11 @@ pub fn render(f: &mut Frame, app: &App) {
     // If too close to right, shift left
     if x + width > f.size().width {
         x = f.size().width.saturating_sub(width);
+    }
+
+    // Final safety check: ensuring Rect dimensions are valid (width/height >= 1)
+    if width == 0 || height == 0 {
+        return;
     }
 
     let area = Rect::new(x, y, width, height);
