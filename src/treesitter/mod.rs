@@ -28,6 +28,11 @@ impl TSManager {
         registry.insert("toml".to_string(), tree_sitter_toml::language());
         registry.insert("md".to_string(), tree_sitter_md::language());
         registry.insert("markdown".to_string(), tree_sitter_md::language());
+        registry.insert("java".to_string(), tree_sitter_java::language());
+        registry.insert("html".to_string(), tree_sitter_html::language());
+        registry.insert("css".to_string(), tree_sitter_css::language());
+        registry.insert("yaml".to_string(), tree_sitter_yaml::language());
+        registry.insert("yml".to_string(), tree_sitter_yaml::language());
 
         Self { registry }
     }
