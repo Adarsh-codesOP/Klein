@@ -58,7 +58,11 @@ pub fn from_lsp_position(pos: &Position, buffer: &Rope) -> (usize, usize) {
     }
 
     // character offset is at or past end of line
-    (line, rope_line.len_chars().saturating_sub(1).max(0))
+    let mut max_col = rope_line.len_chars();
+    while max_col > 0 && (rope_line.char(max_col - 1) == '\n' || rope_line.char(max_col - 1) == '\r') {
+        max_col -= 1;
+    }
+    (line, max_col)
 }
 
 /// Convert a filesystem path to an LSP document URI.
@@ -106,6 +110,25 @@ pub fn to_klein_diagnostic(diag: &Diagnostic, buffer: &Rope) -> KleinDiagnostic 
 }
 
 pub fn to_klein_completion(item: &CompletionItem) -> KleinCompletion {
+    let mut insert_text = item
+        .insert_text
+        .clone()
+        .unwrap_or_else(|| item.label.clone());
+    let mut replace_range = None;
+
+    if let Some(edit) = &item.text_edit {
+        match edit {
+            lsp_types::CompletionTextEdit::Edit(e) => {
+                insert_text = e.new_text.clone();
+                replace_range = Some(e.range);
+            }
+            lsp_types::CompletionTextEdit::InsertAndReplace(e) => {
+                insert_text = e.new_text.clone();
+                replace_range = Some(e.replace);
+            }
+        }
+    }
+
     KleinCompletion {
         label: item.label.clone(),
         detail: item.detail.clone(),
@@ -114,10 +137,8 @@ pub fn to_klein_completion(item: &CompletionItem) -> KleinCompletion {
             lsp_types::Documentation::MarkupContent(m) => m.value.clone(),
         }),
         kind: map_completion_kind(item.kind),
-        insert_text: item
-            .insert_text
-            .clone()
-            .unwrap_or_else(|| item.label.clone()),
+        insert_text,
+        replace_range,
         sort_text: item.sort_text.clone(),
     }
 }

@@ -115,6 +115,8 @@ pub struct KleinCompletion {
     pub kind: CompletionKind,
     /// The text to insert when accepted.
     pub insert_text: String,
+    /// LSP range to replace on accepting the completion.
+    pub replace_range: Option<lsp_types::Range>,
     /// Sort priority (lower string = higher priority).
     pub sort_text: Option<String>,
 }
