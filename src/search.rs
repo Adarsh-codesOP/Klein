@@ -179,6 +179,28 @@ pub fn run_file_search(query: &str) -> Vec<SearchResult> {
     scored_files.into_iter().take(1000).map(|f| f.1).collect()
 }
 
+pub fn fuzzy_filter(
+    prefix: &str,
+    items: Vec<crate::lsp::types::KleinCompletion>,
+) -> Vec<crate::lsp::types::KleinCompletion> {
+    if prefix.is_empty() {
+        return items;
+    }
+
+    let matcher = SkimMatcherV2::default();
+    let mut scored: Vec<(i64, crate::lsp::types::KleinCompletion)> = items
+        .into_iter()
+        .filter_map(|item| {
+            matcher
+                .fuzzy_match(&item.label, prefix)
+                .map(|score| (score, item))
+        })
+        .collect();
+
+    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.into_iter().map(|(_, item)| item).collect()
+}
+
 pub fn load_preview_lines(path: &Path, line: usize, radius: usize) -> Option<Vec<String>> {
     use std::fs::File;
     use std::io::{BufRead, BufReader};

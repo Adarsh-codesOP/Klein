@@ -233,10 +233,7 @@ impl App {
         let _ = self.tabs[self.active_tab]
             .editor
             .open(path, &self.ts_manager);
-        let (p, content) = {
-            let editor = &self.tabs[self.active_tab].editor;
-            (editor.path.clone(), editor.buffer.to_string())
-        };
+        let p = self.tabs[self.active_tab].editor.path.clone();
         if let Some(path) = p {
             let _ = self.event_tx.send(crate::events::klein_event::KleinEvent::InitLsp(path.clone()));
         }
@@ -430,8 +427,28 @@ impl App {
                 }
             };
 
+        let items: Vec<crate::lsp::types::KleinCompletion> = if !items.is_empty() {
+            let editor = self.editor();
+            let (line_idx, col_idx) = (editor.cursor_y, editor.cursor_x);
+            let (start_line, start_col) = trigger_position;
+            
+            if start_line != line_idx || start_col > col_idx {
+                items
+            } else {
+                let line_slice = editor.buffer.line(line_idx);
+                let prefix = if start_col < col_idx {
+                    line_slice.slice(start_col..col_idx).to_string()
+                } else {
+                    "".to_string()
+                };
+                crate::search::fuzzy_filter(&prefix, items)
+            }
+        } else {
+            Vec::new()
+        };
+
         if !items.is_empty() {
-            log::info!("received {} completion items", items.len());
+            log::info!("received {} filtered completion items", items.len());
             self.lsp_state.completion = Some(crate::lsp::types::CompletionState {
                 items,
                 selected_index: 0,
@@ -923,7 +940,6 @@ impl App {
         );
         let action_params = serde_json::Value::Object(params_obj);
 
-        let tx = self.event_tx.clone();
         let tx = self.event_tx.clone();
         tokio::spawn(async move {
             let response = handle.send_request("textDocument/codeAction", action_params).await.ok();

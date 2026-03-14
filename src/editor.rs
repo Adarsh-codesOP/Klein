@@ -471,10 +471,25 @@ impl Editor {
 
             if start_char < end_char {
                 self.buffer_remove(start_char..end_char);
-                self.cursor_x = 0;
+                self.cursor_y = sy;
+                self.cursor_x = sx;
+                self.selection_start = None;
                 self.is_dirty = true;
+                
+                // Ensure cursor is within new buffer bounds
+                let num_lines = self.buffer.len_lines();
+                if self.cursor_y >= num_lines {
+                    self.cursor_y = num_lines.saturating_sub(1);
+                }
+                self.clamp_cursor_x();
+                
+                // Reset scroll if we deleted everything or large chunks
+                if self.cursor_y < self.scroll_y {
+                    self.scroll_y = self.cursor_y;
+                }
+            } else {
+                self.selection_start = None;
             }
-            self.selection_start = None;
         }
     }
 
