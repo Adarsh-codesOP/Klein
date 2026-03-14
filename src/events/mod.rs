@@ -51,7 +51,7 @@ pub async fn handle_timer_event(app: &mut App, kind: klein_event::TimerKind) {
             app.trigger_completion().await;
         }
         klein_event::TimerKind::HoverTrigger => {
-            // Phase 6
+            app.trigger_hover().await;
         }
     }
 }
@@ -74,8 +74,14 @@ fn schedule_completion(app: &mut App) {
     }
 }
 
-
-
+fn schedule_hover(app: &mut App) {
+    if let Some(ref mut tm) = app.timer_manager {
+        tm.schedule(
+            klein_event::TimerKind::HoverTrigger,
+            std::time::Duration::from_millis(400),
+        );
+    }
+}
 pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
     match event {
         Event::Key(key) => {
@@ -771,6 +777,8 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 }
                 let h = app.last_editor_height.get();
                 app.editor_mut().move_cursor_down(h);
+                app.lsp_state.hover = None;
+                schedule_hover(app);
                 return Ok(());
             }
             KeyCode::Up => {
@@ -780,16 +788,22 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     app.editor_mut().clear_selection();
                 }
                 app.editor_mut().move_cursor_up();
+                app.lsp_state.hover = None;
+                schedule_hover(app);
                 return Ok(());
             }
             KeyCode::Left => {
                 app.editor_mut().clear_selection();
                 app.editor_mut().move_cursor_left();
+                app.lsp_state.hover = None;
+                schedule_hover(app);
                 return Ok(());
             }
             KeyCode::Right => {
                 app.editor_mut().clear_selection();
                 app.editor_mut().move_cursor_right();
+                app.lsp_state.hover = None;
+                schedule_hover(app);
                 return Ok(());
             }
             KeyCode::Tab => {
@@ -876,6 +890,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.editor_mut().delete_char();
                 schedule_document_sync(app);
                 app.lsp_state.completion = None; // Close completion on backspace for now
+                app.lsp_state.hover = None;
                 return Ok(());
             }
             KeyCode::Char(' ') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -894,6 +909,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             KeyCode::Char(c) => {
                 app.editor_mut().insert_char(c);
                 schedule_document_sync(app);
+                app.lsp_state.hover = None;
                 if c == '.' || c == ':' {
                     schedule_completion(app);
                 }

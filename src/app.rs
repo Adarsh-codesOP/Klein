@@ -385,4 +385,41 @@ impl App {
             self.lsp_state.completion = None;
         }
     }
+
+    pub async fn trigger_hover(&mut self) {
+        let (path, line, col, buffer) = {
+            let editor = &self.tabs[self.active_tab].editor;
+            match &editor.path {
+                Some(p) => (p.clone(), editor.cursor_y, editor.cursor_x, editor.buffer.clone()),
+                None => return,
+            }
+        };
+
+        let response = match self.lsp_manager.request_hover(&path, line, col, &buffer).await {
+            Some(r) => r,
+            None => return,
+        };
+
+        // Parse response
+        if let Ok(hover) = serde_json::from_value::<lsp_types::Hover>(response) {
+            let contents = match hover.contents {
+                lsp_types::HoverContents::Scalar(m) => match m {
+                    lsp_types::MarkedString::String(s) => s,
+                    lsp_types::MarkedString::LanguageString(ls) => ls.value,
+                },
+                lsp_types::HoverContents::Array(arr) => arr.into_iter().map(|m| match m {
+                    lsp_types::MarkedString::String(s) => s,
+                    lsp_types::MarkedString::LanguageString(ls) => ls.value,
+                }).collect::<Vec<_>>().join("\n"),
+                lsp_types::HoverContents::Markup(m) => m.value,
+            };
+
+            if !contents.is_empty() {
+                self.lsp_state.hover = Some(crate::lsp::types::KleinHoverInfo {
+                    contents,
+                    range: None, // Could parse range later
+                });
+            }
+        }
+    }
 }

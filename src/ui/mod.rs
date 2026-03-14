@@ -4,6 +4,7 @@ use ratatui::Frame;
 pub mod completion;
 pub mod editor;
 pub mod help;
+pub mod hover;
 pub mod layout;
 pub mod picker;
 pub mod sidebar;
@@ -197,8 +198,12 @@ pub fn render(f: &mut Frame, app: &App) {
     if app.picker.active {
         picker::render(f, app);
     }
-
-    if app.lsp_state.completion.is_some() {
-        completion::render(f, app);
     }
+        hover::render(f, app);
+    if app.lsp_state.hover.is_some() {
+
+        completion::render(f, app);
+    if app.lsp_state.completion.is_some() {
+    }
+
 }
