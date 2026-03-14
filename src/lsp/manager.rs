@@ -131,14 +131,20 @@ impl LspManager {
         };
 
         if self.doc_sync.is_open(path) {
+            log::warn!("LSP: document {} is already open in doc_sync, skipping didOpen", path.display());
             return;
         }
 
         let (language_id, version) = self.doc_sync.open_document(path, &lang_id);
         let uri = match router::path_to_uri(path) {
             Some(u) => u,
-            None => return,
+            None => {
+                log::error!("LSP: failed to convert path to URI: {}", path.display());
+                return;
+            }
         };
+
+        log::warn!("LSP: sending textDocument/didOpen for {} (lang: {})", path.display(), language_id);
 
         if let Some(server) = self.servers.get(&lang_id) {
             let _ = server.handle.send_notification(
