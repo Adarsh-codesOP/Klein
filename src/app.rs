@@ -367,7 +367,7 @@ impl App {
             }
         };
 
-        log::debug!("requesting completions at Ln {}, Col {}", line + 1, col + 1);
+        log::info!("requesting completions at Ln {}, Col {}", line + 1, col + 1);
         
         let handle = match self.lsp_manager.server_handle_for_file(&path) {
             Some(h) => h.clone(),
@@ -448,7 +448,7 @@ impl App {
         };
 
         if !items.is_empty() {
-            log::info!("received {} filtered completion items", items.len());
+            log::info!("received {} filtered completion items for prefix", items.len());
             self.lsp_state.completion = Some(crate::lsp::types::CompletionState {
                 items,
                 selected_index: 0,

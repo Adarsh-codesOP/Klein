@@ -77,10 +77,16 @@ impl AppConfig {
 
             if config_path.exists() {
                 if let Ok(contents) = std::fs::read_to_string(&config_path) {
+                    log::info!("loading config from {}", config_path.display());
                     if let Ok(config) = toml::from_str::<AppConfig>(&contents) {
+                        log::info!("loaded config: {:?}", config);
                         return config;
                     }
+                } else {
+                    log::warn!("could not read config file at {}", config_path.display());
                 }
+            } else {
+                log::info!("config file not found at {}", config_path.display());
             }
         }
         AppConfig::default()
