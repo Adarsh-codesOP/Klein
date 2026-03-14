@@ -74,10 +74,20 @@ pub struct App {
     pub save_as_state: SaveAsState,
     pub picker: crate::search::PickerState,
     pub clipboard: Option<arboard::Clipboard>,
+    pub lsp_state: LspState,
+    pub lsp_notification_tx: tokio::sync::mpsc::UnboundedSender<LspServerNotification>,
+    pub lsp_manager: LspManager,
+    pub timer_manager: Option<crate::events::timers::TimerManager>,
+    pub event_tx: tokio::sync::mpsc::UnboundedSender<KleinEvent>,
 }
 
 impl App {
-    pub fn new(cli_file: Option<PathBuf>, clipboard: Option<arboard::Clipboard>) -> App {
+    pub fn new(
+        cli_file: Option<PathBuf>,
+        clipboard: Option<arboard::Clipboard>,
+        lsp_notification_tx: tokio::sync::mpsc::UnboundedSender<LspServerNotification>,
+        event_tx: tokio::sync::mpsc::UnboundedSender<KleinEvent>,
+    ) -> App {
         let config = crate::config::AppConfig::load();
 
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));

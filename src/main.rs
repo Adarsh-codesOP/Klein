@@ -14,6 +14,7 @@ mod app;
 mod config;
 mod editor;
 mod events;
+mod lsp;
 mod search;
 mod sidebar;
 mod tabs;
@@ -41,7 +42,50 @@ async fn main() -> Result<()> {
         .collect();
     let cli = Cli::parse_from(args);
 
+    init_logging();
+    log::info!(
+        "Klein {} starting in {}",
+        env!("CARGO_PKG_VERSION"),
+        std::env::current_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| "<unknown>".into())
+    );
+
     let clipboard = arboard::Clipboard::new().ok();
+
+    // Unified event channel — all sources funnel into this.
+    let (event_tx, event_rx) =
+        tokio::sync::mpsc::unbounded_channel::<events::klein_event::KleinEvent>();
+
+    // LSP notification sender (forwarded into KleinEvent::Lsp by bridge below).
+    let (lsp_notification_tx, mut lsp_notification_rx) =
+        tokio::sync::mpsc::unbounded_channel::<lsp::actor::LspServerNotification>();
+
+    // Bridge: LSP notifications → unified channel
+    let lsp_event_tx = event_tx.clone();
+    tokio::spawn(async move {
+        while let Some(notif) = lsp_notification_rx.recv().await {
+            let _ = lsp_event_tx.send(events::klein_event::KleinEvent::Lsp(notif));
+        }
+    });
+
+    // Bridge: crossterm terminal events → unified channel (runs on blocking thread)
+    let term_event_tx = event_tx.clone();
+    std::thread::spawn(move || {
+        loop {
+            match event::read() {
+                Ok(ev) => {
+                    if term_event_tx
+                        .send(events::klein_event::KleinEvent::Terminal(ev))
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+    });
 
     // Setup terminal
     enable_raw_mode()?;
@@ -55,9 +99,12 @@ async fn main() -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Create app and run it
-    let mut app = App::new(cli.file, clipboard);
-    let res = run_app(&mut terminal, &mut app).await;
+    let timer_manager = events::timers::TimerManager::new(event_tx.clone());
+
+    let mut app = App::new(cli.file, clipboard, lsp_notification_tx, event_tx);
+    app.timer_manager = Some(timer_manager);
+
+    let res = run_app(&mut terminal, &mut app, event_rx).await;
 
     // Restore terminal
     disable_raw_mode()?;
@@ -79,6 +126,7 @@ async fn main() -> Result<()> {
 async fn run_app<B: io::Write + ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
+    mut event_rx: tokio::sync::mpsc::UnboundedReceiver<events::klein_event::KleinEvent>,
 ) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui::render(f, app))?;
@@ -102,13 +150,76 @@ async fn run_app<B: io::Write + ratatui::backend::Backend>(
             app.maximized = crate::app::Maximized::None;
         }
 
-        if event::poll(std::time::Duration::from_millis(16))? {
-            let ev = event::read()?;
-            events::handle_event(app, ev)?;
+        // Drain all pending events (non-blocking)
+        while let Ok(klein_event) = event_rx.try_recv() {
+            match klein_event {
+                events::klein_event::KleinEvent::Terminal(ev) => {
+                    events::handle_event(app, ev)?;
+                }
+                events::klein_event::KleinEvent::Lsp(notification) => {
+                    events::handle_lsp_notification(app, notification);
+                }
+                events::klein_event::KleinEvent::Timer(kind) => {
+                    events::handle_timer_event(app, kind).await;
+                }
+                events::klein_event::KleinEvent::InitLsp(path) => {
+                    // Try to start server for this file
+                    if app.lsp_manager.ensure_server_for_file(&path).await.is_some() {
+                        // Once server is up, send didOpen for the file that triggered it
+                        // This handles the case where the first didOpen was ignored
+                        // because the server was still starting.
+                        app.notify_lsp_did_open_for_path(&path);
+                    }
+                }
+            }
         }
 
+        // Yield briefly so the channel can accumulate events
+        tokio::time::sleep(std::time::Duration::from_millis(8)).await;
+
         if app.should_quit {
+            log::info!("Klein shutting down");
             return Ok(());
+        }
+    }
+}
+
+/// Initialize file-based logging.
+///
+/// Logs are written to the Klein config directory (e.g., `~/.config/Klein/klein.log`
+/// on Linux, `%APPDATA%/Klein/klein.log` on Windows). The log level defaults to
+/// `warn` but can be overridden via the `KLEIN_LOG` environment variable.
+fn init_logging() {
+    use std::io::Write;
+
+    let log_path = directories::ProjectDirs::from("", "", "Klein")
+        .map(|dirs| {
+            let log_dir = dirs.config_dir().to_path_buf();
+            let _ = std::fs::create_dir_all(&log_dir);
+            log_dir.join("klein.log")
+        });
+
+    if let Some(path) = log_path {
+        if let Ok(file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
+            let env_filter = std::env::var("KLEIN_LOG").unwrap_or_else(|_| "warn".to_string());
+            let _ = env_logger::Builder::new()
+                .parse_filters(&env_filter)
+                .target(env_logger::Target::Pipe(Box::new(file)))
+                .format(|buf, record| {
+                    writeln!(
+                        buf,
+                        "[{} {} {}] {}",
+                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                        record.level(),
+                        record.target(),
+                        record.args()
+                    )
+                })
+                .try_init();
         }
     }
 }
