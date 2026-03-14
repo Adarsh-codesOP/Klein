@@ -33,6 +33,7 @@ pub struct LspServerNotification {
 
 // ─── Actor handle ──────────────────────────────────────────────────────
 
+#[derive(Clone)]
 pub struct ActorHandle {
     pub tx: mpsc::UnboundedSender<ActorMessage>,
     pub language_id: String,
@@ -172,7 +173,7 @@ async fn actor_loop(
                         let _ = stdin.flush().await;
 
                         pending.insert(id, response_tx);
-                        log::debug!("[{}] → request #{}: {}", server_name, id, method);
+                        log::info!("[{}] → request #{}: {} | params: {}", server_name, id, method, params);
                     }
 
                     Some(ActorMessage::Notification { method, params }) => {
@@ -188,7 +189,7 @@ async fn actor_loop(
                             break;
                         }
                         let _ = stdin.flush().await;
-                        log::debug!("[{}] → notification: {}", server_name, method);
+                        log::info!("[{}] → notification: {} | params: {}", server_name, method, params);
                     }
 
                     Some(ActorMessage::Cancel { id }) => {
@@ -288,7 +289,7 @@ fn handle_server_message(
                     .get("result")
                     .cloned()
                     .unwrap_or(serde_json::Value::Null);
-                log::debug!("[{}] ← response #{}: ok", server_name, id);
+                log::info!("[{}] ← response #{}: ok | result: {}", server_name, id, result);
                 let _ = tx.send(Ok(result));
             }
         } else {

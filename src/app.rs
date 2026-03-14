@@ -356,7 +356,7 @@ impl App {
         }
     }
 
-    pub async fn trigger_completion(&mut self) {
+    pub fn trigger_completion(&mut self) {
         let (path, line, col, buffer) = {
             let editor = &self.tabs[self.active_tab].editor;
             match &editor.path {
@@ -371,13 +371,45 @@ impl App {
         };
 
         log::debug!("requesting completions at Ln {}, Col {}", line + 1, col + 1);
-        let response = match self
-            .lsp_manager
-            .request_completion(&path, line, col, &buffer)
-            .await
-        {
-            Some(r) => r,
+        
+        let handle = match self.lsp_manager.server_handle_for_file(&path) {
+            Some(h) => h.clone(),
             None => return,
+        };
+        let caps = match self.lsp_manager.get_capabilities(&path) {
+            Some(c) => c,
+            None => return,
+        };
+        if !caps.completion { return; }
+
+        let params = match self.lsp_manager.text_doc_position(&path, line, col, &buffer) {
+            Some(p) => p,
+            None => return,
+        };
+
+        let mut params_obj = params.as_object().unwrap().clone();
+        params_obj.insert(
+            "context".to_string(),
+            serde_json::json!({
+                "triggerKind": 1, // Invoked
+            }),
+        );
+        let params_with_context = serde_json::Value::Object(params_obj);
+
+        let tx = self.event_tx.clone();
+        tokio::spawn(async move {
+            let response = handle.send_request("textDocument/completion", params_with_context).await.ok();
+            let _ = tx.send(crate::events::klein_event::KleinEvent::CompletionResponse(response, path, (line, col)));
+        });
+    }
+
+    pub fn handle_completion_response(&mut self, response: Option<serde_json::Value>, _path: std::path::PathBuf, trigger_position: (usize, usize)) {
+        let response = match response {
+            Some(r) => r,
+            None => {
+                self.lsp_state.completion = None;
+                return;
+            }
         };
 
         // Parse response (can be Array or List)
@@ -404,14 +436,14 @@ impl App {
                 items,
                 selected_index: 0,
                 scroll: 0,
-                trigger_position: (line, col),
+                trigger_position,
             });
         } else {
             self.lsp_state.completion = None;
         }
     }
 
-    pub async fn trigger_hover(&mut self) {
+    pub fn trigger_hover(&mut self) {
         let (path, line, col, buffer) = {
             let editor = &self.tabs[self.active_tab].editor;
             match &editor.path {
@@ -425,13 +457,35 @@ impl App {
             }
         };
 
-        let response = match self
-            .lsp_manager
-            .request_hover(&path, line, col, &buffer)
-            .await
-        {
-            Some(r) => r,
+        let handle = match self.lsp_manager.server_handle_for_file(&path) {
+            Some(h) => h.clone(),
             None => return,
+        };
+        let caps = match self.lsp_manager.get_capabilities(&path) {
+            Some(c) => c,
+            None => return,
+        };
+        if !caps.hover { return; }
+
+        let params = match self.lsp_manager.text_doc_position(&path, line, col, &buffer) {
+            Some(p) => p,
+            None => return,
+        };
+
+        let tx = self.event_tx.clone();
+        tokio::spawn(async move {
+            let response = handle.send_request("textDocument/hover", params).await.ok();
+            let _ = tx.send(crate::events::klein_event::KleinEvent::HoverResponse(response, path, (line, col)));
+        });
+    }
+
+    pub fn handle_hover_response(&mut self, response: Option<serde_json::Value>, _path: std::path::PathBuf, _pos: (usize, usize)) {
+        let response = match response {
+            Some(r) => r,
+            None => {
+                self.lsp_state.hover = None;
+                return;
+            }
         };
 
         // Parse response
@@ -457,11 +511,16 @@ impl App {
                     contents,
                     range: None, // Could parse range later
                 });
+            } else {
+                self.lsp_state.hover = None;
             }
+        } else {
+            self.lsp_state.hover = None;
         }
     }
 
-    pub async fn trigger_goto_definition(&mut self) {
+
+    pub fn trigger_goto_definition(&mut self) {
         let (path, line, col, buffer) = {
             let editor = &self.tabs[self.active_tab].editor;
             match &editor.path {
@@ -475,42 +534,65 @@ impl App {
             }
         };
 
-        if let Some(resp) = self
-            .lsp_manager
-            .request_goto_definition(&path, line, col, &buffer)
-            .await
-        {
-            let loc = match serde_json::from_value::<lsp_types::GotoDefinitionResponse>(resp) {
-                Ok(lsp_types::GotoDefinitionResponse::Scalar(l)) => Some(l),
-                Ok(lsp_types::GotoDefinitionResponse::Array(a)) => a.into_iter().next(),
-                Ok(lsp_types::GotoDefinitionResponse::Link(l)) => {
-                    l.into_iter().next().map(|link| lsp_types::Location {
-                        uri: link.target_uri,
-                        range: link.target_range,
-                    })
-                }
-                _ => None,
-            };
+        let handle = match self.lsp_manager.server_handle_for_file(&path) {
+            Some(h) => h.clone(),
+            None => return,
+        };
+        let caps = match self.lsp_manager.get_capabilities(&path) {
+            Some(c) => c,
+            None => return,
+        };
+        if !caps.definition { return; }
 
-            if let Some(loc) = loc {
-                if let Some(target_path) = crate::lsp::router::uri_to_path(&loc.uri) {
-                    let target_line = loc.range.start.line as usize;
-                    let target_col = if let Some(idx) = self.find_tab_by_path(&target_path) {
-                        let (_, col) = crate::lsp::router::from_lsp_position(
-                            &loc.range.start,
-                            &self.tabs[idx].editor.buffer,
-                        );
-                        col
-                    } else {
-                        loc.range.start.character as usize
-                    };
-                    self.jump_to_location(target_path, target_line, target_col);
-                }
+        let params = match self.lsp_manager.text_doc_position(&path, line, col, &buffer) {
+            Some(p) => p,
+            None => return,
+        };
+
+        let tx = self.event_tx.clone();
+        tokio::spawn(async move {
+            let response = handle.send_request("textDocument/definition", params).await.ok();
+            let _ = tx.send(crate::events::klein_event::KleinEvent::DefinitionResponse(response, path));
+        });
+    }
+
+    pub fn handle_definition_response(&mut self, response: Option<serde_json::Value>, _path: std::path::PathBuf) {
+        let resp = match response {
+            Some(r) => r,
+            None => return,
+        };
+
+        let loc = match serde_json::from_value::<lsp_types::GotoDefinitionResponse>(resp) {
+            Ok(lsp_types::GotoDefinitionResponse::Scalar(l)) => Some(l),
+            Ok(lsp_types::GotoDefinitionResponse::Array(a)) => a.into_iter().next(),
+            Ok(lsp_types::GotoDefinitionResponse::Link(l)) => {
+                l.into_iter().next().map(|link| lsp_types::Location {
+                    uri: link.target_uri,
+                    range: link.target_range,
+                })
+            }
+            _ => None,
+        };
+
+        if let Some(loc) = loc {
+            if let Some(target_path) = crate::lsp::router::uri_to_path(&loc.uri) {
+                let target_line = loc.range.start.line as usize;
+                let target_col = if let Some(idx) = self.find_tab_by_path(&target_path) {
+                    let (_, col) = crate::lsp::router::from_lsp_position(
+                        &loc.range.start,
+                        &self.tabs[idx].editor.buffer,
+                    );
+                    col
+                } else {
+                    loc.range.start.character as usize
+                };
+                self.jump_to_location(target_path, target_line, target_col);
             }
         }
     }
 
-    pub async fn trigger_find_references(&mut self) {
+
+    pub fn trigger_find_references(&mut self) {
         let (path, line, col, buffer) = {
             let editor = &self.tabs[self.active_tab].editor;
             match &editor.path {
@@ -524,39 +606,68 @@ impl App {
             }
         };
 
-        if let Some(resp) = self
-            .lsp_manager
-            .request_references(&path, line, col, &buffer)
-            .await
-        {
-            let locs: Vec<lsp_types::Location> = serde_json::from_value(resp).unwrap_or_default();
+        let handle = match self.lsp_manager.server_handle_for_file(&path) {
+            Some(h) => h.clone(),
+            None => return,
+        };
+        let caps = match self.lsp_manager.get_capabilities(&path) {
+            Some(c) => c,
+            None => return,
+        };
+        if !caps.references { return; }
 
-            if locs.is_empty() {
-                return;
-            }
+        let params = match self.lsp_manager.text_doc_position(&path, line, col, &buffer) {
+            Some(p) => p,
+            None => return,
+        };
 
-            let mut results = Vec::new();
-            for loc in locs {
-                if let Some(p) = crate::lsp::router::uri_to_path(&loc.uri) {
-                    results.push(crate::search::SearchResult {
-                        path: p,
-                        line: Some(loc.range.start.line as usize),
-                        content: None, // Could fetch line content for preview
-                    });
-                }
-            }
+        let mut params_obj = params.as_object().unwrap().clone();
+        params_obj.insert(
+            "context".to_string(),
+            serde_json::json!({ "includeDeclaration": true }),
+        );
+        let params_with_context = serde_json::Value::Object(params_obj);
 
-            if !results.is_empty() {
-                self.picker.active = true;
-                self.picker.mode = crate::search::SearchMode::Lsp;
-                self.picker.results = results;
-                self.picker.query = "References".to_string();
-                self.picker.selected_index = 0;
+        let tx = self.event_tx.clone();
+        tokio::spawn(async move {
+            let response = handle.send_request("textDocument/references", params_with_context).await.ok();
+            let _ = tx.send(crate::events::klein_event::KleinEvent::ReferencesResponse(response, path));
+        });
+    }
+
+    pub fn handle_references_response(&mut self, response: Option<serde_json::Value>, _path: std::path::PathBuf) {
+        let resp = match response {
+            Some(r) => r,
+            None => return,
+        };
+
+        let locs: Vec<lsp_types::Location> = serde_json::from_value(resp).unwrap_or_default();
+
+        if locs.is_empty() {
+            return;
+        }
+
+        let mut results = Vec::new();
+        for loc in locs {
+            if let Some(p) = crate::lsp::router::uri_to_path(&loc.uri) {
+                results.push(crate::search::SearchResult {
+                    path: p,
+                    line: Some(loc.range.start.line as usize),
+                    content: None, // Could fetch line content for preview
+                });
             }
+        }
+
+        if !results.is_empty() {
+            self.picker.active = true;
+            self.picker.mode = crate::search::SearchMode::Lsp;
+            self.picker.results = results;
+            self.picker.query = "References".to_string();
+            self.picker.selected_index = 0;
         }
     }
 
-    pub async fn trigger_format_document(&mut self) {
+    pub fn trigger_format_document(&mut self) {
         let path = {
             let editor = &self.tabs[self.active_tab].editor;
             match &editor.path {
@@ -565,37 +676,64 @@ impl App {
             }
         };
 
-        if let Some(resp) = self.lsp_manager.request_formatting(&path).await {
-            let edits: Vec<lsp_types::TextEdit> = serde_json::from_value(resp).unwrap_or_default();
+        let handle = match self.lsp_manager.server_handle_for_file(&path) {
+            Some(h) => h.clone(),
+            None => return,
+        };
+        let caps = match self.lsp_manager.get_capabilities(&path) {
+            Some(c) => c,
+            None => return,
+        };
+        if !caps.formatting { return; }
 
-            if edits.is_empty() {
-                return;
+        let uri = match crate::lsp::router::path_to_uri(&path) {
+            Some(u) => u,
+            None => return,
+        };
+        let params = serde_json::json!({
+            "textDocument": { "uri": uri.as_str() },
+            "options": {
+                "tabSize": 4,
+                "insertSpaces": true
             }
+        });
 
-            // Apply edits to the buffer
-            // We apply in reverse order to keep positions valid
-            let mut sorted_edits = edits;
-            sorted_edits.sort_by(|a, b| b.range.start.cmp(&a.range.start));
+        let tx = self.event_tx.clone();
+        tokio::spawn(async move {
+            let response = handle.send_request("textDocument/formatting", params).await.ok();
+            let _ = tx.send(crate::events::klein_event::KleinEvent::FormatResponse(response, path));
+        });
+    }
 
-            self.editor_mut().save_undo_state();
-            {
-                let editor = self.editor_mut();
-                for edit in sorted_edits {
-                    let (start_line, start_col) =
-                        crate::lsp::router::from_lsp_position(&edit.range.start, &editor.buffer);
-                    let (end_line, end_col) =
-                        crate::lsp::router::from_lsp_position(&edit.range.end, &editor.buffer);
+    pub fn handle_format_response(&mut self, response: Option<serde_json::Value>, path: std::path::PathBuf) {
+        let resp = match response {
+            Some(r) => r,
+            None => return,
+        };
+        let edits: Vec<lsp_types::TextEdit> = serde_json::from_value(resp).unwrap_or_default();
+        if edits.is_empty() { return; }
 
-                    let start_char = editor.buffer.line_to_char(start_line) + start_col;
-                    let end_char = editor.buffer.line_to_char(end_line) + end_col;
+        let mut sorted_edits = edits;
+        sorted_edits.sort_by(|a, b| b.range.start.cmp(&a.range.start));
 
-                    if start_char <= end_char && end_char <= editor.buffer.len_chars() {
-                        editor.buffer.remove(start_char..end_char);
-                        editor.buffer.insert(start_char, &edit.new_text);
-                    }
+        if let Some(tab_idx) = self.find_tab_by_path(&path) {
+            let editor = &mut self.tabs[tab_idx].editor;
+            editor.save_undo_state();
+            for edit in sorted_edits {
+                let (start_line, start_col) =
+                    crate::lsp::router::from_lsp_position(&edit.range.start, &editor.buffer);
+                let (end_line, end_col) =
+                    crate::lsp::router::from_lsp_position(&edit.range.end, &editor.buffer);
+
+                let start_char = editor.buffer.line_to_char(start_line) + start_col;
+                let end_char = editor.buffer.line_to_char(end_line) + end_col;
+
+                if start_char <= end_char && end_char <= editor.buffer.len_chars() {
+                    editor.buffer.remove(start_char..end_char);
+                    editor.buffer.insert(start_char, &edit.new_text);
                 }
-                editor.is_dirty = true;
             }
+            editor.is_dirty = true;
         }
     }
 
@@ -614,7 +752,7 @@ impl App {
         });
     }
 
-    pub async fn execute_rename(&mut self) {
+    pub fn execute_rename(&mut self) {
         let state = match self.lsp_state.rename.take() {
             Some(s) if s.active && !s.new_name.is_empty() => s,
             _ => return,
@@ -625,22 +763,40 @@ impl App {
             None => return, // Should not happen if active
         };
 
-        let response = match self
-            .lsp_manager
-            .request_rename(
-                &state.path,
-                state.trigger_position.0,
-                state.trigger_position.1,
-                &state.new_name,
-                &buffer,
-            )
-            .await
-        {
+        let handle = match self.lsp_manager.server_handle_for_file(&state.path) {
+            Some(h) => h.clone(),
+            None => return,
+        };
+        let caps = match self.lsp_manager.get_capabilities(&state.path) {
+            Some(c) => c,
+            None => return,
+        };
+        if !caps.rename { return; }
+
+        let params = match self.lsp_manager.text_doc_position(&state.path, state.trigger_position.0, state.trigger_position.1, &buffer) {
+            Some(p) => p,
+            None => return,
+        };
+
+        let mut params_obj = params.as_object().unwrap().clone();
+        params_obj.insert("newName".to_string(), serde_json::Value::String(state.new_name.clone()));
+        let params_with_name = serde_json::Value::Object(params_obj);
+
+        let tx = self.event_tx.clone();
+        let path_clone = state.path.clone();
+        tokio::spawn(async move {
+            let response = handle.send_request("textDocument/rename", params_with_name).await.ok();
+            let _ = tx.send(crate::events::klein_event::KleinEvent::RenameResponse(response, path_clone, state.new_name));
+        });
+    }
+
+    pub fn handle_rename_response(&mut self, response: Option<serde_json::Value>, _path: std::path::PathBuf, _new_name: String) {
+        let resp = match response {
             Some(r) => r,
             None => return,
         };
 
-        let edit: lsp_types::WorkspaceEdit = match serde_json::from_value(response) {
+        let edit: lsp_types::WorkspaceEdit = match serde_json::from_value(resp) {
             Ok(v) => v,
             _ => return,
         };
@@ -720,7 +876,7 @@ impl App {
         }
     }
 
-    pub async fn trigger_code_action(&mut self) {
+    pub fn trigger_code_action(&mut self) {
         let (path, line, col, buffer) = {
             let editor = &self.tabs[self.active_tab].editor;
             match &editor.path {
@@ -734,38 +890,79 @@ impl App {
             }
         };
 
-        if let Some(resp) = self
-            .lsp_manager
-            .request_code_action(&path, line, col, &buffer)
-            .await
-        {
-            let actions: Vec<lsp_types::CodeActionOrCommand> =
-                serde_json::from_value(resp).unwrap_or_default();
+        let handle = match self.lsp_manager.server_handle_for_file(&path) {
+            Some(h) => h.clone(),
+            None => return,
+        };
+        let caps = match self.lsp_manager.get_capabilities(&path) {
+            Some(c) => c,
+            None => return,
+        };
+        if !caps.code_action { return; }
 
-            if actions.is_empty() {
-                return;
-            }
+        let params = match self.lsp_manager.text_doc_position(&path, line, col, &buffer) {
+            Some(p) => p,
+            None => return,
+        };
 
-            self.code_actions = actions;
-            let mut results = Vec::new();
-            for action in &self.code_actions {
-                let title = match action {
-                    lsp_types::CodeActionOrCommand::Command(c) => &c.title,
-                    lsp_types::CodeActionOrCommand::CodeAction(a) => &a.title,
-                };
-                results.push(crate::search::SearchResult {
-                    path: path.clone(),
-                    line: Some(line),
-                    content: Some(title.to_string()),
-                });
-            }
+        let mut params_obj = params.as_object().unwrap().clone();
+        let range = params_obj.get("position").unwrap().clone();
+        params_obj.insert(
+            "range".to_string(),
+            serde_json::json!({
+                "start": range,
+                "end": range,
+            }),
+        );
+        params_obj.remove("position");
+        params_obj.insert(
+            "context".to_string(),
+            serde_json::json!({
+                "diagnostics": []
+            }),
+        );
+        let action_params = serde_json::Value::Object(params_obj);
 
-            self.picker.active = true;
-            self.picker.mode = crate::search::SearchMode::CodeAction;
-            self.picker.results = results;
-            self.picker.query = "Code Actions".to_string();
-            self.picker.selected_index = 0;
+        let tx = self.event_tx.clone();
+        let tx = self.event_tx.clone();
+        tokio::spawn(async move {
+            let response = handle.send_request("textDocument/codeAction", action_params).await.ok();
+            let _ = tx.send(crate::events::klein_event::KleinEvent::CodeActionResponse(response, path, (line, col)));
+        });
+    }
+
+    pub fn handle_code_action_response(&mut self, response: Option<serde_json::Value>, path: std::path::PathBuf, pos: (usize, usize)) {
+        let resp = match response {
+            Some(r) => r,
+            None => return,
+        };
+
+        let actions: Vec<lsp_types::CodeActionOrCommand> =
+            serde_json::from_value(resp).unwrap_or_default();
+
+        if actions.is_empty() {
+            return;
         }
+
+        self.code_actions = actions;
+        let mut results = Vec::new();
+        for action in &self.code_actions {
+            let title = match action {
+                lsp_types::CodeActionOrCommand::Command(c) => &c.title,
+                lsp_types::CodeActionOrCommand::CodeAction(a) => &a.title,
+            };
+            results.push(crate::search::SearchResult {
+                path: path.clone(),
+                line: Some(pos.0),
+                content: Some(title.to_string()),
+            });
+        }
+
+        self.picker.active = true;
+        self.picker.mode = crate::search::SearchMode::CodeAction;
+        self.picker.results = results;
+        self.picker.query = "Code Actions".to_string();
+        self.picker.selected_index = 0;
     }
     pub fn apply_code_action(&mut self, index: usize) {
         let action = match self.code_actions.get(index) {

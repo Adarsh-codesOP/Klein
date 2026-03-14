@@ -41,16 +41,16 @@ pub fn handle_lsp_notification(app: &mut App, notification: LspServerNotificatio
     }
 }
 
-pub async fn handle_timer_event(app: &mut App, kind: klein_event::TimerKind) {
+pub fn handle_timer_event(app: &mut App, kind: klein_event::TimerKind) {
     match kind {
         klein_event::TimerKind::DocumentSync => {
             app.notify_lsp_did_change();
         }
         klein_event::TimerKind::CompletionTrigger => {
-            app.trigger_completion().await;
+            app.trigger_completion();
         }
         klein_event::TimerKind::HoverTrigger => {
-            app.trigger_hover().await;
+            app.trigger_hover();
         }
     }
 }
@@ -988,7 +988,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.editor_mut().insert_char(c);
                 schedule_document_sync(app);
                 app.lsp_state.hover = None;
-                if c == '.' || c == ':' {
+                if c == '.' || c == ':' || app.lsp_state.completion.is_some() {
                     schedule_completion(app);
                 }
                 return Ok(());

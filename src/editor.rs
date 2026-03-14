@@ -777,7 +777,7 @@ impl Editor {
         use ratatui::style::{Color, Modifier, Style};
         let style = Style::default();
         match kind {
-            // Keywords - Common across many languages
+            // Keywords
             "keyword" | "storage_class" | "type_qualifier" | "repeat" | "conditional"
             | "exception" | "include" | "statement" | "use" | "pub" | "struct" | "enum"
             | "impl" | "fn" | "let" | "mut" | "match" | "if" | "else" | "elif" | "for"
@@ -789,37 +789,32 @@ impl Editor {
             | "delete" | "in" | "of" | "export" | "interface" | "namespace" | "implements"
             | "extends" | "public" | "private" | "protected" | "readonly" | "abstract"
             | "declare" | "package" | "go" | "chan" | "select" | "defer" | "fallthrough"
-            | "range" => style.fg(Color::Magenta).add_modifier(Modifier::BOLD),
+            | "range" | "type" | "extern_crate_declaration" => style.fg(Color::Magenta).add_modifier(Modifier::BOLD),
 
             // Types
             "type" | "primitive_type" | "type_identifier" | "builtin_type" | "class_name"
-            | "struct_name" => style.fg(Color::Blue),
+            | "struct_name" | "type_name" | "user_type" | "type_parameter" => style.fg(Color::LightBlue),
 
             // Functions / Methods
-            "function"
-            | "method"
-            | "function_item"
-            | "call_expression"
-            | "function_declarator"
-            | "field_identifier"
-            | "function_definition"
-            | "method_definition" => style.fg(Color::Cyan),
+            "function" | "method" | "function_item" | "call_expression" | "function_declarator"
+            | "field_identifier" | "function_definition" | "method_definition" | "method_declaration"
+            | "constructor" => style.fg(Color::Cyan),
+
+            // Variables / Properties
+            "variable" | "variable_parameter" | "parameter" | "property" | "field"
+            | "shorthand_field_identifier" | "field_name" | "variable_name" => style.fg(Color::White),
+
+            // Constants
+            "constant" | "constant_identifier" | "const_parameter" => style.fg(Color::Yellow).add_modifier(Modifier::BOLD),
 
             // HTML / XML
-            "tag_name" | "start_tag" | "end_tag" | "self_closing_tag" => style.fg(Color::LightBlue),
+            "tag_name" | "start_tag" | "end_tag" | "self_closing_tag" | "tag" => style.fg(Color::LightBlue),
             "attribute_name" => style.fg(Color::Cyan),
             "attribute_value" => style.fg(Color::Yellow),
 
-            // CSS
-            "selector" | "class_selector" | "id_selector" | "tag_selector" => {
-                style.fg(Color::LightMagenta)
-            }
-            "property_name" => style.fg(Color::Cyan),
-            "property_value" | "value" => style.fg(Color::White),
-
             // Literals
             "string" | "string_literal" | "char_literal" | "escape_sequence"
-            | "system_lib_string" => style.fg(Color::Yellow),
+            | "system_lib_string" | "raw_string_literal" => style.fg(Color::Yellow),
             "number" | "integer_literal" | "float_literal" | "boolean_literal" | "none"
             | "null" | "undefined" | "true" | "false" => style.fg(Color::LightRed),
 
@@ -828,19 +823,21 @@ impl Editor {
                 style.fg(Color::DarkGray).add_modifier(Modifier::ITALIC)
             }
 
-            // Other
-            "attribute" | "attribute_item" | "meta" => {
+            // Attributes / Macros
+            "attribute" | "attribute_item" | "meta" | "preproc_directive" | "preproc_arg" => {
                 style.fg(Color::Green).add_modifier(Modifier::ITALIC)
             }
-            "macro_definition" | "macro_invocation" | "macro_call" | "g_attribute" => {
+            "macro_definition" | "macro_invocation" | "macro_call" | "g_attribute" | "function_macro" => {
                 style.fg(Color::LightCyan)
             }
-            "operator" | "binary_expression" | "unary_expression" | "assignment_expression" => {
-                style.fg(Color::White)
-            }
-            "punctuation" | "delimiter" | "bracket" | "parenthesized_expression" => {
-                style.fg(Color::White)
-            }
+
+            // Operators & Punctuation
+            "operator" | "binary_expression" | "unary_expression" | "assignment_expression"
+            | "pointer_expression" | "reference_expression" => style.fg(Color::LightCyan),
+
+            "punctuation" | "delimiter" | "bracket" | "parenthesized_expression"
+            | "list" | "parameters" | "arguments" => style.fg(Color::Gray),
+
             "identifier" => style.fg(Color::White),
             _ => style.fg(Color::White),
         }

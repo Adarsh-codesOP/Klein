@@ -147,36 +147,53 @@ async fn run_app<B: io::Write + ratatui::backend::Backend>(
                     events::handle_lsp_notification(app, notification);
                 }
                 events::klein_event::KleinEvent::Timer(kind) => {
-                    events::handle_timer_event(app, kind).await;
+                    events::handle_timer_event(app, kind);
                 }
                 events::klein_event::KleinEvent::InitLsp(path) => {
-                    // Try to start server for this file
                     if app
                         .lsp_manager
                         .ensure_server_for_file(&path)
                         .await
                         .is_some()
                     {
-                        // Once server is up, send didOpen for the file that triggered it
-                        // This handles the case where the first didOpen was ignored
-                        // because the server was still starting.
                         app.notify_lsp_did_open_for_path(&path);
                     }
                 }
                 events::klein_event::KleinEvent::GotoDefinition => {
-                    app.trigger_goto_definition().await;
+                    app.trigger_goto_definition();
                 }
                 events::klein_event::KleinEvent::FindReferences => {
-                    app.trigger_find_references().await;
+                    app.trigger_find_references();
                 }
                 events::klein_event::KleinEvent::FormatDocument => {
-                    app.trigger_format_document().await;
+                    app.trigger_format_document();
                 }
                 events::klein_event::KleinEvent::Rename => {
-                    app.execute_rename().await;
+                    app.execute_rename();
                 }
                 events::klein_event::KleinEvent::CodeAction => {
-                    app.trigger_code_action().await;
+                    app.trigger_code_action();
+                }
+                events::klein_event::KleinEvent::CompletionResponse(resp, path, pos) => {
+                    app.handle_completion_response(resp, path, pos);
+                }
+                events::klein_event::KleinEvent::HoverResponse(resp, path, pos) => {
+                    app.handle_hover_response(resp, path, pos);
+                }
+                events::klein_event::KleinEvent::DefinitionResponse(resp, path) => {
+                    app.handle_definition_response(resp, path);
+                }
+                events::klein_event::KleinEvent::ReferencesResponse(resp, path) => {
+                    app.handle_references_response(resp, path);
+                }
+                events::klein_event::KleinEvent::FormatResponse(resp, path) => {
+                    app.handle_format_response(resp, path);
+                }
+                events::klein_event::KleinEvent::RenameResponse(resp, path, new_name) => {
+                    app.handle_rename_response(resp, path, new_name);
+                }
+                events::klein_event::KleinEvent::CodeActionResponse(resp, path, pos) => {
+                    app.handle_code_action_response(resp, path, pos);
                 }
             }
         }

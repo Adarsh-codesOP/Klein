@@ -240,12 +240,12 @@ impl LspManager {
         self.servers.get(lang_id).map(|s| &s.capabilities)
     }
 
-    fn server_handle_for_file(&self, path: &Path) -> Option<&ActorHandle> {
+    pub fn server_handle_for_file(&self, path: &Path) -> Option<&ActorHandle> {
         let lang_id = self.registry.language_id_for_file(path)?;
         self.servers.get(lang_id).map(|s| &s.handle)
     }
 
-    fn text_doc_position(
+    pub fn text_doc_position(
         &self,
         path: &Path,
         line: usize,
@@ -511,6 +511,9 @@ fn client_capabilities() -> serde_json::Value {
             "publishDiagnostics": {
                 "relatedInformation": false,
             },
+        },
+        "general": {
+            "positionEncodings": ["utf-8", "utf-16"]
         },
         "window": {
             "workDoneProgress": false,
