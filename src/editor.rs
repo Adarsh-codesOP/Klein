@@ -628,7 +628,11 @@ impl Editor {
                 }
             }
 
-            spans.push(ratatui::text::Span::raw(" ".repeat(_width)));
+            if current_char_in_line < _width {
+                spans.push(ratatui::text::Span::raw(
+                    " ".repeat(_width - current_char_in_line),
+                ));
+            }
             lines.push(ratatui::text::Line::from(spans));
         }
 
@@ -1112,13 +1116,18 @@ impl Editor {
                 for span in spans {
                     let text = span.content.trim_end_matches(['\n', '\r']);
                     if !text.is_empty() {
-                        cleaned_spans
-                            .push(ratatui::text::Span::styled(text.to_string(), span.style));
+                        let span_len = text.chars().count();
+                        current_char_in_line += span_len;
+                        cleaned_spans.push(ratatui::text::Span::styled(text.to_string(), span.style));
                     }
                 }
             }
 
-            cleaned_spans.push(ratatui::text::Span::raw(" ".repeat(width)));
+            if current_char_in_line < width {
+                cleaned_spans.push(ratatui::text::Span::raw(
+                    " ".repeat(width - current_char_in_line),
+                ));
+            }
             lines.push(ratatui::text::Line::from(cleaned_spans));
         }
 
