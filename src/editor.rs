@@ -470,6 +470,10 @@ impl Editor {
         _width: usize,
         height: usize,
     ) -> Vec<ratatui::text::Line<'_>> {
+        if let Some(tree) = &self.tree {
+            return self.get_ts_highlighted_lines(tree, height);
+        }
+
         let syntax = if let Some(path) = &self.path {
             self.syntax_set
                 .find_syntax_for_file(path)
@@ -750,6 +754,137 @@ impl Editor {
         if self.cursor_x > max_x {
             self.cursor_x = max_x;
         }
+    }
+
+    fn get_ts_style(&self, kind: &str) -> ratatui::style::Style {
+        use ratatui::style::{Color, Modifier, Style};
+        let style = Style::default();
+        match kind {
+            "keyword" | "storage_class" | "type_qualifier" | "repeat" | "conditional"
+            | "exception" | "include" | "statement" => {
+                style.fg(Color::Magenta).add_modifier(Modifier::BOLD)
+            }
+            "type" | "primitive_type" | "type_identifier" => style.fg(Color::Blue),
+            "function" | "method" | "function_item" | "call_expression" | "function_declarator" => {
+                style.fg(Color::Cyan)
+            }
+            "string" | "string_literal" | "char_literal" | "escape_sequence" => {
+                style.fg(Color::Yellow)
+            }
+            "comment" | "line_comment" | "block_comment" => {
+                style.fg(Color::DarkGray).add_modifier(Modifier::ITALIC)
+            }
+            "number" | "integer_literal" | "float_literal" => style.fg(Color::LightRed),
+            "operator" | "binary_expression" | "unary_expression" => style.fg(Color::White),
+            "punctuation" | "delimiter" | "bracket" => style.fg(Color::White),
+            "identifier" | "field_identifier" => style.fg(Color::White),
+            _ => style.fg(Color::White),
+        }
+    }
+
+    fn get_ts_highlighted_lines(
+        &self,
+        tree: &tree_sitter::Tree,
+        height: usize,
+    ) -> Vec<ratatui::text::Line<'_>> {
+        let start_line = self.scroll_y;
+        let end_line = (start_line + height).min(self.buffer.len_lines());
+        let mut lines = Vec::new();
+
+        for i in start_line..end_line {
+            let line_obj = self.buffer.line(i);
+            let line_start_char = self.buffer.line_to_char(i);
+            let start_byte = self.buffer.char_to_byte(line_start_char);
+            let end_byte = start_byte + line_obj.len_bytes();
+
+            let mut spans = Vec::new();
+            let mut current_byte = start_byte;
+
+            let node = tree
+                .root_node()
+                .descendant_for_byte_range(start_byte, end_byte)
+                .unwrap_or(tree.root_node());
+            self.walk_line_highlights(node, start_byte, end_byte, &mut current_byte, &mut spans);
+
+            if current_byte < end_byte {
+                let remaining_text = self.get_byte_range_text(current_byte..end_byte);
+                if !remaining_text.is_empty() {
+                    spans.push(ratatui::text::Span::styled(
+                        remaining_text,
+                        ratatui::style::Style::default().fg(ratatui::style::Color::White),
+                    ));
+                }
+            }
+
+            let mut cleaned_spans = Vec::new();
+            for span in spans {
+                let text = span.content.trim_end_matches(['\n', '\r']);
+                if !text.is_empty() {
+                    cleaned_spans.push(ratatui::text::Span::styled(text.to_string(), span.style));
+                }
+            }
+            lines.push(ratatui::text::Line::from(cleaned_spans));
+        }
+
+        while lines.len() < height {
+            lines.push(ratatui::text::Line::from(" "));
+        }
+        lines
+    }
+
+    fn walk_line_highlights(
+        &self,
+        node: tree_sitter::Node,
+        line_start: usize,
+        line_end: usize,
+        current_byte: &mut usize,
+        spans: &mut Vec<ratatui::text::Span>,
+    ) {
+        if node.start_byte() >= line_end || node.end_byte() <= line_start {
+            return;
+        }
+
+        if node.child_count() == 0 {
+            let node_start = node.start_byte();
+            let node_end = node.end_byte();
+
+            if node_start > *current_byte {
+                let gap_text = self.get_byte_range_text(*current_byte..node_start);
+                if !gap_text.is_empty() {
+                    spans.push(ratatui::text::Span::styled(
+                        gap_text,
+                        ratatui::style::Style::default().fg(ratatui::style::Color::White),
+                    ));
+                }
+            }
+
+            let start = node_start.max(*current_byte);
+            let end = node_end.min(line_end);
+            if start < end {
+                let text = self.get_byte_range_text(start..end);
+                spans.push(ratatui::text::Span::styled(
+                    text,
+                    self.get_ts_style(node.kind()),
+                ));
+                *current_byte = end;
+            }
+        } else {
+            for i in 0..node.child_count() {
+                self.walk_line_highlights(
+                    node.child(i).unwrap(),
+                    line_start,
+                    line_end,
+                    current_byte,
+                    spans,
+                );
+            }
+        }
+    }
+
+    fn get_byte_range_text(&self, range: std::ops::Range<usize>) -> String {
+        let start = self.buffer.byte_to_char(range.start);
+        let end = self.buffer.byte_to_char(range.end);
+        self.buffer.slice(start..end).to_string()
     }
 }
 
