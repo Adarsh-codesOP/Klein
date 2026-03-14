@@ -1,7 +1,10 @@
 use crate::app::{App, Panel};
 use crate::config;
+use crate::lsp::types::DiagnosticSeverity;
 use ratatui::{
     layout::Rect,
+    style::{Color, Style},
+    text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
@@ -58,7 +61,13 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let inner_rect = editor_block.inner(area);
     f.render_widget(editor_block, area);
 
-    let gutter_width = editor.get_gutter_width();
+    // Diagnostics for this file
+    let empty_vec = Vec::new();
+    let file_diagnostics = editor.path.as_ref()
+        .and_then(|p| app.lsp_state.diagnostics.get(p))
+        .unwrap_or(&empty_vec);
+
+    let gutter_width = editor.get_gutter_width() + 2; // icon + space + padding
 
     let layout = ratatui::layout::Layout::default()
         .direction(ratatui::layout::Direction::Horizontal)
@@ -84,11 +93,29 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
 
     let end_line = (start_line + content_area.height as usize).min(num_lines);
     for i in start_line..end_line {
-        gutter_lines.push(ratatui::text::Line::from(format!(
-            "{:>width$} ",
-            i + 1,
-            width = gutter_width - 1
-        )));
+        // Find highest severity diagnostic for this line
+        let line_diag = file_diagnostics.iter()
+            .filter(|d| d.line == i)
+            .max_by_key(|d| d.severity.clone());
+
+        let icon_span = if let Some(d) = line_diag {
+            let color = match d.severity {
+                DiagnosticSeverity::Error => Color::Red,
+                DiagnosticSeverity::Warning => Color::Yellow,
+                DiagnosticSeverity::Info => Color::Blue,
+                DiagnosticSeverity::Hint => Color::DarkGray,
+            };
+            Span::styled(format!("{} ", d.severity.icon()), Style::default().fg(color))
+        } else {
+            Span::from("  ")
+        };
+
+        let line_num_span = Span::styled(
+            format!("{:>width$} ", i + 1, width = gutter_width - 3),
+            Style::default().fg(Color::DarkGray)
+        );
+
+        gutter_lines.push(Line::from(vec![icon_span, line_num_span]));
     }
 
     // Pad gutter to full height

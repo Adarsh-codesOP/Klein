@@ -1,8 +1,80 @@
+pub mod klein_event;
+pub mod timers;
+
 use crate::app::{App, Panel};
+use crate::lsp::actor::LspServerNotification;
 use crossterm::event::{
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
 };
 use std::io;
+
+pub fn handle_lsp_notification(app: &mut App, notification: LspServerNotification) {
+    match notification.method.as_str() {
+        "textDocument/publishDiagnostics" => {
+            if let Ok(params) = serde_json::from_value::<lsp_types::PublishDiagnosticsParams>(
+                notification.params,
+            ) {
+                if let Some(path) = crate::lsp::router::uri_to_path(&params.uri) {
+                    // Find the buffer for this file to do position conversion
+                    let mut diagnostics = Vec::new();
+                    let mut buffer = None;
+
+                    for tab in &app.tabs {
+                        if tab.editor.path.as_ref() == Some(&path) {
+                            buffer = Some(tab.editor.buffer.clone());
+                            break;
+                        }
+                    }
+
+                    if let Some(buf) = buffer {
+                        for diag in params.diagnostics {
+                            diagnostics
+                                .push(crate::lsp::router::to_klein_diagnostic(&diag, &buf));
+                        }
+                        app.lsp_state.diagnostics.insert(path, diagnostics);
+                    }
+                }
+            }
+        }
+        _ => {
+            log::trace!("unhandled LSP notification: {}", notification.method);
+        }
+    }
+}
+
+pub async fn handle_timer_event(app: &mut App, kind: klein_event::TimerKind) {
+    match kind {
+        klein_event::TimerKind::DocumentSync => {
+            app.notify_lsp_did_change();
+        }
+        klein_event::TimerKind::CompletionTrigger => {
+            app.trigger_completion().await;
+        }
+        klein_event::TimerKind::HoverTrigger => {
+            // Phase 6
+        }
+    }
+}
+
+fn schedule_document_sync(app: &mut App) {
+    if let Some(ref mut tm) = app.timer_manager {
+        tm.schedule(
+            klein_event::TimerKind::DocumentSync,
+            std::time::Duration::from_millis(150),
+        );
+    }
+}
+
+fn schedule_completion(app: &mut App) {
+    if let Some(ref mut tm) = app.timer_manager {
+        tm.schedule(
+            klein_event::TimerKind::CompletionTrigger,
+            std::time::Duration::from_millis(50),
+        );
+    }
+}
+
+
 
 pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
     match event {
