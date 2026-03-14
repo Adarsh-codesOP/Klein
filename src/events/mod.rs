@@ -278,6 +278,10 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 let _ = app.event_tx.send(klein_event::KleinEvent::GotoDefinition);
                 return Ok(());
             }
+            KeyCode::Char('h') => {
+                app.trigger_hover();
+                return Ok(());
+            }
             KeyCode::Char('r') => {
                 let _ = app.event_tx.send(klein_event::KleinEvent::FindReferences);
                 return Ok(());
@@ -831,7 +835,6 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 let h = app.last_editor_height.get();
                 app.editor_mut().move_cursor_down(h);
                 app.lsp_state.hover = None;
-                schedule_hover(app);
                 return Ok(());
             }
             KeyCode::Up => {
@@ -851,7 +854,6 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 }
                 app.editor_mut().move_cursor_up();
                 app.lsp_state.hover = None;
-                schedule_hover(app);
                 return Ok(());
             }
             KeyCode::Left => {
@@ -863,7 +865,6 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.editor_mut().clear_selection();
                 app.editor_mut().move_cursor_left();
                 app.lsp_state.hover = None;
-                schedule_hover(app);
                 return Ok(());
             }
             KeyCode::Right => {
@@ -875,7 +876,6 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.editor_mut().clear_selection();
                 app.editor_mut().move_cursor_right();
                 app.lsp_state.hover = None;
-                schedule_hover(app);
                 return Ok(());
             }
             KeyCode::Tab => {
@@ -981,6 +981,10 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Char('g') if key.modifiers.contains(KeyModifiers::ALT) => {
                 app.g_mode = true;
+                return Ok(());
+            }
+            KeyCode::Char('k') | KeyCode::Char('K') => {
+                app.trigger_hover();
                 return Ok(());
             }
             KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::ALT) => {
@@ -1096,11 +1100,27 @@ fn handle_completion_keys(app: &mut App, key: KeyEvent) -> io::Result<bool> {
                     (start, end)
                 } else {
                     let buffer = &app.editor().buffer;
-                    let start = buffer.line_to_char(state.trigger_position.0.min(buffer.len_lines().saturating_sub(1))) + state.trigger_position.1;
-                    let end = buffer.line_to_char(app.editor().cursor_y.min(buffer.len_lines().saturating_sub(1))) + app.editor().cursor_x;
+                    let cursor_y = app.editor().cursor_y;
+                    let cursor_x = app.editor().cursor_x;
+                    
+                    // Token-aware: find the start of the current word prefix
+                    let line_idx = cursor_y.min(buffer.len_lines().saturating_sub(1));
+                    let line = buffer.line(line_idx);
+                    let mut start_col = cursor_x;
+                    
+                    while start_col > 0 {
+                        let ch = line.char(start_col - 1);
+                        if ch.is_alphanumeric() || ch == '_' {
+                            start_col -= 1;
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    let start = buffer.line_to_char(line_idx) + start_col;
+                    let end = buffer.line_to_char(line_idx) + cursor_x;
                     (start, end)
                 };
-
                 let buffer_len = app.editor().buffer.len_chars();
                 app.editor_mut().replace_range(
                     start_char.min(buffer_len),
