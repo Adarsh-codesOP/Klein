@@ -2,7 +2,7 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 pub fn get_main_layout(area: Rect, show_terminal: bool) -> Vec<Rect> {
     let constraints = vec![
-        Constraint::Length(1), // Help Hint Tab
+        Constraint::Length(1), // Top Bar (Menu)
         Constraint::Length(1), // Tab Bar
         Constraint::Fill(1),   // Main workspace
         if show_terminal {
@@ -22,7 +22,7 @@ pub fn get_main_layout(area: Rect, show_terminal: bool) -> Vec<Rect> {
 
 pub fn get_maximized_terminal_layout(area: Rect) -> Vec<Rect> {
     let constraints = vec![
-        Constraint::Length(1), // Help Hint Tab
+        Constraint::Length(1), // Top Bar (Menu)
         Constraint::Length(0), // Tab Bar hidden
         Constraint::Length(0), // Main workspace hidden
         Constraint::Fill(1),   // Terminal fills

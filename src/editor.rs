@@ -528,7 +528,7 @@ impl Editor {
         height: usize,
     ) -> Vec<ratatui::text::Line<'_>> {
         if let Some(tree) = &self.tree {
-            return self.get_ts_highlighted_lines(tree, height);
+            return self.get_ts_highlighted_lines(tree, _width, height);
         }
 
         let syntax = if let Some(path) = &self.path {
@@ -628,13 +628,15 @@ impl Editor {
                 }
             }
 
+            spans.push(ratatui::text::Span::raw(" ".repeat(_width)));
             lines.push(ratatui::text::Line::from(spans));
         }
 
         // Fill remaining height with empty lines to ensure the background is fully drawn
         // and any debris from previous frames is overwritten.
+        let empty_line = " ".repeat(_width);
         while lines.len() < height {
-            lines.push(ratatui::text::Line::from(" "));
+            lines.push(ratatui::text::Line::from(empty_line.clone()));
         }
 
         lines
@@ -913,6 +915,7 @@ impl Editor {
     fn get_ts_highlighted_lines(
         &self,
         tree: &tree_sitter::Tree,
+        width: usize,
         height: usize,
     ) -> Vec<ratatui::text::Line<'_>> {
         let start_line = self.scroll_y;
@@ -1016,11 +1019,13 @@ impl Editor {
                 }
             }
 
+            cleaned_spans.push(ratatui::text::Span::raw(" ".repeat(width)));
             lines.push(ratatui::text::Line::from(cleaned_spans));
         }
 
+        let empty_line = " ".repeat(width);
         while lines.len() < height {
-            lines.push(ratatui::text::Line::from(" "));
+            lines.push(ratatui::text::Line::from(empty_line.clone()));
         }
         lines
     }
