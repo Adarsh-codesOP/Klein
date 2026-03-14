@@ -106,7 +106,8 @@ impl LspManager {
             flags.references, flags.formatting, flags.rename,
         );
 
-        // Send initialized notification
+        // Send initialized notification AFTER successful initialization response
+        // This is a critical step in the LSP handshake
         spawned
             .handle
             .send_notification("initialized", serde_json::json!({}))?;

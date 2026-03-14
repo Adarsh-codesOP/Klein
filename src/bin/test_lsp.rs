@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 use klein_ide::lsp::manager::LspManager;
 use klein_ide::lsp::actor::LspServerNotification;
@@ -7,7 +6,7 @@ use klein_ide::config::AppConfig;
 
 #[tokio::main]
 async fn main() {
-    let (tx, mut rx) = mpsc::unbounded_channel::<LspServerNotification>();
+    let (tx, _rx) = mpsc::unbounded_channel::<LspServerNotification>();
     let config = AppConfig {
         enabled_lsps: Some(vec!["rust".to_string()]),
         ..Default::default()
@@ -32,7 +31,7 @@ async fn main() {
     println!("Sent didOpen");
 
     // Let's test hover at line 0, char 0
-    let mut buffer = ropey::Rope::from_str(&text);
+    let buffer = ropey::Rope::from_str(&text);
     if let Some(hover) = manager.request_hover(&absolute_path, 0, 0, &buffer).await {
         println!("Hover successful: {:?}", hover);
     } else {

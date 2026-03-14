@@ -804,7 +804,7 @@ impl Editor {
             | "delete" | "in" | "of" | "export" | "interface" | "namespace" | "implements"
             | "extends" | "public" | "private" | "protected" | "readonly" | "abstract"
             | "declare" | "package" | "go" | "chan" | "select" | "defer" | "fallthrough"
-            | "range" | "type" | "extern_crate_declaration" => style.fg(Color::Magenta).add_modifier(Modifier::BOLD),
+            | "range" | "extern_crate_declaration" => style.fg(Color::Magenta).add_modifier(Modifier::BOLD),
 
             // Types
             "type" | "primitive_type" | "type_identifier" | "builtin_type" | "class_name"
