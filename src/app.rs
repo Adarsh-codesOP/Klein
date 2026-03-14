@@ -409,20 +409,21 @@ impl App {
             }
         };
 
-        // Parse response (can be Array or List)
+        // Parse response (can be Array or List or null)
         let items: Vec<crate::lsp::types::KleinCompletion> =
-            match serde_json::from_value::<lsp_types::CompletionResponse>(response) {
-                Ok(lsp_types::CompletionResponse::Array(arr)) => arr
+            match serde_json::from_value::<Option<lsp_types::CompletionResponse>>(response.clone()) {
+                Ok(Some(lsp_types::CompletionResponse::Array(arr))) => arr
                     .into_iter()
                     .map(|i| crate::lsp::router::to_klein_completion(&i))
                     .collect(),
-                Ok(lsp_types::CompletionResponse::List(list)) => list
+                Ok(Some(lsp_types::CompletionResponse::List(list))) => list
                     .items
                     .into_iter()
                     .map(|i| crate::lsp::router::to_klein_completion(&i))
                     .collect(),
+                Ok(None) => Vec::new(),
                 Err(e) => {
-                    log::error!("failed to parse completion response: {}", e);
+                    log::error!("failed to parse completion response: {}. Raw response: {}", e, response);
                     Vec::new()
                 }
             };
@@ -504,35 +505,41 @@ impl App {
                 return;
             }
         };
-
-        // Parse response
-        if let Ok(hover) = serde_json::from_value::<lsp_types::Hover>(response) {
-            let contents = match hover.contents {
-                lsp_types::HoverContents::Scalar(m) => match m {
-                    lsp_types::MarkedString::String(s) => s,
-                    lsp_types::MarkedString::LanguageString(ls) => ls.value,
-                },
-                lsp_types::HoverContents::Array(arr) => arr
-                    .into_iter()
-                    .map(|m| match m {
+        // Parse response (can be Hover or null)
+        match serde_json::from_value::<Option<lsp_types::Hover>>(response.clone()) {
+            Ok(Some(hover)) => {
+                let contents = match hover.contents {
+                    lsp_types::HoverContents::Scalar(m) => match m {
                         lsp_types::MarkedString::String(s) => s,
                         lsp_types::MarkedString::LanguageString(ls) => ls.value,
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-                lsp_types::HoverContents::Markup(m) => m.value,
-            };
+                    },
+                    lsp_types::HoverContents::Array(arr) => arr
+                        .into_iter()
+                        .map(|m| match m {
+                            lsp_types::MarkedString::String(s) => s,
+                            lsp_types::MarkedString::LanguageString(ls) => ls.value,
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                    lsp_types::HoverContents::Markup(m) => m.value,
+                };
 
-            if !contents.is_empty() {
-                self.lsp_state.hover = Some(crate::lsp::types::KleinHoverInfo {
-                    contents,
-                    range: None, // Could parse range later
-                });
-            } else {
+                if !contents.is_empty() {
+                    self.lsp_state.hover = Some(crate::lsp::types::KleinHoverInfo {
+                        contents,
+                        range: hover.range.map(|r| (r.start.line as usize, r.start.character as usize, r.end.line as usize, r.end.character as usize)),
+                    });
+                } else {
+                    self.lsp_state.hover = None;
+                }
+            }
+            Ok(None) => {
                 self.lsp_state.hover = None;
             }
-        } else {
-            self.lsp_state.hover = None;
+            Err(e) => {
+                log::error!("failed to parse hover response: {}. Raw response: {}", e, response);
+                self.lsp_state.hover = None;
+            }
         }
     }
 
@@ -579,16 +586,20 @@ impl App {
             None => return,
         };
 
-        let loc = match serde_json::from_value::<lsp_types::GotoDefinitionResponse>(resp) {
-            Ok(lsp_types::GotoDefinitionResponse::Scalar(l)) => Some(l),
-            Ok(lsp_types::GotoDefinitionResponse::Array(a)) => a.into_iter().next(),
-            Ok(lsp_types::GotoDefinitionResponse::Link(l)) => {
+        let loc = match serde_json::from_value::<Option<lsp_types::GotoDefinitionResponse>>(resp.clone()) {
+            Ok(Some(lsp_types::GotoDefinitionResponse::Scalar(l))) => Some(l),
+            Ok(Some(lsp_types::GotoDefinitionResponse::Array(a))) => a.into_iter().next(),
+            Ok(Some(lsp_types::GotoDefinitionResponse::Link(l))) => {
                 l.into_iter().next().map(|link| lsp_types::Location {
                     uri: link.target_uri,
                     range: link.target_range,
                 })
             }
-            _ => None,
+            Ok(None) => None,
+            Err(e) => {
+                log::error!("failed to parse definition response: {}. Raw response: {}", e, resp);
+                None
+            }
         };
 
         if let Some(loc) = loc {
@@ -813,9 +824,13 @@ impl App {
             None => return,
         };
 
-        let edit: lsp_types::WorkspaceEdit = match serde_json::from_value(resp) {
-            Ok(v) => v,
-            _ => return,
+        let edit = match serde_json::from_value::<Option<lsp_types::WorkspaceEdit>>(resp.clone()) {
+            Ok(Some(v)) => v,
+            Ok(None) => return,
+            Err(e) => {
+                log::error!("failed to parse rename response: {}. Raw response: {}", e, resp);
+                return;
+            }
         };
 
         self.apply_workspace_edit(edit);
