@@ -71,13 +71,11 @@ impl DocSyncEngine {
     }
 
     /// Get the current version of a tracked document.
-    #[allow(dead_code)]
     pub fn version(&self, path: &Path) -> Option<i32> {
         self.documents.get(path).map(|s| s.version)
     }
 
     /// Get the language ID of a tracked document.
-    #[allow(dead_code)]
     pub fn language_id(&self, path: &Path) -> Option<&str> {
         self.documents.get(path).map(|s| s.language_id.as_str())
     }
@@ -102,5 +100,41 @@ impl DocSyncEngine {
 impl Default for DocSyncEngine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_doc_sync() {
+        let mut engine = DocSyncEngine::new();
+        let path = PathBuf::from("test.rs");
+
+        // Test open
+        let (lang, ver) = engine.open_document(&path, "rust");
+        assert_eq!(lang, "rust");
+        assert_eq!(ver, 1);
+        assert!(engine.is_open(&path));
+        assert_eq!(engine.version(&path), Some(1));
+        assert_eq!(engine.language_id(&path), Some("rust"));
+
+        // Test change
+        let new_ver = engine.change_document(&path).unwrap();
+        assert_eq!(new_ver, 2);
+        assert_eq!(engine.version(&path), Some(2));
+
+        // Test open_documents
+        let docs = engine.open_documents();
+        assert_eq!(docs.len(), 1);
+        assert_eq!(docs[0].0, &path);
+        assert_eq!(docs[0].1, "rust");
+
+        // Test close
+        assert!(engine.close_document(&path));
+        assert!(!engine.is_open(&path));
+        assert!(engine.change_document(&path).is_none());
+        assert_eq!(engine.open_documents().len(), 0);
     }
 }

@@ -31,17 +31,15 @@ impl LspRegistry {
     pub fn new(enabled_lsps: Option<&Vec<String>>) -> Self {
         let mut servers = HashMap::new();
 
+        // If config.enabled_lsps is None, we assume no servers are enabled.
+        // The user must explicitly opt-in to LSP servers via config.toml
         let is_enabled = |id: &str| {
             if let Some(enabled) = enabled_lsps {
                 enabled
                     .iter()
                     .any(|s| s.to_lowercase() == id.to_lowercase())
             } else {
-                false // If no list, disable all or enable all? User says "user can addon this lsp only if he need it"
-                      // So default should be none or only core ones.
-                      // Let's go with "if none provided, none enabled" for new installations,
-                      // but for backwards compatibility maybe enable Rust?
-                      // Actually, the user wants a selection.
+                false
             }
         };
 
@@ -226,10 +224,43 @@ impl LspRegistry {
     pub fn set_server(&mut self, extension: String, config: ServerConfig) {
         self.servers.insert(extension, config);
     }
+
+    /// Get a static list of all available language server identifiers currently supported.
+    pub fn available_servers() -> &'static [&'static str] {
+        &[
+            "rust",
+            "python",
+            "javascript",
+            "typescript",
+            "c",
+            "cpp",
+            "go",
+            "java",
+            "html",
+            "css",
+            "json",
+            "yaml",
+            "markdown",
+            "toml",
+        ]
+    }
 }
 
 impl Default for LspRegistry {
     fn default() -> Self {
         Self::new(None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_available_servers() {
+        let servers = LspRegistry::available_servers();
+        assert!(servers.contains(&"rust"));
+        assert!(servers.contains(&"python"));
+        assert!(servers.contains(&"typescript"));
     }
 }
