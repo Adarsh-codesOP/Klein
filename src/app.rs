@@ -85,6 +85,7 @@ pub struct App {
     pub g_mode: bool,
     pub code_actions: Vec<lsp_types::CodeActionOrCommand>,
     pub ts_manager: crate::treesitter::TSManager,
+    pub last_completion_trigger_char: Option<char>,
 }
 
 impl App {
@@ -135,6 +136,7 @@ impl App {
             g_mode: false,
             code_actions: Vec::new(),
             ts_manager: crate::treesitter::TSManager::new(),
+            last_completion_trigger_char: None,
         };
 
         if let Some(file) = cli_file {
@@ -390,20 +392,35 @@ impl App {
             None => return,
         };
 
-        let mut params_obj = params.as_object().unwrap().clone();
-        params_obj.insert(
-            "context".to_string(),
-            serde_json::json!({
-                "triggerKind": 1, // Invoked
-            }),
-        );
-        let params_with_context = serde_json::Value::Object(params_obj);
+        if let Some(mut params_obj) = params.as_object().cloned() {
+            let (trigger_kind, trigger_char) = match self.last_completion_trigger_char.take() {
+                Some(c) => (2, Some(c.to_string())), // TriggerCharacter
+                None => (1, None),                  // Invoked
+            };
 
-        let tx = self.event_tx.clone();
-        tokio::spawn(async move {
-            let response = handle.send_request("textDocument/completion", params_with_context).await.ok();
-            let _ = tx.send(crate::events::klein_event::KleinEvent::CompletionResponse(response, path, (line, col)));
-        });
+            let mut context = serde_json::json!({
+                "triggerKind": trigger_kind,
+            });
+            if let Some(c) = trigger_char {
+                context["triggerCharacter"] = serde_json::json!(c);
+            }
+
+            params_obj.insert("context".to_string(), context);
+            let params_with_context = serde_json::Value::Object(params_obj);
+
+            let tx = self.event_tx.clone();
+            tokio::spawn(async move {
+                let response = handle
+                    .send_request("textDocument/completion", params_with_context)
+                    .await
+                    .ok();
+                let _ = tx.send(crate::events::klein_event::KleinEvent::CompletionResponse(
+                    response,
+                    path,
+                    (line, col),
+                ));
+            });
+        }
     }
 
     pub fn handle_completion_response(&mut self, response: Option<serde_json::Value>, _path: std::path::PathBuf, trigger_position: (usize, usize)) {

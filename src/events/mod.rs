@@ -966,6 +966,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 return Ok(());
             }
             KeyCode::Char(' ') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.last_completion_trigger_char = None;
                 schedule_completion(app);
                 return Ok(());
             }
@@ -993,6 +994,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.lsp_state.hover = None;
                 if c == '.' || c == ':' || app.lsp_state.completion.is_some() {
                     log::warn!("LSP: Triggering schedule_completion for '{}'", c);
+                    app.last_completion_trigger_char = Some(c);
                     schedule_completion(app);
                 }
                 return Ok(());
@@ -1084,26 +1086,27 @@ fn handle_completion_keys(app: &mut App, key: KeyEvent) -> io::Result<bool> {
         }
         KeyCode::Enter | KeyCode::Tab => {
             if let Some(item) = state.items.get(state.selected_index) {
-                if let Some(range) = &item.replace_range {
+                let (start_char, end_char) = if let Some(range) = &item.replace_range {
                     let buffer = &app.editor().buffer;
-                    let (start_line, start_col) = crate::lsp::router::from_lsp_position(&range.start, buffer);
-                    let (end_line, end_col) = crate::lsp::router::from_lsp_position(&range.end, buffer);
+                    let (sl, sc) = crate::lsp::router::from_lsp_position(&range.start, buffer);
+                    let (el, ec) = crate::lsp::router::from_lsp_position(&range.end, buffer);
                     
-                    let start_char = buffer.line_to_char(start_line) + start_col;
-                    let end_char = buffer.line_to_char(end_line) + end_col;
-                    
-                    if start_char <= end_char && end_char <= buffer.len_chars() {
-                        app.editor_mut().buffer.remove(start_char..end_char);
-                        app.editor_mut().cursor_x = start_col;
-                        app.editor_mut().cursor_y = start_line;
-                    }
+                    let start = buffer.line_to_char(sl.min(buffer.len_lines().saturating_sub(1))) + sc;
+                    let end = buffer.line_to_char(el.min(buffer.len_lines().saturating_sub(1))) + ec;
+                    (start, end)
                 } else {
-                    let diff = app.editor().cursor_x.saturating_sub(state.trigger_position.1);
-                    for _ in 0..diff {
-                        app.editor_mut().delete_char();
-                    }
-                }
-                app.editor_mut().insert_paste(&item.insert_text, 0);
+                    let buffer = &app.editor().buffer;
+                    let start = buffer.line_to_char(state.trigger_position.0.min(buffer.len_lines().saturating_sub(1))) + state.trigger_position.1;
+                    let end = buffer.line_to_char(app.editor().cursor_y.min(buffer.len_lines().saturating_sub(1))) + app.editor().cursor_x;
+                    (start, end)
+                };
+
+                let buffer_len = app.editor().buffer.len_chars();
+                app.editor_mut().replace_range(
+                    start_char.min(buffer_len),
+                    end_char.min(buffer_len),
+                    &item.insert_text
+                );
                 schedule_document_sync(app);
             }
         }
