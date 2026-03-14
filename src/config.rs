@@ -71,24 +71,45 @@ pub struct AppConfig {
 
 impl AppConfig {
     pub fn load() -> Self {
-        if let Some(proj_dirs) = directories::ProjectDirs::from("", "", "Klein") {
-            let config_dir = proj_dirs.config_dir();
-            let config_path = config_dir.join("config.toml");
+        let mut search_paths = Vec::new();
 
+        // 1. Current Working Directory (highest priority for development)
+        if let Ok(cwd) = std::env::current_dir() {
+            search_paths.push(cwd.join("config.toml"));
+        }
+
+        // 2. Standard Roaming Config Dir
+        if let Some(proj_dirs) = directories::ProjectDirs::from("", "", "Klein") {
+            search_paths.push(proj_dirs.config_dir().join("config.toml"));
+        }
+
+        // 3. KleinLocal (Used by local installer)
+        if let Some(user_dirs) = directories::UserDirs::new() {
+             let app_data_local = user_dirs.home_dir().join("AppData").join("Local").join("KleinLocal");
+             search_paths.push(app_data_local.join("config.toml"));
+        }
+
+        // 4. Standard Home Dir fallback
+        if let Some(home) = directories::UserDirs::new() {
+            search_paths.push(home.home_dir().join(".klein").join("config.toml"));
+        }
+
+        for config_path in search_paths {
             if config_path.exists() {
                 if let Ok(contents) = std::fs::read_to_string(&config_path) {
-                    log::info!("loading config from {}", config_path.display());
+                    log::warn!("LSP: loading config from {}", config_path.display());
                     if let Ok(config) = toml::from_str::<AppConfig>(&contents) {
-                        log::info!("loaded config: {:?}", config);
+                        log::warn!("LSP: loaded config: {:?}", config);
                         return config;
                     }
                 } else {
-                    log::warn!("could not read config file at {}", config_path.display());
+                    log::error!("LSP: found config but could not read file at {}", config_path.display());
                 }
-            } else {
-                log::info!("config file not found at {}", config_path.display());
             }
         }
+
+        log::warn!("LSP: No config.toml found in search paths. LSP features will be DISABLED.");
+        log::warn!("LSP: Please create a config.toml in the current directory or in %AppData%\\Klein\\config\\config.toml");
         AppConfig::default()
     }
 }
