@@ -51,6 +51,32 @@ pub enum Maximized {
     Terminal,
 }
 
+#[derive(PartialEq, Clone, Copy, Debug)]
+pub enum TopBarMenu {
+    Navigation,
+    Edit,
+    Files,
+    Panels,
+    Sidebar,
+    Code,
+    Help,
+}
+
+pub struct TopBarState {
+    pub active_menu: Option<TopBarMenu>,
+    pub selected_index: usize,
+}
+
+impl Default for TopBarState {
+    fn default() -> Self {
+        Self {
+            active_menu: None,
+            selected_index: 0,
+        }
+    }
+}
+
+
 pub struct App {
     pub active_panel: Panel,
     pub show_sidebar: bool,
@@ -86,6 +112,7 @@ pub struct App {
     pub code_actions: Vec<lsp_types::CodeActionOrCommand>,
     pub ts_manager: crate::treesitter::TSManager,
     pub last_completion_trigger_char: Option<char>,
+    pub top_bar: TopBarState,
 }
 
 impl App {
@@ -137,6 +164,7 @@ impl App {
             code_actions: Vec::new(),
             ts_manager: crate::treesitter::TSManager::new(),
             last_completion_trigger_char: None,
+            top_bar: TopBarState::default(),
         };
 
         if let Some(file) = cli_file {
@@ -163,6 +191,122 @@ impl App {
             }
         }
         self.editor()
+    }
+
+    pub fn toggle_menu(&mut self, menu: TopBarMenu) {
+        if self.top_bar.active_menu == Some(menu) {
+            self.top_bar.active_menu = None;
+        } else {
+            self.top_bar.active_menu = Some(menu);
+            self.top_bar.selected_index = 0;
+        }
+    }
+
+    pub fn close_menu(&mut self) {
+        self.top_bar.active_menu = None;
+    }
+
+    pub fn execute_top_bar_action(&mut self) {
+        if let Some(menu) = self.top_bar.active_menu {
+            let idx = self.top_bar.selected_index;
+            self.close_menu();
+            
+            match menu {
+                TopBarMenu::Navigation => match idx {
+                    0 => { // Home
+                        let h = self.last_editor_height.get();
+                        self.editor_mut().cursor_x = 0;
+                        self.editor_mut().ensure_cursor_visible(h);
+                    }
+                    1 => { // Ctrl+Home
+                        let h = self.last_editor_height.get();
+                        self.editor_mut().cursor_y = 0;
+                        self.editor_mut().cursor_x = 0;
+                        self.editor_mut().ensure_cursor_visible(h);
+                    }
+                    2 => { // PgUp
+                        let h = self.last_editor_height.get();
+                        let sy = self.editor().scroll_y;
+                        self.editor_mut().scroll_y = sy.saturating_sub(h);
+                        self.editor_mut().cursor_y = sy.saturating_sub(h);
+                    }
+                    3 => { } // Ctrl+D
+                    4 => { self.editor_mut().expand_selection(); }
+                    _ => {}
+                },
+                TopBarMenu::Edit => match idx {
+                    0 => { self.editor_mut().delete_forward_char(); }
+                    1 => { self.cut_selection(); }
+                    2 => { self.copy_selection(); }
+                    3 => {
+                        let h = self.last_editor_height.get();
+                        self.paste_clipboard(h); 
+                    }
+                    4 => { self.editor_mut().select_all(); }
+                    5 => { self.editor_mut().undo(); }
+                    _ => {}
+                },
+                TopBarMenu::Files => match idx {
+                    0 => {
+                        self.picker.active = true;
+                        self.picker.mode = crate::search::SearchMode::File;
+                        self.picker.query.clear();
+                        self.picker.results = crate::search::run_file_search("");
+                        self.picker.selected_index = 0;
+                        self.picker.scroll = 0;
+                    }
+                    1 => {
+                        self.picker.active = true;
+                        self.picker.mode = crate::search::SearchMode::Grep;
+                        self.picker.query.clear();
+                        self.picker.results.clear();
+                        self.picker.selected_index = 0;
+                        self.picker.scroll = 0;
+                    }
+                    2 => { self.save_current_file(); }
+                    3 => { self.close_tab(); }
+                    4 => { self.next_tab(); }
+                    5 => { self.close_tab(); }
+                    _ => {}
+                },
+                TopBarMenu::Panels => match idx {
+                    0 => { self.active_panel = Panel::Sidebar; self.show_sidebar = true; }
+                    1 => { self.active_panel = Panel::Editor; }
+                    2 => { self.active_panel = Panel::Terminal; self.show_terminal = true; }
+                    3 => { self.show_sidebar = !self.show_sidebar; }
+                    4 => { self.show_terminal = !self.show_terminal; }
+                    5 => { self.maximized = Maximized::None; }
+                    _ => {}
+                },
+                TopBarMenu::Sidebar => match idx {
+                    0 => {
+                        self.sidebar.show_hidden = !self.sidebar.show_hidden;
+                        self.sidebar.update_flat_list();
+                    }
+                    1 => { /* Open file managed via tree normally */ }
+                    2 => { self.sidebar.offset = 0; self.sidebar.selected_index = 0; }
+                    3 => {
+                        let len = self.sidebar.flat_list.len();
+                        self.sidebar.selected_index = len.saturating_sub(1);
+                    }
+                    _ => {}
+                },
+                TopBarMenu::Code => match idx {
+                    0 => { self.trigger_completion(); }
+                    1 => { self.trigger_goto_definition(); }
+                    2 => { self.trigger_find_references(); }
+                    3 => { self.trigger_rename(); }
+                    4 => { self.trigger_format_document(); }
+                    5 => { let _ = self.event_tx.send(crate::events::klein_event::KleinEvent::CodeAction); }
+                    _ => {}
+                },
+                TopBarMenu::Help => match idx {
+                    0 => { self.show_help = !self.show_help; }
+                    1 => { self.show_help = false; }
+                    _ => {}
+                },
+            }
+        }
     }
 
     /// Get a reference to the current tab's editor

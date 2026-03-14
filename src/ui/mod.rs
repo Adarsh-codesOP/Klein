@@ -12,6 +12,7 @@ pub mod sidebar;
 pub mod status_bar;
 pub mod tabs;
 pub mod terminal;
+pub mod top_bar;
 
 pub fn render(f: &mut Frame, app: &App) {
     f.render_widget(ratatui::widgets::Clear, f.size());
@@ -27,8 +28,7 @@ pub fn render(f: &mut Frame, app: &App) {
         layout::get_main_layout(f.size(), show_terminal_layout)
     };
 
-    // Render the subtle help hint tab at the very top
-    help::render_hint(f, chunks[0]);
+    // We will render the top bar later to ensure dropdown is on top
 
     if app.maximized != crate::app::Maximized::Terminal {
         // Render tab bar
@@ -57,6 +57,9 @@ pub fn render(f: &mut Frame, app: &App) {
     if app.show_help {
         help::render(f, f.size(), app);
     }
+
+    // Render the Top Bar Menu HERE so its dropdown renders on top of editor/sidebar
+    top_bar::render(f, chunks[0], app);
 
     // Quit confirm dialog
     if app.show_quit_confirm {

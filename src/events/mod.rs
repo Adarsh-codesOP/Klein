@@ -270,6 +270,75 @@ fn trigger_picker_preview(app: &mut App) {
 }
 
 fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    if key.modifiers.contains(KeyModifiers::ALT) {
+         match key.code {
+             KeyCode::Char('n') | KeyCode::Char('N') => { app.toggle_menu(crate::app::TopBarMenu::Navigation); return Ok(()); }
+             KeyCode::Char('e') | KeyCode::Char('E') => { app.toggle_menu(crate::app::TopBarMenu::Edit); return Ok(()); }
+             KeyCode::Char('f') | KeyCode::Char('F') => { app.toggle_menu(crate::app::TopBarMenu::Files); return Ok(()); }
+             KeyCode::Char('p') | KeyCode::Char('P') => { app.toggle_menu(crate::app::TopBarMenu::Panels); return Ok(()); }
+             KeyCode::Char('s') | KeyCode::Char('S') => { app.toggle_menu(crate::app::TopBarMenu::Sidebar); return Ok(()); }
+             KeyCode::Char('c') | KeyCode::Char('C') => { app.toggle_menu(crate::app::TopBarMenu::Code); return Ok(()); }
+             KeyCode::Char('h') | KeyCode::Char('H') => { app.toggle_menu(crate::app::TopBarMenu::Help); return Ok(()); }
+             _ => {}
+         }
+    }
+
+    if app.top_bar.active_menu.is_some() {
+        match key.code {
+            KeyCode::Esc => {
+                app.close_menu();
+                return Ok(());
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                let items_len = crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap()).len();
+                app.top_bar.selected_index = (app.top_bar.selected_index + 1) % items_len;
+                return Ok(());
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                let items_len = crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap()).len();
+                if app.top_bar.selected_index == 0 {
+                    app.top_bar.selected_index = items_len - 1;
+                } else {
+                    app.top_bar.selected_index -= 1;
+                }
+                return Ok(());
+            }
+            KeyCode::Right | KeyCode::Char('l') => {
+                let next = match app.top_bar.active_menu.unwrap() {
+                    crate::app::TopBarMenu::Navigation => crate::app::TopBarMenu::Edit,
+                    crate::app::TopBarMenu::Edit => crate::app::TopBarMenu::Files,
+                    crate::app::TopBarMenu::Files => crate::app::TopBarMenu::Panels,
+                    crate::app::TopBarMenu::Panels => crate::app::TopBarMenu::Sidebar,
+                    crate::app::TopBarMenu::Sidebar => crate::app::TopBarMenu::Code,
+                    crate::app::TopBarMenu::Code => crate::app::TopBarMenu::Help,
+                    crate::app::TopBarMenu::Help => crate::app::TopBarMenu::Navigation,
+                };
+                app.top_bar.active_menu = Some(next);
+                app.top_bar.selected_index = 0;
+                return Ok(());
+            }
+            KeyCode::Left | KeyCode::Char('h') => {
+                let prev = match app.top_bar.active_menu.unwrap() {
+                    crate::app::TopBarMenu::Navigation => crate::app::TopBarMenu::Help,
+                    crate::app::TopBarMenu::Edit => crate::app::TopBarMenu::Navigation,
+                    crate::app::TopBarMenu::Files => crate::app::TopBarMenu::Edit,
+                    crate::app::TopBarMenu::Panels => crate::app::TopBarMenu::Files,
+                    crate::app::TopBarMenu::Sidebar => crate::app::TopBarMenu::Panels,
+                    crate::app::TopBarMenu::Code => crate::app::TopBarMenu::Sidebar,
+                    crate::app::TopBarMenu::Help => crate::app::TopBarMenu::Code,
+                };
+                app.top_bar.active_menu = Some(prev);
+                app.top_bar.selected_index = 0;
+                return Ok(());
+            }
+            KeyCode::Enter => {
+                app.execute_top_bar_action();
+                return Ok(());
+            }
+            _ => { return Ok(()); } // Block other keys while menu is open
+        }
+    }
+
     // 0. Handle g_mode
     if app.g_mode {
         app.g_mode = false;
