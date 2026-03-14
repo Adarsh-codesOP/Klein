@@ -84,6 +84,7 @@ pub struct App {
     pub event_tx: tokio::sync::mpsc::UnboundedSender<KleinEvent>,
     pub g_mode: bool,
     pub code_actions: Vec<lsp_types::CodeActionOrCommand>,
+    pub ts_manager: crate::treesitter::TSManager,
 }
 
 impl App {
@@ -133,6 +134,7 @@ impl App {
             event_tx,
             g_mode: false,
             code_actions: Vec::new(),
+            ts_manager: crate::treesitter::TSManager::new(),
         };
 
         if let Some(file) = cli_file {

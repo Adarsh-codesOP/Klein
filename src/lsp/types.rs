@@ -192,6 +192,7 @@ pub enum ServerStatus {
 ///
 /// This struct is owned by `App` and updated when LSP notifications arrive.
 /// The UI reads from it to render diagnostics, completions, hover, etc.
+#[derive(Default)]
 pub struct LspState {
     /// Per-file diagnostics. Key is the canonical file path.
     pub diagnostics: HashMap<PathBuf, Vec<KleinDiagnostic>>,
@@ -208,14 +209,3 @@ pub struct LspState {
     pub rename: Option<RenameState>,
 }
 
-impl Default for LspState {
-    fn default() -> Self {
-        Self {
-            diagnostics: HashMap::new(),
-            completion: None,
-            hover: None,
-            server_status: HashMap::new(),
-            rename: None,
-        }
-    }
-}
