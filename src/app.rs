@@ -205,6 +205,15 @@ impl App {
         }
     }
 
+    pub fn jump_to_location(&mut self, path: PathBuf, line: usize, col: usize) {
+        self.open_file(path);
+        let h = self.last_editor_height.get();
+        let editor = self.editor_mut();
+        editor.cursor_y = line;
+        editor.cursor_x = col;
+        editor.ensure_cursor_visible(h);
+    }
+
     pub fn open_in_new_tab(&mut self, path: PathBuf) {
         let mut tab = TabState::new();
         let _ = tab.editor.open(path);
