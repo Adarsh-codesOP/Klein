@@ -49,7 +49,8 @@ pub async fn decode<R: AsyncBufReadExt + Unpin>(reader: &mut R) -> Result<serde_
         }
 
         // Parse Content-Length header (case-insensitive)
-        if let Some(value) = trimmed.strip_prefix("Content-Length:") {
+        let lower = trimmed.to_ascii_lowercase();
+        if let Some(value) = lower.strip_prefix("content-length:") {
             content_length = Some(
                 value
                     .trim()
@@ -108,5 +109,15 @@ mod tests {
         let data: &[u8] = b"";
         let mut cursor = tokio::io::BufReader::new(data);
         assert!(decode(&mut cursor).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_decode_case_insensitive() {
+        let msg = serde_json::json!({"jsonrpc": "2.0", "id": 2, "result": null});
+        let body = serde_json::to_string(&msg).unwrap();
+        let encoded = format!("content-length: {}\r\n\r\n{}", body.len(), body);
+        let mut cursor = tokio::io::BufReader::new(encoded.as_bytes());
+        let decoded = decode(&mut cursor).await.unwrap();
+        assert_eq!(decoded["id"], 2);
     }
 }

@@ -225,7 +225,26 @@ async fn actor_loop(
             result = codec::decode(&mut stdout) => {
                 match result {
                     Ok(msg) => {
-                        handle_server_message(msg, &mut pending, &event_tx, &server_name);
+                        // Check for server-initiated requests first to send an error back
+                        let is_server_req = msg.get("id").is_some() && msg.get("method").is_some();
+                        if is_server_req {
+                            if let Some(id) = msg.get("id") {
+                                log::debug!("[{}] ← server request #{} (unsupported)", server_name, id);
+                                let error_response = serde_json::json!({
+                                    "jsonrpc": "2.0",
+                                    "id": id,
+                                    "error": {
+                                        "code": -32601, // MethodNotFound
+                                        "message": "Server-initiated requests are not supported by Klein",
+                                    }
+                                });
+                                let bytes = codec::encode(&error_response);
+                                let _ = stdin.write_all(&bytes).await;
+                                let _ = stdin.flush().await;
+                            }
+                        } else {
+                            handle_server_message(msg, &mut pending, &event_tx, &server_name);
+                        }
                     }
                     Err(e) => {
                         log::error!("[{}] server read error (likely crashed): {}", server_name, e);
@@ -255,12 +274,6 @@ fn handle_server_message(
 ) {
     // Response to a request we sent
     if let Some(id) = msg.get("id").and_then(|v| v.as_i64()) {
-        if msg.get("method").is_some() {
-            // Server-initiated request (we don't handle these yet)
-            log::debug!("[{}] ← server request #{} (ignored)", server_name, id);
-            return;
-        }
-
         if let Some(tx) = pending.remove(&id) {
             if let Some(error) = msg.get("error") {
                 let err_msg = error
