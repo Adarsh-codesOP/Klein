@@ -493,7 +493,15 @@ impl Editor {
         }
     }
 
-    pub fn replace_range(&mut self, start_char: usize, end_char: usize, text: &str) {
+    pub fn replace_range(&mut self, mut start_char: usize, mut end_char: usize, text: &str) {
+        let max_len = self.buffer.len_chars();
+        start_char = start_char.min(max_len);
+        end_char = end_char.min(max_len);
+        
+        if start_char > end_char {
+            std::mem::swap(&mut start_char, &mut end_char);
+        }
+
         self.save_undo_state();
         if start_char < end_char {
             self.buffer_remove(start_char..end_char);

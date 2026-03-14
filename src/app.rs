@@ -1033,12 +1033,12 @@ impl App {
                     crate::lsp::router::from_lsp_position(&edit.range.start, &editor.buffer);
                 let (end_line, end_col) =
                     crate::lsp::router::from_lsp_position(&edit.range.end, &editor.buffer);
+                
+                // Line to char is safe because from_lsp_position clamps lines
                 let start_char = editor.buffer.line_to_char(start_line) + start_col;
                 let end_char = editor.buffer.line_to_char(end_line) + end_col;
-                if start_char <= end_char && end_char <= editor.buffer.len_chars() {
-                    editor.buffer.remove(start_char..end_char);
-                    editor.buffer.insert(start_char, &edit.new_text);
-                }
+                
+                editor.replace_range(start_char, end_char, &edit.new_text);
             }
             editor.is_dirty = true;
         } else {
@@ -1050,12 +1050,14 @@ impl App {
                         crate::lsp::router::from_lsp_position(&edit.range.start, &rope);
                     let (end_line, end_col) =
                         crate::lsp::router::from_lsp_position(&edit.range.end, &rope);
-                    let start_char = rope.line_to_char(start_line) + start_col;
-                    let end_char = rope.line_to_char(end_line) + end_col;
-                    if start_char <= end_char && end_char <= rope.len_chars() {
+                    let max_len = rope.len_chars();
+                    let start_char = (rope.line_to_char(start_line) + start_col).min(max_len);
+                    let end_char = (rope.line_to_char(end_line) + end_col).min(max_len);
+                    
+                    if start_char < end_char {
                         rope.remove(start_char..end_char);
-                        rope.insert(start_char, &edit.new_text);
                     }
+                    rope.insert(start_char, &edit.new_text);
                 }
                 let _ = std::fs::write(&path, rope.to_string());
             }
