@@ -1,6 +1,6 @@
 use crate::app::App;
 use ratatui::{
-    layout::{Rect},
+    layout::Rect,
     style::{Color, Style},
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
@@ -25,7 +25,7 @@ pub fn render(f: &mut Frame, app: &App) {
 
     // The popup should appear above the cursor if possible, else below
     let width = 60.min(f.size().width.saturating_sub(editor_area.x + 4));
-    
+
     // Estimate height based on wrap
     let text = hover.contents.clone();
     let line_count = text.lines().count();
@@ -53,9 +53,7 @@ pub fn render(f: &mut Frame, app: &App) {
         .border_style(Style::default().fg(Color::Magenta))
         .title(" Documentation ");
 
-    let para = Paragraph::new(text)
-        .block(block)
-        .wrap(Wrap { trim: true });
+    let para = Paragraph::new(text).block(block).wrap(Wrap { trim: true });
 
     f.render_widget(para, area);
 }

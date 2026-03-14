@@ -41,11 +41,7 @@ impl DocSyncEngine {
     ///
     /// Returns `(language_id, version)` for the `didOpen` notification.
     /// If the document was already tracked, it is re-opened with a fresh version.
-    pub fn open_document(
-        &mut self,
-        path: &Path,
-        language_id: &str,
-    ) -> (String, i32) {
+    pub fn open_document(&mut self, path: &Path, language_id: &str) -> (String, i32) {
         let state = DocumentState {
             language_id: language_id.to_string(),
             version: 1,

@@ -19,7 +19,9 @@ pub enum ActorMessage {
         method: String,
         params: serde_json::Value,
     },
-    Cancel { id: i64 },
+    Cancel {
+        id: i64,
+    },
     Shutdown,
 }
 
@@ -57,11 +59,7 @@ impl ActorHandle {
             .map_err(|_| "actor dropped response sender".to_string())?
     }
 
-    pub fn send_notification(
-        &self,
-        method: &str,
-        params: serde_json::Value,
-    ) -> Result<(), String> {
+    pub fn send_notification(&self, method: &str, params: serde_json::Value) -> Result<(), String> {
         self.tx
             .send(ActorMessage::Notification {
                 method: method.to_string(),
@@ -273,7 +271,10 @@ fn handle_server_message(
                 log::debug!("[{}] ← response #{}: error: {}", server_name, id, err_msg);
                 let _ = tx.send(Err(err_msg));
             } else {
-                let result = msg.get("result").cloned().unwrap_or(serde_json::Value::Null);
+                let result = msg
+                    .get("result")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
                 log::debug!("[{}] ← response #{}: ok", server_name, id);
                 let _ = tx.send(Ok(result));
             }
@@ -285,7 +286,10 @@ fn handle_server_message(
 
     // Server-initiated notification
     if let Some(method) = msg.get("method").and_then(|m| m.as_str()) {
-        let params = msg.get("params").cloned().unwrap_or(serde_json::Value::Null);
+        let params = msg
+            .get("params")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
         log::debug!("[{}] ← notification: {}", server_name, method);
         let _ = event_tx.send(LspServerNotification {
             method: method.to_string(),

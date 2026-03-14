@@ -1,8 +1,8 @@
 use crate::app::App;
 use ratatui::{
-    layout::{Rect},
+    layout::Rect,
     style::{Color, Style},
-    widgets::{Block, Borders, Paragraph, Clear},
+    widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
 
@@ -26,14 +26,10 @@ pub fn render(f: &mut Frame, app: &App) {
         .border_style(Style::default().fg(Color::Yellow))
         .title(" Rename Symbol ");
 
-    let para = Paragraph::new(format!(" New name: {}", state.new_name))
-        .block(block);
+    let para = Paragraph::new(format!(" New name: {}", state.new_name)).block(block);
 
     f.render_widget(para, area);
 
     // Set cursor for the rename input
-    f.set_cursor(
-        x + 11 + state.new_name.len() as u16,
-        y + 1
-    );
+    f.set_cursor(x + 11 + state.new_name.len() as u16, y + 1);
 }

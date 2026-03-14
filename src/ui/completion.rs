@@ -1,6 +1,6 @@
 use crate::app::App;
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
@@ -49,19 +49,30 @@ pub fn render(f: &mut Frame, app: &App) {
         .border_style(Style::default().fg(Color::Cyan))
         .title(" Suggestions ");
 
-    let items: Vec<ListItem> = state.items.iter().enumerate().map(|(i, item)| {
-        let style = if i == state.selected_index {
-            Style::default().bg(Color::White).fg(Color::Black).add_modifier(Modifier::BOLD)
-        } else {
-            Style::default()
-        };
+    let items: Vec<ListItem> = state
+        .items
+        .iter()
+        .enumerate()
+        .map(|(i, item)| {
+            let style = if i == state.selected_index {
+                Style::default()
+                    .bg(Color::White)
+                    .fg(Color::Black)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
 
-        let content = Line::from(vec![
-            Span::styled(format!(" {} ", item.kind.icon()), Style::default().fg(Color::Yellow)),
-            Span::styled(item.label.clone(), style),
-        ]);
-        ListItem::new(content)
-    }).collect();
+            let content = Line::from(vec![
+                Span::styled(
+                    format!(" {} ", item.kind.icon()),
+                    Style::default().fg(Color::Yellow),
+                ),
+                Span::styled(item.label.clone(), style),
+            ]);
+            ListItem::new(content)
+        })
+        .collect();
 
     let mut list_state = ListState::default();
     list_state.select(Some(state.selected_index));
@@ -81,9 +92,7 @@ pub fn render(f: &mut Frame, app: &App) {
             if doc_width > 10 {
                 let doc_area = Rect::new(x + width, y, doc_width, height);
                 f.render_widget(ratatui::widgets::Clear, doc_area);
-                let doc_block = Block::default()
-                    .borders(Borders::ALL)
-                    .title(" Info ");
+                let doc_block = Block::default().borders(Borders::ALL).title(" Info ");
                 let doc_para = Paragraph::new(doc.as_str())
                     .block(doc_block)
                     .wrap(ratatui::widgets::Wrap { trim: true });

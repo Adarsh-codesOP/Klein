@@ -114,7 +114,10 @@ pub fn to_klein_completion(item: &CompletionItem) -> KleinCompletion {
             lsp_types::Documentation::MarkupContent(m) => m.value.clone(),
         }),
         kind: map_completion_kind(item.kind),
-        insert_text: item.insert_text.clone().unwrap_or_else(|| item.label.clone()),
+        insert_text: item
+            .insert_text
+            .clone()
+            .unwrap_or_else(|| item.label.clone()),
         sort_text: item.sort_text.clone(),
     }
 }

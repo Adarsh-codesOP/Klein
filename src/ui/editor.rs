@@ -63,7 +63,9 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
 
     // Diagnostics for this file
     let empty_vec = Vec::new();
-    let file_diagnostics = editor.path.as_ref()
+    let file_diagnostics = editor
+        .path
+        .as_ref()
         .and_then(|p| app.lsp_state.diagnostics.get(p))
         .unwrap_or(&empty_vec);
 
@@ -94,7 +96,8 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let end_line = (start_line + content_area.height as usize).min(num_lines);
     for i in start_line..end_line {
         // Find highest severity diagnostic for this line
-        let line_diag = file_diagnostics.iter()
+        let line_diag = file_diagnostics
+            .iter()
             .filter(|d| d.line == i)
             .max_by_key(|d| d.severity.clone());
 
@@ -105,14 +108,17 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                 DiagnosticSeverity::Info => Color::Blue,
                 DiagnosticSeverity::Hint => Color::DarkGray,
             };
-            Span::styled(format!("{} ", d.severity.icon()), Style::default().fg(color))
+            Span::styled(
+                format!("{} ", d.severity.icon()),
+                Style::default().fg(color),
+            )
         } else {
             Span::from("  ")
         };
 
         let line_num_span = Span::styled(
             format!("{:>width$} ", i + 1, width = gutter_width - 3),
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(Color::DarkGray),
         );
 
         gutter_lines.push(Line::from(vec![icon_span, line_num_span]));

@@ -11,10 +11,9 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 
 use klein_ide::app::App;
-use klein_ide::init_logging;
 use klein_ide::events;
+use klein_ide::init_logging;
 use klein_ide::ui;
-use klein_ide::lsp::actor::LspServerNotification;
 
 #[derive(Parser)]
 #[command(name = "klein")]
@@ -65,17 +64,12 @@ async fn main() -> Result<()> {
     // Bridge: crossterm terminal events → unified channel (runs on blocking thread)
     let term_event_tx = event_tx.clone();
     std::thread::spawn(move || {
-        loop {
-            match event::read() {
-                Ok(ev) => {
-                    if term_event_tx
-                        .send(events::klein_event::KleinEvent::Terminal(ev))
-                        .is_err()
-                    {
-                        break;
-                    }
-                }
-                Err(_) => break,
+        while let Ok(ev) = event::read() {
+            if term_event_tx
+                .send(events::klein_event::KleinEvent::Terminal(ev))
+                .is_err()
+            {
+                break;
             }
         }
     });
@@ -157,7 +151,12 @@ async fn run_app<B: io::Write + ratatui::backend::Backend>(
                 }
                 events::klein_event::KleinEvent::InitLsp(path) => {
                     // Try to start server for this file
-                    if app.lsp_manager.ensure_server_for_file(&path).await.is_some() {
+                    if app
+                        .lsp_manager
+                        .ensure_server_for_file(&path)
+                        .await
+                        .is_some()
+                    {
                         // Once server is up, send didOpen for the file that triggered it
                         // This handles the case where the first didOpen was ignored
                         // because the server was still starting.
@@ -191,4 +190,3 @@ async fn run_app<B: io::Write + ratatui::backend::Backend>(
         }
     }
 }
-

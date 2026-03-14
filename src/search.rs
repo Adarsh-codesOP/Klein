@@ -147,7 +147,11 @@ pub fn run_file_search(query: &str) -> Vec<SearchResult> {
         return file_paths
             .into_iter()
             .take(1000)
-            .map(|path| SearchResult { path, line: None, content: None })
+            .map(|path| SearchResult {
+                path,
+                line: None,
+                content: None,
+            })
             .collect();
     }
 
@@ -156,9 +160,16 @@ pub fn run_file_search(query: &str) -> Vec<SearchResult> {
         .into_par_iter()
         .filter_map(|path| {
             let path_str = path.to_string_lossy().to_string();
-            matcher
-                .fuzzy_match(&path_str, query)
-                .map(|score| (score, SearchResult { path, line: None, content: None }))
+            matcher.fuzzy_match(&path_str, query).map(|score| {
+                (
+                    score,
+                    SearchResult {
+                        path,
+                        line: None,
+                        content: None,
+                    },
+                )
+            })
         })
         .collect();
 

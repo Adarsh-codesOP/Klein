@@ -33,13 +33,15 @@ impl LspRegistry {
 
         let is_enabled = |id: &str| {
             if let Some(enabled) = enabled_lsps {
-                enabled.iter().any(|s| s.to_lowercase() == id.to_lowercase())
+                enabled
+                    .iter()
+                    .any(|s| s.to_lowercase() == id.to_lowercase())
             } else {
                 false // If no list, disable all or enable all? User says "user can addon this lsp only if he need it"
-                // So default should be none or only core ones. 
-                // Let's go with "if none provided, none enabled" for new installations, 
-                // but for backwards compatibility maybe enable Rust?
-                // Actually, the user wants a selection.
+                      // So default should be none or only core ones.
+                      // Let's go with "if none provided, none enabled" for new installations,
+                      // but for backwards compatibility maybe enable Rust?
+                      // Actually, the user wants a selection.
             }
         };
 

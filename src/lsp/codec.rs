@@ -60,8 +60,7 @@ pub async fn decode<R: AsyncBufReadExt + Unpin>(reader: &mut R) -> Result<serde_
         // Ignore other headers (e.g., Content-Type)
     }
 
-    let content_length =
-        content_length.ok_or_else(|| anyhow!("missing Content-Length header"))?;
+    let content_length = content_length.ok_or_else(|| anyhow!("missing Content-Length header"))?;
 
     if content_length == 0 {
         return Err(anyhow!("Content-Length is 0"));
@@ -71,8 +70,8 @@ pub async fn decode<R: AsyncBufReadExt + Unpin>(reader: &mut R) -> Result<serde_
     let mut body = vec![0u8; content_length];
     reader.read_exact(&mut body).await?;
 
-    let value: serde_json::Value = serde_json::from_slice(&body)
-        .map_err(|e| anyhow!("invalid JSON in LSP message: {}", e))?;
+    let value: serde_json::Value =
+        serde_json::from_slice(&body).map_err(|e| anyhow!("invalid JSON in LSP message: {}", e))?;
 
     Ok(value)
 }

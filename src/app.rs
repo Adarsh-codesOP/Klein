@@ -365,30 +365,43 @@ impl App {
         let (path, line, col, buffer) = {
             let editor = &self.tabs[self.active_tab].editor;
             match &editor.path {
-                Some(p) => (p.clone(), editor.cursor_y, editor.cursor_x, editor.buffer.clone()),
+                Some(p) => (
+                    p.clone(),
+                    editor.cursor_y,
+                    editor.cursor_x,
+                    editor.buffer.clone(),
+                ),
                 None => return,
             }
         };
 
         log::debug!("requesting completions at Ln {}, Col {}", line + 1, col + 1);
-        let response = match self.lsp_manager.request_completion(&path, line, col, &buffer).await {
+        let response = match self
+            .lsp_manager
+            .request_completion(&path, line, col, &buffer)
+            .await
+        {
             Some(r) => r,
             None => return,
         };
 
         // Parse response (can be Array or List)
-        let items: Vec<crate::lsp::types::KleinCompletion> = match serde_json::from_value::<lsp_types::CompletionResponse>(response) {
-            Ok(lsp_types::CompletionResponse::Array(arr)) => {
-                arr.into_iter().map(|i| crate::lsp::router::to_klein_completion(&i)).collect()
-            }
-            Ok(lsp_types::CompletionResponse::List(list)) => {
-                list.items.into_iter().map(|i| crate::lsp::router::to_klein_completion(&i)).collect()
-            }
-            Err(e) => {
-                log::error!("failed to parse completion response: {}", e);
-                Vec::new()
-            }
-        };
+        let items: Vec<crate::lsp::types::KleinCompletion> =
+            match serde_json::from_value::<lsp_types::CompletionResponse>(response) {
+                Ok(lsp_types::CompletionResponse::Array(arr)) => arr
+                    .into_iter()
+                    .map(|i| crate::lsp::router::to_klein_completion(&i))
+                    .collect(),
+                Ok(lsp_types::CompletionResponse::List(list)) => list
+                    .items
+                    .into_iter()
+                    .map(|i| crate::lsp::router::to_klein_completion(&i))
+                    .collect(),
+                Err(e) => {
+                    log::error!("failed to parse completion response: {}", e);
+                    Vec::new()
+                }
+            };
 
         if !items.is_empty() {
             log::info!("received {} completion items", items.len());
@@ -407,12 +420,21 @@ impl App {
         let (path, line, col, buffer) = {
             let editor = &self.tabs[self.active_tab].editor;
             match &editor.path {
-                Some(p) => (p.clone(), editor.cursor_y, editor.cursor_x, editor.buffer.clone()),
+                Some(p) => (
+                    p.clone(),
+                    editor.cursor_y,
+                    editor.cursor_x,
+                    editor.buffer.clone(),
+                ),
                 None => return,
             }
         };
 
-        let response = match self.lsp_manager.request_hover(&path, line, col, &buffer).await {
+        let response = match self
+            .lsp_manager
+            .request_hover(&path, line, col, &buffer)
+            .await
+        {
             Some(r) => r,
             None => return,
         };
@@ -424,10 +446,14 @@ impl App {
                     lsp_types::MarkedString::String(s) => s,
                     lsp_types::MarkedString::LanguageString(ls) => ls.value,
                 },
-                lsp_types::HoverContents::Array(arr) => arr.into_iter().map(|m| match m {
-                    lsp_types::MarkedString::String(s) => s,
-                    lsp_types::MarkedString::LanguageString(ls) => ls.value,
-                }).collect::<Vec<_>>().join("\n"),
+                lsp_types::HoverContents::Array(arr) => arr
+                    .into_iter()
+                    .map(|m| match m {
+                        lsp_types::MarkedString::String(s) => s,
+                        lsp_types::MarkedString::LanguageString(ls) => ls.value,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n"),
                 lsp_types::HoverContents::Markup(m) => m.value,
             };
 
@@ -444,19 +470,30 @@ impl App {
         let (path, line, col, buffer) = {
             let editor = &self.tabs[self.active_tab].editor;
             match &editor.path {
-                Some(p) => (p.clone(), editor.cursor_y, editor.cursor_x, editor.buffer.clone()),
+                Some(p) => (
+                    p.clone(),
+                    editor.cursor_y,
+                    editor.cursor_x,
+                    editor.buffer.clone(),
+                ),
                 None => return,
             }
         };
 
-        if let Some(resp) = self.lsp_manager.request_goto_definition(&path, line, col, &buffer).await {
+        if let Some(resp) = self
+            .lsp_manager
+            .request_goto_definition(&path, line, col, &buffer)
+            .await
+        {
             let loc = match serde_json::from_value::<lsp_types::GotoDefinitionResponse>(resp) {
                 Ok(lsp_types::GotoDefinitionResponse::Scalar(l)) => Some(l),
                 Ok(lsp_types::GotoDefinitionResponse::Array(a)) => a.into_iter().next(),
-                Ok(lsp_types::GotoDefinitionResponse::Link(l)) => l.into_iter().next().map(|link| lsp_types::Location {
-                    uri: link.target_uri,
-                    range: link.target_range,
-                }),
+                Ok(lsp_types::GotoDefinitionResponse::Link(l)) => {
+                    l.into_iter().next().map(|link| lsp_types::Location {
+                        uri: link.target_uri,
+                        range: link.target_range,
+                    })
+                }
                 _ => None,
             };
 
@@ -464,7 +501,10 @@ impl App {
                 if let Some(target_path) = crate::lsp::router::uri_to_path(&loc.uri) {
                     let target_line = loc.range.start.line as usize;
                     let target_col = if let Some(idx) = self.find_tab_by_path(&target_path) {
-                        let (_, col) = crate::lsp::router::from_lsp_position(&loc.range.start, &self.tabs[idx].editor.buffer);
+                        let (_, col) = crate::lsp::router::from_lsp_position(
+                            &loc.range.start,
+                            &self.tabs[idx].editor.buffer,
+                        );
                         col
                     } else {
                         loc.range.start.character as usize
@@ -479,16 +519,23 @@ impl App {
         let (path, line, col, buffer) = {
             let editor = &self.tabs[self.active_tab].editor;
             match &editor.path {
-                Some(p) => (p.clone(), editor.cursor_y, editor.cursor_x, editor.buffer.clone()),
+                Some(p) => (
+                    p.clone(),
+                    editor.cursor_y,
+                    editor.cursor_x,
+                    editor.buffer.clone(),
+                ),
                 None => return,
             }
         };
 
-        if let Some(resp) = self.lsp_manager.request_references(&path, line, col, &buffer).await {
-            let locs: Vec<lsp_types::Location> = match serde_json::from_value(resp) {
-                Ok(v) => v,
-                _ => Vec::new(),
-            };
+        if let Some(resp) = self
+            .lsp_manager
+            .request_references(&path, line, col, &buffer)
+            .await
+        {
+            let locs: Vec<lsp_types::Location> =
+                serde_json::from_value(resp).unwrap_or_default();
 
             if locs.is_empty() {
                 return;
@@ -525,10 +572,8 @@ impl App {
         };
 
         if let Some(resp) = self.lsp_manager.request_formatting(&path).await {
-            let edits: Vec<lsp_types::TextEdit> = match serde_json::from_value(resp) {
-                Ok(v) => v,
-                _ => Vec::new(),
-            };
+            let edits: Vec<lsp_types::TextEdit> =
+                serde_json::from_value(resp).unwrap_or_default();
 
             if edits.is_empty() {
                 return;
@@ -543,8 +588,10 @@ impl App {
             {
                 let editor = self.editor_mut();
                 for edit in sorted_edits {
-                    let (start_line, start_col) = crate::lsp::router::from_lsp_position(&edit.range.start, &editor.buffer);
-                    let (end_line, end_col) = crate::lsp::router::from_lsp_position(&edit.range.end, &editor.buffer);
+                    let (start_line, start_col) =
+                        crate::lsp::router::from_lsp_position(&edit.range.start, &editor.buffer);
+                    let (end_line, end_col) =
+                        crate::lsp::router::from_lsp_position(&edit.range.end, &editor.buffer);
 
                     let start_char = editor.buffer.line_to_char(start_line) + start_col;
                     let end_char = editor.buffer.line_to_char(end_line) + end_col;
@@ -585,13 +632,17 @@ impl App {
             None => return, // Should not happen if active
         };
 
-        let response = match self.lsp_manager.request_rename(
-            &state.path,
-            state.trigger_position.0,
-            state.trigger_position.1,
-            &state.new_name,
-            &buffer
-        ).await {
+        let response = match self
+            .lsp_manager
+            .request_rename(
+                &state.path,
+                state.trigger_position.0,
+                state.trigger_position.1,
+                &state.new_name,
+                &buffer,
+            )
+            .await
+        {
             Some(r) => r,
             None => return,
         };
@@ -610,7 +661,11 @@ impl App {
         }
     }
 
-    fn apply_workspace_edits_to_file(&mut self, path: PathBuf, mut edits: Vec<lsp_types::TextEdit>) {
+    fn apply_workspace_edits_to_file(
+        &mut self,
+        path: PathBuf,
+        mut edits: Vec<lsp_types::TextEdit>,
+    ) {
         // Sort in reverse
         edits.sort_by(|a, b| b.range.start.cmp(&a.range.start));
 
@@ -618,8 +673,10 @@ impl App {
             let editor = &mut self.tabs[tab_idx].editor;
             editor.save_undo_state();
             for edit in edits {
-                let (start_line, start_col) = crate::lsp::router::from_lsp_position(&edit.range.start, &editor.buffer);
-                let (end_line, end_col) = crate::lsp::router::from_lsp_position(&edit.range.end, &editor.buffer);
+                let (start_line, start_col) =
+                    crate::lsp::router::from_lsp_position(&edit.range.start, &editor.buffer);
+                let (end_line, end_col) =
+                    crate::lsp::router::from_lsp_position(&edit.range.end, &editor.buffer);
                 let start_char = editor.buffer.line_to_char(start_line) + start_col;
                 let end_char = editor.buffer.line_to_char(end_line) + end_col;
                 if start_char <= end_char && end_char <= editor.buffer.len_chars() {
@@ -633,8 +690,10 @@ impl App {
             if let Ok(content) = std::fs::read_to_string(&path) {
                 let mut rope = ropey::Rope::from_str(&content);
                 for edit in edits {
-                    let (start_line, start_col) = crate::lsp::router::from_lsp_position(&edit.range.start, &rope);
-                    let (end_line, end_col) = crate::lsp::router::from_lsp_position(&edit.range.end, &rope);
+                    let (start_line, start_col) =
+                        crate::lsp::router::from_lsp_position(&edit.range.start, &rope);
+                    let (end_line, end_col) =
+                        crate::lsp::router::from_lsp_position(&edit.range.end, &rope);
                     let start_char = rope.line_to_char(start_line) + start_col;
                     let end_char = rope.line_to_char(end_line) + end_col;
                     if start_char <= end_char && end_char <= rope.len_chars() {
@@ -651,16 +710,23 @@ impl App {
         let (path, line, col, buffer) = {
             let editor = &self.tabs[self.active_tab].editor;
             match &editor.path {
-                Some(p) => (p.clone(), editor.cursor_y, editor.cursor_x, editor.buffer.clone()),
+                Some(p) => (
+                    p.clone(),
+                    editor.cursor_y,
+                    editor.cursor_x,
+                    editor.buffer.clone(),
+                ),
                 None => return,
             }
         };
 
-        if let Some(resp) = self.lsp_manager.request_code_action(&path, line, col, &buffer).await {
-            let actions: Vec<lsp_types::CodeActionOrCommand> = match serde_json::from_value(resp) {
-                Ok(v) => v,
-                _ => Vec::new(),
-            };
+        if let Some(resp) = self
+            .lsp_manager
+            .request_code_action(&path, line, col, &buffer)
+            .await
+        {
+            let actions: Vec<lsp_types::CodeActionOrCommand> =
+                serde_json::from_value(resp).unwrap_or_default();
 
             if actions.is_empty() {
                 return;

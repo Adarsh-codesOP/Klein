@@ -11,9 +11,9 @@ use std::io;
 pub fn handle_lsp_notification(app: &mut App, notification: LspServerNotification) {
     match notification.method.as_str() {
         "textDocument/publishDiagnostics" => {
-            if let Ok(params) = serde_json::from_value::<lsp_types::PublishDiagnosticsParams>(
-                notification.params,
-            ) {
+            if let Ok(params) =
+                serde_json::from_value::<lsp_types::PublishDiagnosticsParams>(notification.params)
+            {
                 if let Some(path) = crate::lsp::router::uri_to_path(&params.uri) {
                     // Find the buffer for this file to do position conversion
                     let mut diagnostics = Vec::new();
@@ -28,8 +28,7 @@ pub fn handle_lsp_notification(app: &mut App, notification: LspServerNotificatio
 
                     if let Some(buf) = buffer {
                         for diag in params.diagnostics {
-                            diagnostics
-                                .push(crate::lsp::router::to_klein_diagnostic(&diag, &buf));
+                            diagnostics.push(crate::lsp::router::to_klein_diagnostic(&diag, &buf));
                         }
                         app.lsp_state.diagnostics.insert(path, diagnostics);
                     }
@@ -297,18 +296,16 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
         }
     }
 
-    if app.lsp_state.rename.is_some() {
-        if handle_rename_keys(app, key)? {
+    if app.lsp_state.rename.is_some()
+        && handle_rename_keys(app, key)? {
             return Ok(());
         }
-    }
 
     // 1. If completion popup is open, it gets first dibs
-    if app.lsp_state.completion.is_some() {
-        if handle_completion_keys(app, key)? {
+    if app.lsp_state.completion.is_some()
+        && handle_completion_keys(app, key)? {
             return Ok(());
         }
-    }
 
     if app.picker.active {
         match key.code {
@@ -377,7 +374,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     crate::search::SearchMode::Grep => {
                         app.picker.results = crate::search::run_grep(&app.picker.query);
                     }
-                    crate::search::SearchMode::Lsp | crate::search::SearchMode::CodeAction => {} 
+                    crate::search::SearchMode::Lsp | crate::search::SearchMode::CodeAction => {}
                 }
                 app.picker.selected_index = 0;
                 app.picker.scroll = 0;
@@ -1028,12 +1025,12 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
         }
         KeyCode::Down if matches!(app.active_panel, Panel::Sidebar) => {
-            if let Some(path) = app.sidebar.next() {
+            if let Some(path) = app.sidebar.select_next() {
                 load_preview(app, path);
             }
         }
         KeyCode::Up if matches!(app.active_panel, Panel::Sidebar) => {
-            if let Some(path) = app.sidebar.previous() {
+            if let Some(path) = app.sidebar.select_previous() {
                 load_preview(app, path);
             }
         }

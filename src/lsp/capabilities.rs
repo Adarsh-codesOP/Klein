@@ -43,52 +43,30 @@ pub struct LspFeatureFlags {
 impl LspFeatureFlags {
     /// Extract feature flags from raw server capabilities.
     pub fn from_capabilities(caps: &ServerCapabilities) -> Self {
-        let mut flags = LspFeatureFlags::default();
-
-        // Hover
-        flags.hover = caps.hover_provider.is_some();
-
-        // Completion
+        let mut completion = false;
+        let mut completion_trigger_chars = Vec::new();
         if let Some(ref provider) = caps.completion_provider {
-            flags.completion = true;
+            completion = true;
             if let Some(ref triggers) = provider.trigger_characters {
-                flags.completion_trigger_chars = triggers
-                    .iter()
-                    .filter_map(|s| s.chars().next())
-                    .collect();
+                completion_trigger_chars =
+                    triggers.iter().filter_map(|s| s.chars().next()).collect();
             }
         }
 
-        // Definition
-        flags.definition = caps.definition_provider.is_some();
-
-        // References
-        flags.references = caps.references_provider.is_some();
-
-        // Formatting
-        flags.formatting = caps.document_formatting_provider.is_some();
-
-        // Rename
-        flags.rename = caps.rename_provider.is_some();
-
-        // Code Action
-        flags.code_action = caps.code_action_provider.is_some();
-
-        // Signature Help
-        flags.signature_help = caps.signature_help_provider.is_some();
-
-        // Document Symbols
-        flags.document_symbols = caps.document_symbol_provider.is_some();
-
-        // Workspace Symbols
-        flags.workspace_symbols = caps.workspace_symbol_provider.is_some();
-
-        // Semantic Tokens
-        flags.semantic_tokens = caps.semantic_tokens_provider.is_some();
-
-        // Inlay Hints
-        flags.inlay_hints = caps.inlay_hint_provider.is_some();
-
-        flags
+        Self {
+            hover: caps.hover_provider.is_some(),
+            completion,
+            completion_trigger_chars,
+            definition: caps.definition_provider.is_some(),
+            references: caps.references_provider.is_some(),
+            formatting: caps.document_formatting_provider.is_some(),
+            rename: caps.rename_provider.is_some(),
+            code_action: caps.code_action_provider.is_some(),
+            signature_help: caps.signature_help_provider.is_some(),
+            document_symbols: caps.document_symbol_provider.is_some(),
+            workspace_symbols: caps.workspace_symbol_provider.is_some(),
+            semantic_tokens: caps.semantic_tokens_provider.is_some(),
+            inlay_hints: caps.inlay_hint_provider.is_some(),
+        }
     }
 }

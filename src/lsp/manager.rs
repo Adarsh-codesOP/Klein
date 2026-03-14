@@ -22,7 +22,7 @@ pub struct LspManager {
 struct ServerState {
     handle: ActorHandle,
     capabilities: LspFeatureFlags,
-    root_uri: url::Url,
+    _root_uri: url::Url,
     #[allow(dead_code)]
     join_handle: tokio::task::JoinHandle<()>,
 }
@@ -60,7 +60,11 @@ impl LspManager {
         }
     }
 
-    async fn start_server(&mut self, config: &ServerConfig, file_path: &Path) -> Result<(), String> {
+    async fn start_server(
+        &mut self,
+        config: &ServerConfig,
+        file_path: &Path,
+    ) -> Result<(), String> {
         let root_dir = detect_project_root(file_path, &config.root_markers);
         let root_uri = router::path_to_uri(&root_dir)
             .ok_or_else(|| "failed to convert root path to URI".to_string())?;
@@ -84,12 +88,15 @@ impl LspManager {
             },
         });
 
-        let result = spawned.handle.send_request("initialize", init_params).await?;
+        let result = spawned
+            .handle
+            .send_request("initialize", init_params)
+            .await?;
 
         // Extract server capabilities
-        let server_caps: lsp_types::ServerCapabilities = serde_json::from_value(
-            result.get("capabilities").cloned().unwrap_or_default(),
-        ).unwrap_or_default();
+        let server_caps: lsp_types::ServerCapabilities =
+            serde_json::from_value(result.get("capabilities").cloned().unwrap_or_default())
+                .unwrap_or_default();
 
         let flags = LspFeatureFlags::from_capabilities(&server_caps);
         log::info!(
@@ -100,7 +107,8 @@ impl LspManager {
         );
 
         // Send initialized notification
-        spawned.handle
+        spawned
+            .handle
             .send_notification("initialized", serde_json::json!({}))?;
 
         self.servers.insert(
@@ -108,7 +116,7 @@ impl LspManager {
             ServerState {
                 handle: spawned.handle,
                 capabilities: flags,
-                root_uri,
+                _root_uri: root_uri,
                 join_handle: spawned.join_handle,
             },
         );
@@ -116,8 +124,7 @@ impl LspManager {
         Ok(())
     }
 
-    // ─── Document sync ─────────────────────────────────────────────
-
+   
     pub fn notify_did_open(&mut self, path: &Path, content: &str) {
         let lang_id = match self.registry.language_id_for_file(path) {
             Some(id) => id.to_string(),
@@ -239,7 +246,13 @@ impl LspManager {
         self.servers.get(lang_id).map(|s| &s.handle)
     }
 
-    fn text_doc_position(&self, path: &Path, line: usize, col: usize, buffer: &ropey::Rope) -> Option<serde_json::Value> {
+    fn text_doc_position(
+        &self,
+        path: &Path,
+        line: usize,
+        col: usize,
+        buffer: &ropey::Rope,
+    ) -> Option<serde_json::Value> {
         let uri = router::path_to_uri(path)?;
         let pos = router::to_lsp_position(line, col, buffer);
         Some(serde_json::json!({
@@ -256,11 +269,16 @@ impl LspManager {
         buffer: &ropey::Rope,
     ) -> Option<serde_json::Value> {
         let caps = self.get_capabilities(path)?;
-        if !caps.completion { return None; }
+        if !caps.completion {
+            return None;
+        }
 
         let handle = self.server_handle_for_file(path)?;
         let params = self.text_doc_position(path, line, col, buffer)?;
-        handle.send_request("textDocument/completion", params).await.ok()
+        handle
+            .send_request("textDocument/completion", params)
+            .await
+            .ok()
     }
 
     pub async fn request_hover(
@@ -271,7 +289,9 @@ impl LspManager {
         buffer: &ropey::Rope,
     ) -> Option<serde_json::Value> {
         let caps = self.get_capabilities(path)?;
-        if !caps.hover { return None; }
+        if !caps.hover {
+            return None;
+        }
 
         let handle = self.server_handle_for_file(path)?;
         let params = self.text_doc_position(path, line, col, buffer)?;
@@ -286,11 +306,16 @@ impl LspManager {
         buffer: &ropey::Rope,
     ) -> Option<serde_json::Value> {
         let caps = self.get_capabilities(path)?;
-        if !caps.definition { return None; }
+        if !caps.definition {
+            return None;
+        }
 
         let handle = self.server_handle_for_file(path)?;
         let params = self.text_doc_position(path, line, col, buffer)?;
-        handle.send_request("textDocument/definition", params).await.ok()
+        handle
+            .send_request("textDocument/definition", params)
+            .await
+            .ok()
     }
 
     pub async fn request_references(
@@ -301,7 +326,9 @@ impl LspManager {
         buffer: &ropey::Rope,
     ) -> Option<serde_json::Value> {
         let caps = self.get_capabilities(path)?;
-        if !caps.references { return None; }
+        if !caps.references {
+            return None;
+        }
 
         let uri = router::path_to_uri(path)?;
         let pos = router::to_lsp_position(line, col, buffer);
@@ -312,15 +339,17 @@ impl LspManager {
         });
 
         let handle = self.server_handle_for_file(path)?;
-        handle.send_request("textDocument/references", params).await.ok()
+        handle
+            .send_request("textDocument/references", params)
+            .await
+            .ok()
     }
 
-    pub async fn request_formatting(
-        &self,
-        path: &Path,
-    ) -> Option<serde_json::Value> {
+    pub async fn request_formatting(&self, path: &Path) -> Option<serde_json::Value> {
         let caps = self.get_capabilities(path)?;
-        if !caps.formatting { return None; }
+        if !caps.formatting {
+            return None;
+        }
 
         let uri = router::path_to_uri(path)?;
         let params = serde_json::json!({
@@ -332,7 +361,10 @@ impl LspManager {
         });
 
         let handle = self.server_handle_for_file(path)?;
-        handle.send_request("textDocument/formatting", params).await.ok()
+        handle
+            .send_request("textDocument/formatting", params)
+            .await
+            .ok()
     }
 
     pub async fn request_code_action(
@@ -343,7 +375,9 @@ impl LspManager {
         buffer: &ropey::Rope,
     ) -> Option<serde_json::Value> {
         let caps = self.get_capabilities(path)?;
-        if !caps.code_action { return None; }
+        if !caps.code_action {
+            return None;
+        }
 
         let uri = router::path_to_uri(path)?;
         let pos = router::to_lsp_position(line, col, buffer);
@@ -357,7 +391,10 @@ impl LspManager {
         });
 
         let handle = self.server_handle_for_file(path)?;
-        handle.send_request("textDocument/codeAction", params).await.ok()
+        handle
+            .send_request("textDocument/codeAction", params)
+            .await
+            .ok()
     }
 
     pub async fn request_rename(
@@ -369,7 +406,9 @@ impl LspManager {
         buffer: &ropey::Rope,
     ) -> Option<serde_json::Value> {
         let caps = self.get_capabilities(path)?;
-        if !caps.rename { return None; }
+        if !caps.rename {
+            return None;
+        }
 
         let uri = router::path_to_uri(path)?;
         let pos = router::to_lsp_position(line, col, buffer);
@@ -380,7 +419,10 @@ impl LspManager {
         });
 
         let handle = self.server_handle_for_file(path)?;
-        handle.send_request("textDocument/rename", params).await.ok()
+        handle
+            .send_request("textDocument/rename", params)
+            .await
+            .ok()
     }
 
     // ─── Lifecycle ─────────────────────────────────────────────────
