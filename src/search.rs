@@ -11,12 +11,15 @@ use std::sync::{Arc, Mutex};
 pub enum SearchMode {
     File,
     Grep,
+    Lsp,
+    CodeAction,
 }
 
 #[derive(Clone, Debug)]
 pub struct SearchResult {
     pub path: PathBuf,
     pub line: Option<usize>,
+    pub content: Option<String>,
 }
 
 pub struct PickerState {
@@ -114,6 +117,7 @@ impl<'a> Sink for SearchSink<'a> {
         self.results.push(SearchResult {
             path: self.path.to_path_buf(),
             line: Some(line.line_number().unwrap_or(1).saturating_sub(1) as usize),
+            content: None,
         });
         Ok(true)
     }
@@ -143,7 +147,7 @@ pub fn run_file_search(query: &str) -> Vec<SearchResult> {
         return file_paths
             .into_iter()
             .take(1000)
-            .map(|path| SearchResult { path, line: None })
+            .map(|path| SearchResult { path, line: None, content: None })
             .collect();
     }
 
@@ -154,7 +158,7 @@ pub fn run_file_search(query: &str) -> Vec<SearchResult> {
             let path_str = path.to_string_lossy().to_string();
             matcher
                 .fuzzy_match(&path_str, query)
-                .map(|score| (score, SearchResult { path, line: None }))
+                .map(|score| (score, SearchResult { path, line: None, content: None }))
         })
         .collect();
 

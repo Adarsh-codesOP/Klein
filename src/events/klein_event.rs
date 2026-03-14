@@ -17,6 +17,16 @@ pub enum KleinEvent {
 
     /// Trigger LSP server initialization for a file.
     InitLsp(std::path::PathBuf),
+    /// Request definition for symbol at cursor.
+    GotoDefinition,
+    /// Request references for symbol at cursor.
+    FindReferences,
+    /// Request formatting for current document.
+    FormatDocument,
+    /// Request rename for symbol at cursor.
+    Rename,
+    /// Request code actions for cursor position.
+    CodeAction,
 }
 
 /// Identifies which debounce timer fired.

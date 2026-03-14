@@ -82,6 +82,8 @@ pub struct App {
     pub lsp_manager: LspManager,
     pub timer_manager: Option<crate::events::timers::TimerManager>,
     pub event_tx: tokio::sync::mpsc::UnboundedSender<KleinEvent>,
+    pub g_mode: bool,
+    pub code_actions: Vec<lsp_types::CodeActionOrCommand>,
 }
 
 impl App {
@@ -129,6 +131,8 @@ impl App {
             lsp_notification_tx,
             timer_manager: None,
             event_tx,
+            g_mode: false,
+            code_actions: Vec::new(),
         };
 
         if let Some(file) = cli_file {
@@ -428,6 +432,277 @@ impl App {
                     contents,
                     range: None, // Could parse range later
                 });
+            }
+        }
+    }
+
+    pub async fn trigger_goto_definition(&mut self) {
+        let (path, line, col, buffer) = {
+            let editor = &self.tabs[self.active_tab].editor;
+            match &editor.path {
+                Some(p) => (p.clone(), editor.cursor_y, editor.cursor_x, editor.buffer.clone()),
+                None => return,
+            }
+        };
+
+        if let Some(resp) = self.lsp_manager.request_goto_definition(&path, line, col, &buffer).await {
+            let loc = match serde_json::from_value::<lsp_types::GotoDefinitionResponse>(resp) {
+                Ok(lsp_types::GotoDefinitionResponse::Scalar(l)) => Some(l),
+                Ok(lsp_types::GotoDefinitionResponse::Array(a)) => a.into_iter().next(),
+                Ok(lsp_types::GotoDefinitionResponse::Link(l)) => l.into_iter().next().map(|link| lsp_types::Location {
+                    uri: link.target_uri,
+                    range: link.target_range,
+                }),
+                _ => None,
+            };
+
+            if let Some(loc) = loc {
+                if let Some(target_path) = crate::lsp::router::uri_to_path(&loc.uri) {
+                    let target_line = loc.range.start.line as usize;
+                    let target_col = if let Some(idx) = self.find_tab_by_path(&target_path) {
+                        let (_, col) = crate::lsp::router::from_lsp_position(&loc.range.start, &self.tabs[idx].editor.buffer);
+                        col
+                    } else {
+                        loc.range.start.character as usize
+                    };
+                    self.jump_to_location(target_path, target_line, target_col);
+                }
+            }
+        }
+    }
+
+    pub async fn trigger_find_references(&mut self) {
+        let (path, line, col, buffer) = {
+            let editor = &self.tabs[self.active_tab].editor;
+            match &editor.path {
+                Some(p) => (p.clone(), editor.cursor_y, editor.cursor_x, editor.buffer.clone()),
+                None => return,
+            }
+        };
+
+        if let Some(resp) = self.lsp_manager.request_references(&path, line, col, &buffer).await {
+            let locs: Vec<lsp_types::Location> = match serde_json::from_value(resp) {
+                Ok(v) => v,
+                _ => Vec::new(),
+            };
+
+            if locs.is_empty() {
+                return;
+            }
+
+            let mut results = Vec::new();
+            for loc in locs {
+                if let Some(p) = crate::lsp::router::uri_to_path(&loc.uri) {
+                    results.push(crate::search::SearchResult {
+                        path: p,
+                        line: Some(loc.range.start.line as usize),
+                        content: None, // Could fetch line content for preview
+                    });
+                }
+            }
+
+            if !results.is_empty() {
+                self.picker.active = true;
+                self.picker.mode = crate::search::SearchMode::Lsp;
+                self.picker.results = results;
+                self.picker.query = "References".to_string();
+                self.picker.selected_index = 0;
+            }
+        }
+    }
+
+    pub async fn trigger_format_document(&mut self) {
+        let path = {
+            let editor = &self.tabs[self.active_tab].editor;
+            match &editor.path {
+                Some(p) => p.clone(),
+                None => return,
+            }
+        };
+
+        if let Some(resp) = self.lsp_manager.request_formatting(&path).await {
+            let edits: Vec<lsp_types::TextEdit> = match serde_json::from_value(resp) {
+                Ok(v) => v,
+                _ => Vec::new(),
+            };
+
+            if edits.is_empty() {
+                return;
+            }
+
+            // Apply edits to the buffer
+            // We apply in reverse order to keep positions valid
+            let mut sorted_edits = edits;
+            sorted_edits.sort_by(|a, b| b.range.start.cmp(&a.range.start));
+
+            self.editor_mut().save_undo_state();
+            {
+                let editor = self.editor_mut();
+                for edit in sorted_edits {
+                    let (start_line, start_col) = crate::lsp::router::from_lsp_position(&edit.range.start, &editor.buffer);
+                    let (end_line, end_col) = crate::lsp::router::from_lsp_position(&edit.range.end, &editor.buffer);
+
+                    let start_char = editor.buffer.line_to_char(start_line) + start_col;
+                    let end_char = editor.buffer.line_to_char(end_line) + end_col;
+
+                    if start_char <= end_char && end_char <= editor.buffer.len_chars() {
+                        editor.buffer.remove(start_char..end_char);
+                        editor.buffer.insert(start_char, &edit.new_text);
+                    }
+                }
+                editor.is_dirty = true;
+            }
+        }
+    }
+
+    pub fn trigger_rename(&mut self) {
+        let editor = self.editor();
+        let path = match &editor.path {
+            Some(p) => p.clone(),
+            None => return,
+        };
+
+        self.lsp_state.rename = Some(crate::lsp::types::RenameState {
+            trigger_position: (editor.cursor_y, editor.cursor_x),
+            path,
+            new_name: String::new(),
+            active: true,
+        });
+    }
+
+    pub async fn execute_rename(&mut self) {
+        let state = match self.lsp_state.rename.take() {
+            Some(s) if s.active && !s.new_name.is_empty() => s,
+            _ => return,
+        };
+
+        let buffer = match self.find_tab_by_path(&state.path) {
+            Some(idx) => self.tabs[idx].editor.buffer.clone(),
+            None => return, // Should not happen if active
+        };
+
+        let response = match self.lsp_manager.request_rename(
+            &state.path,
+            state.trigger_position.0,
+            state.trigger_position.1,
+            &state.new_name,
+            &buffer
+        ).await {
+            Some(r) => r,
+            None => return,
+        };
+
+        let edit: lsp_types::WorkspaceEdit = match serde_json::from_value(response) {
+            Ok(v) => v,
+            _ => return,
+        };
+
+        if let Some(changes) = edit.changes {
+            for (uri, edits) in changes {
+                if let Some(path) = crate::lsp::router::uri_to_path(&uri) {
+                    self.apply_workspace_edits_to_file(path, edits);
+                }
+            }
+        }
+    }
+
+    fn apply_workspace_edits_to_file(&mut self, path: PathBuf, mut edits: Vec<lsp_types::TextEdit>) {
+        // Sort in reverse
+        edits.sort_by(|a, b| b.range.start.cmp(&a.range.start));
+
+        if let Some(tab_idx) = self.find_tab_by_path(&path) {
+            let editor = &mut self.tabs[tab_idx].editor;
+            editor.save_undo_state();
+            for edit in edits {
+                let (start_line, start_col) = crate::lsp::router::from_lsp_position(&edit.range.start, &editor.buffer);
+                let (end_line, end_col) = crate::lsp::router::from_lsp_position(&edit.range.end, &editor.buffer);
+                let start_char = editor.buffer.line_to_char(start_line) + start_col;
+                let end_char = editor.buffer.line_to_char(end_line) + end_col;
+                if start_char <= end_char && end_char <= editor.buffer.len_chars() {
+                    editor.buffer.remove(start_char..end_char);
+                    editor.buffer.insert(start_char, &edit.new_text);
+                }
+            }
+            editor.is_dirty = true;
+        } else {
+            // File not open, apply to disk
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                let mut rope = ropey::Rope::from_str(&content);
+                for edit in edits {
+                    let (start_line, start_col) = crate::lsp::router::from_lsp_position(&edit.range.start, &rope);
+                    let (end_line, end_col) = crate::lsp::router::from_lsp_position(&edit.range.end, &rope);
+                    let start_char = rope.line_to_char(start_line) + start_col;
+                    let end_char = rope.line_to_char(end_line) + end_col;
+                    if start_char <= end_char && end_char <= rope.len_chars() {
+                        rope.remove(start_char..end_char);
+                        rope.insert(start_char, &edit.new_text);
+                    }
+                }
+                let _ = std::fs::write(&path, rope.to_string());
+            }
+        }
+    }
+
+    pub async fn trigger_code_action(&mut self) {
+        let (path, line, col, buffer) = {
+            let editor = &self.tabs[self.active_tab].editor;
+            match &editor.path {
+                Some(p) => (p.clone(), editor.cursor_y, editor.cursor_x, editor.buffer.clone()),
+                None => return,
+            }
+        };
+
+        if let Some(resp) = self.lsp_manager.request_code_action(&path, line, col, &buffer).await {
+            let actions: Vec<lsp_types::CodeActionOrCommand> = match serde_json::from_value(resp) {
+                Ok(v) => v,
+                _ => Vec::new(),
+            };
+
+            if actions.is_empty() {
+                return;
+            }
+
+            self.code_actions = actions;
+            let mut results = Vec::new();
+            for action in &self.code_actions {
+                let title = match action {
+                    lsp_types::CodeActionOrCommand::Command(c) => &c.title,
+                    lsp_types::CodeActionOrCommand::CodeAction(a) => &a.title,
+                };
+                results.push(crate::search::SearchResult {
+                    path: path.clone(),
+                    line: Some(line),
+                    content: Some(title.to_string()),
+                });
+            }
+
+            self.picker.active = true;
+            self.picker.mode = crate::search::SearchMode::CodeAction;
+            self.picker.results = results;
+            self.picker.query = "Code Actions".to_string();
+            self.picker.selected_index = 0;
+        }
+    }
+    pub fn apply_code_action(&mut self, index: usize) {
+        let action = match self.code_actions.get(index) {
+            Some(a) => a.clone(),
+            None => return,
+        };
+
+        match action {
+            lsp_types::CodeActionOrCommand::CodeAction(a) => {
+                if let Some(edit) = &a.edit {
+                    if let Some(changes) = &edit.changes {
+                        for (uri, edits) in changes {
+                            if let Some(path) = crate::lsp::router::uri_to_path(uri) {
+                                self.apply_workspace_edits_to_file(path, edits.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            lsp_types::CodeActionOrCommand::Command(c) => {
+                log::warn!("Executing LSP command '{}' is not supported yet", c.command);
             }
         }
     }

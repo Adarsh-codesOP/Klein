@@ -171,6 +171,21 @@ async fn run_app<B: io::Write + ratatui::backend::Backend>(
                         app.notify_lsp_did_open_for_path(&path);
                     }
                 }
+                events::klein_event::KleinEvent::GotoDefinition => {
+                    app.trigger_goto_definition().await;
+                }
+                events::klein_event::KleinEvent::FindReferences => {
+                    app.trigger_find_references().await;
+                }
+                events::klein_event::KleinEvent::FormatDocument => {
+                    app.trigger_format_document().await;
+                }
+                events::klein_event::KleinEvent::Rename => {
+                    app.execute_rename().await;
+                }
+                events::klein_event::KleinEvent::CodeAction => {
+                    app.trigger_code_action().await;
+                }
             }
         }
 

@@ -17,12 +17,16 @@ pub fn render(f: &mut Frame, app: &App) {
     let title_color = match app.picker.mode {
         SearchMode::File => Color::Cyan,
         SearchMode::Grep => Color::Magenta,
+        SearchMode::Lsp => Color::Green,
+        SearchMode::CodeAction => Color::Yellow,
     };
 
     let block = Block::default()
         .title(match app.picker.mode {
             SearchMode::File => " 📂 Find File ",
             SearchMode::Grep => " 🔍 Project Search ",
+            SearchMode::Lsp => "  References ",
+            SearchMode::CodeAction => "  Code Actions ",
         })
         .borders(Borders::ALL)
         .border_type(ratatui::widgets::BorderType::Rounded)
@@ -99,17 +103,23 @@ pub fn render(f: &mut Frame, app: &App) {
             line_spans.push(Span::raw("  "));
 
             // Icon
-            let icon = if app.picker.mode == SearchMode::File {
-                " "
-            } else {
-                " "
+            let icon = match app.picker.mode {
+                SearchMode::File => " ",
+                SearchMode::Grep => " ",
+                SearchMode::Lsp => " ",
+                SearchMode::CodeAction => " ",
             };
             line_spans.push(Span::styled(icon, Style::default().fg(title_color)));
 
-            // Filename
-            let file_name = res.path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+            // Filename or Title
+            let text = if app.picker.mode == SearchMode::CodeAction {
+                res.content.as_deref().unwrap_or("?")
+            } else {
+                res.path.file_name().and_then(|n| n.to_str()).unwrap_or("?")
+            };
+
             line_spans.push(Span::styled(
-                file_name.to_string(),
+                text.to_string(),
                 Style::default()
                     .fg(if is_selected {
                         Color::White
@@ -121,10 +131,12 @@ pub fn render(f: &mut Frame, app: &App) {
 
             // Grep location (small)
             if let Some(l) = res.line {
-                line_spans.push(Span::styled(
-                    format!(" :{}", l + 1),
-                    Style::default().fg(Color::Yellow),
-                ));
+                if app.picker.mode != SearchMode::CodeAction {
+                    line_spans.push(Span::styled(
+                        format!(" :{}", l + 1),
+                        Style::default().fg(Color::Yellow),
+                    ));
+                }
             }
 
             let style = if is_selected {
