@@ -7,18 +7,18 @@ pub mod search;
 pub mod sidebar;
 pub mod tabs;
 pub mod terminal;
+pub mod treesitter;
 pub mod ui;
 
 /// Initialize file-based logging.
 pub fn init_logging() {
     use std::io::Write;
 
-    let log_path = directories::ProjectDirs::from("", "", "Klein")
-        .map(|dirs| {
-            let log_dir = dirs.config_dir().to_path_buf();
-            let _ = std::fs::create_dir_all(&log_dir);
-            log_dir.join("klein.log")
-        });
+    let log_path = directories::ProjectDirs::from("", "", "Klein").map(|dirs| {
+        let log_dir = dirs.config_dir().to_path_buf();
+        let _ = std::fs::create_dir_all(&log_dir);
+        log_dir.join("klein.log")
+    });
 
     if let Some(path) = log_path {
         if let Ok(file) = std::fs::OpenOptions::new()
