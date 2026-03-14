@@ -534,8 +534,7 @@ impl App {
             .request_references(&path, line, col, &buffer)
             .await
         {
-            let locs: Vec<lsp_types::Location> =
-                serde_json::from_value(resp).unwrap_or_default();
+            let locs: Vec<lsp_types::Location> = serde_json::from_value(resp).unwrap_or_default();
 
             if locs.is_empty() {
                 return;
@@ -572,8 +571,7 @@ impl App {
         };
 
         if let Some(resp) = self.lsp_manager.request_formatting(&path).await {
-            let edits: Vec<lsp_types::TextEdit> =
-                serde_json::from_value(resp).unwrap_or_default();
+            let edits: Vec<lsp_types::TextEdit> = serde_json::from_value(resp).unwrap_or_default();
 
             if edits.is_empty() {
                 return;
@@ -652,10 +650,31 @@ impl App {
             _ => return,
         };
 
+        self.apply_workspace_edit(edit);
+    }
+
+    fn apply_workspace_edit(&mut self, edit: lsp_types::WorkspaceEdit) {
         if let Some(changes) = edit.changes {
             for (uri, edits) in changes {
                 if let Some(path) = crate::lsp::router::uri_to_path(&uri) {
                     self.apply_workspace_edits_to_file(path, edits);
+                }
+            }
+        } else if let Some(doc_changes) = edit.document_changes {
+            match doc_changes {
+                lsp_types::DocumentChanges::Edits(edits) => {
+                    for edit in edits {
+                        if let Some(path) = crate::lsp::router::uri_to_path(&edit.text_document.uri) {
+                            let text_edits = edit.edits.into_iter().map(|e| match e {
+                                lsp_types::OneOf::Left(te) => te,
+                                lsp_types::OneOf::Right(ae) => ae.text_edit,
+                            }).collect();
+                            self.apply_workspace_edits_to_file(path, text_edits);
+                        }
+                    }
+                }
+                lsp_types::DocumentChanges::Operations(_) => {
+                    log::warn!("Workspace file operations are not supported yet");
                 }
             }
         }
@@ -762,13 +781,7 @@ impl App {
         match action {
             lsp_types::CodeActionOrCommand::CodeAction(a) => {
                 if let Some(edit) = &a.edit {
-                    if let Some(changes) = &edit.changes {
-                        for (uri, edits) in changes {
-                            if let Some(path) = crate::lsp::router::uri_to_path(uri) {
-                                self.apply_workspace_edits_to_file(path, edits.clone());
-                            }
-                        }
-                    }
+                    self.apply_workspace_edit(edit.clone());
                 }
             }
             lsp_types::CodeActionOrCommand::Command(c) => {
