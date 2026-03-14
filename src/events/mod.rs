@@ -269,6 +269,40 @@ fn trigger_picker_preview(app: &mut App) {
 }
 
 fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    // 0. Handle g_mode
+    if app.g_mode {
+        app.g_mode = false;
+        match key.code {
+            KeyCode::Char('d') => {
+                let _ = app.event_tx.send(klein_event::KleinEvent::GotoDefinition);
+                return Ok(());
+            }
+            KeyCode::Char('r') => {
+                let _ = app.event_tx.send(klein_event::KleinEvent::FindReferences);
+                return Ok(());
+            }
+            KeyCode::Char('f') => {
+                let _ = app.event_tx.send(klein_event::KleinEvent::FormatDocument);
+                return Ok(());
+            }
+            KeyCode::Char('n') => {
+                app.trigger_rename();
+                return Ok(());
+            }
+            KeyCode::Char('a') => {
+                let _ = app.event_tx.send(klein_event::KleinEvent::CodeAction);
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
+    if app.lsp_state.rename.is_some() {
+        if handle_rename_keys(app, key)? {
+            return Ok(());
+        }
+    }
+
     // 1. If completion popup is open, it gets first dibs
     if app.lsp_state.completion.is_some() {
         if handle_completion_keys(app, key)? {
@@ -288,6 +322,11 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     let line = res.line;
                     app.picker.active = false;
                     app.picker.preview = None;
+
+                    if app.picker.mode == crate::search::SearchMode::CodeAction {
+                        app.apply_code_action(app.picker.selected_index);
+                        return Ok(());
+                    }
 
                     // Open the file
                     app.open_file(path);
@@ -338,6 +377,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     crate::search::SearchMode::Grep => {
                         app.picker.results = crate::search::run_grep(&app.picker.query);
                     }
+                    crate::search::SearchMode::Lsp | crate::search::SearchMode::CodeAction => {} 
                 }
                 app.picker.selected_index = 0;
                 app.picker.scroll = 0;
@@ -360,6 +400,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     crate::search::SearchMode::Grep => {
                         app.picker.results = crate::search::run_grep(&app.picker.query);
                     }
+                    crate::search::SearchMode::Lsp | crate::search::SearchMode::CodeAction => {}
                 }
                 app.picker.selected_index = 0;
                 app.picker.scroll = 0;
@@ -906,6 +947,14 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 schedule_document_sync(app);
                 return Ok(());
             }
+            KeyCode::Char('g') if key.modifiers.contains(KeyModifiers::ALT) => {
+                app.g_mode = true;
+                return Ok(());
+            }
+            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::ALT) => {
+                let _ = app.event_tx.send(klein_event::KleinEvent::FormatDocument);
+                return Ok(());
+            }
             KeyCode::Char(c) => {
                 app.editor_mut().insert_char(c);
                 schedule_document_sync(app);
@@ -1013,4 +1062,34 @@ fn handle_completion_keys(app: &mut App, key: KeyEvent) -> io::Result<bool> {
     }
 
     Ok(handled)
+}
+fn handle_rename_keys(app: &mut App, key: KeyEvent) -> io::Result<bool> {
+    let mut state = match app.lsp_state.rename.take() {
+        Some(s) => s,
+        None => return Ok(false),
+    };
+
+    match key.code {
+        KeyCode::Esc => {
+            state.active = false;
+            app.lsp_state.rename = None;
+            return Ok(true);
+        }
+        KeyCode::Enter => {
+            state.active = true; // Still active but we are sending
+            app.lsp_state.rename = Some(state);
+            let _ = app.event_tx.send(klein_event::KleinEvent::Rename);
+            return Ok(true);
+        }
+        KeyCode::Backspace => {
+            state.new_name.pop();
+        }
+        KeyCode::Char(c) => {
+            state.new_name.push(c);
+        }
+        _ => {}
+    }
+
+    app.lsp_state.rename = Some(state);
+    Ok(true)
 }
