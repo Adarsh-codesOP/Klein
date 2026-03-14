@@ -26,6 +26,7 @@ pub struct Editor {
     pub is_dirty: bool,
     pub undo_stack: Vec<UndoState>,
     pub tree: Option<tree_sitter::Tree>,
+    pub ts_lang: Option<tree_sitter::Language>,
     pub expansion_stack: Vec<((usize, usize), (usize, usize))>,
 }
 
@@ -49,6 +50,7 @@ impl Editor {
             is_dirty: false,
             undo_stack: Vec::new(),
             tree: None,
+            ts_lang: None,
             expansion_stack: Vec::new(),
         }
     }
@@ -72,14 +74,25 @@ impl Editor {
             self.cursor_y = state.cursor_y;
             self.selection_start = state.selection_start;
             self.is_dirty = true;
+            self.ts_reparse();
         }
     }
 
     pub fn reparse(&mut self, ts_manager: &crate::treesitter::TSManager) {
         if let Some(path) = &self.path {
             if let Some(mut parser) = ts_manager.create_parser_for_file(path) {
+                self.ts_lang = parser.language();
                 let content = self.buffer.to_string();
-                // If we already have a tree that was edited, parse will be incremental.
+                self.tree = parser.parse(content, self.tree.as_ref());
+            }
+        }
+    }
+
+    pub fn ts_reparse(&mut self) {
+        if let Some(lang) = self.ts_lang {
+            let mut parser = tree_sitter::Parser::new();
+            if parser.set_language(lang).is_ok() {
+                let content = self.buffer.to_string();
                 self.tree = parser.parse(content, self.tree.as_ref());
             }
         }
@@ -381,12 +394,14 @@ impl Editor {
         self.cursor_x += 1;
         self.is_dirty = true;
         self.selection_start = None;
+        self.ts_reparse();
     }
 
     pub fn delete_char(&mut self) {
         self.save_undo_state();
         if self.selection_start.is_some() {
             self.delete_selection_internal();
+            self.ts_reparse();
             return;
         }
 
@@ -405,6 +420,7 @@ impl Editor {
                 self.cursor_x = prev_line_len.saturating_sub(1);
             }
             self.is_dirty = true;
+            self.ts_reparse();
         }
     }
 
@@ -412,6 +428,7 @@ impl Editor {
         self.save_undo_state();
         if self.selection_start.is_some() {
             self.delete_selection_internal();
+            self.ts_reparse();
             return;
         }
 
@@ -429,6 +446,7 @@ impl Editor {
             }
             self.buffer_remove(char_idx..end_idx);
             self.is_dirty = true;
+            self.ts_reparse();
         }
     }
 
@@ -717,9 +735,8 @@ impl Editor {
         self.is_dirty = true;
         self.clamp_cursor_x();
 
-        // Ensure the cursor (at the end of the paste) is visible.
-        // This naturally pushes the view down for large pastes, showing the text.
         self.ensure_cursor_visible(height);
+        self.ts_reparse();
     }
 
     pub fn ensure_cursor_visible(&mut self, height: usize) {
@@ -760,24 +777,71 @@ impl Editor {
         use ratatui::style::{Color, Modifier, Style};
         let style = Style::default();
         match kind {
+            // Keywords - Common across many languages
             "keyword" | "storage_class" | "type_qualifier" | "repeat" | "conditional"
-            | "exception" | "include" | "statement" => {
-                style.fg(Color::Magenta).add_modifier(Modifier::BOLD)
+            | "exception" | "include" | "statement" | "use" | "pub" | "struct" | "enum"
+            | "impl" | "fn" | "let" | "mut" | "match" | "if" | "else" | "elif" | "for"
+            | "while" | "loop" | "return" | "break" | "continue" | "async" | "await" | "crate"
+            | "super" | "self" | "mod" | "trait" | "where" | "const" | "static" | "unsafe"
+            | "extern" | "as" | "move" | "dyn" | "def" | "class" | "import" | "from" | "yield"
+            | "try" | "except" | "finally" | "with" | "lambda" | "pass" | "var" | "switch"
+            | "case" | "default" | "throw" | "new" | "typeof" | "instanceof" | "void"
+            | "delete" | "in" | "of" | "export" | "interface" | "namespace" | "implements"
+            | "extends" | "public" | "private" | "protected" | "readonly" | "abstract"
+            | "declare" | "package" | "go" | "chan" | "select" | "defer" | "fallthrough"
+            | "range" => style.fg(Color::Magenta).add_modifier(Modifier::BOLD),
+
+            // Types
+            "type" | "primitive_type" | "type_identifier" | "builtin_type" | "class_name"
+            | "struct_name" => style.fg(Color::Blue),
+
+            // Functions / Methods
+            "function"
+            | "method"
+            | "function_item"
+            | "call_expression"
+            | "function_declarator"
+            | "field_identifier"
+            | "function_definition"
+            | "method_definition" => style.fg(Color::Cyan),
+
+            // HTML / XML
+            "tag_name" | "start_tag" | "end_tag" | "self_closing_tag" => style.fg(Color::LightBlue),
+            "attribute_name" => style.fg(Color::Cyan),
+            "attribute_value" => style.fg(Color::Yellow),
+
+            // CSS
+            "selector" | "class_selector" | "id_selector" | "tag_selector" => {
+                style.fg(Color::LightMagenta)
             }
-            "type" | "primitive_type" | "type_identifier" => style.fg(Color::Blue),
-            "function" | "method" | "function_item" | "call_expression" | "function_declarator" => {
-                style.fg(Color::Cyan)
-            }
-            "string" | "string_literal" | "char_literal" | "escape_sequence" => {
-                style.fg(Color::Yellow)
-            }
-            "comment" | "line_comment" | "block_comment" => {
+            "property_name" => style.fg(Color::Cyan),
+            "property_value" | "value" => style.fg(Color::White),
+
+            // Literals
+            "string" | "string_literal" | "char_literal" | "escape_sequence"
+            | "system_lib_string" => style.fg(Color::Yellow),
+            "number" | "integer_literal" | "float_literal" | "boolean_literal" | "none"
+            | "null" | "undefined" | "true" | "false" => style.fg(Color::LightRed),
+
+            // Comments
+            "comment" | "line_comment" | "block_comment" | "doc_comment" => {
                 style.fg(Color::DarkGray).add_modifier(Modifier::ITALIC)
             }
-            "number" | "integer_literal" | "float_literal" => style.fg(Color::LightRed),
-            "operator" | "binary_expression" | "unary_expression" => style.fg(Color::White),
-            "punctuation" | "delimiter" | "bracket" => style.fg(Color::White),
-            "identifier" | "field_identifier" => style.fg(Color::White),
+
+            // Other
+            "attribute" | "attribute_item" | "meta" => {
+                style.fg(Color::Green).add_modifier(Modifier::ITALIC)
+            }
+            "macro_definition" | "macro_invocation" | "macro_call" | "g_attribute" => {
+                style.fg(Color::LightCyan)
+            }
+            "operator" | "binary_expression" | "unary_expression" | "assignment_expression" => {
+                style.fg(Color::White)
+            }
+            "punctuation" | "delimiter" | "bracket" | "parenthesized_expression" => {
+                style.fg(Color::White)
+            }
+            "identifier" => style.fg(Color::White),
             _ => style.fg(Color::White),
         }
     }
@@ -800,10 +864,9 @@ impl Editor {
             let mut spans = Vec::new();
             let mut current_byte = start_byte;
 
-            let node = tree
-                .root_node()
-                .descendant_for_byte_range(start_byte, end_byte)
-                .unwrap_or(tree.root_node());
+            // Start from root for each line to ensure we don't miss anything that spans multiple lines
+            // but isn't fully contained in a single descendant. byte-range clipping handles efficiency.
+            let node = tree.root_node();
             self.walk_line_highlights(node, start_byte, end_byte, &mut current_byte, &mut spans);
 
             if current_byte < end_byte {
@@ -815,14 +878,80 @@ impl Editor {
                     ));
                 }
             }
-
             let mut cleaned_spans = Vec::new();
-            for span in spans {
-                let text = span.content.trim_end_matches(['\n', '\r']);
-                if !text.is_empty() {
-                    cleaned_spans.push(ratatui::text::Span::styled(text.to_string(), span.style));
+            let mut current_char_in_line = 0;
+
+            if let Some((start_y, start_x)) = self.selection_start {
+                let (sy, sx, ey, ex) = if (start_y, start_x) < (self.cursor_y, self.cursor_x) {
+                    (start_y, start_x, self.cursor_y, self.cursor_x)
+                } else {
+                    (self.cursor_y, self.cursor_x, start_y, start_x)
+                };
+
+                let line_idx = i;
+
+                for span in spans {
+                    let text = span.content.trim_end_matches(['\n', '\r']);
+                    if text.is_empty() {
+                        continue;
+                    }
+
+                    let mut current_segment = String::new();
+                    let mut current_is_selected = false;
+
+                    for (idx, c) in text.chars().enumerate() {
+                        let char_pos = current_char_in_line + idx;
+                        let is_char_selected = if line_idx > sy && line_idx < ey {
+                            true
+                        } else if line_idx == sy && line_idx == ey {
+                            char_pos >= sx && char_pos < ex
+                        } else if line_idx == sy {
+                            char_pos >= sx
+                        } else if line_idx == ey {
+                            char_pos < ex
+                        } else {
+                            false
+                        };
+
+                        if idx == 0 {
+                            current_is_selected = is_char_selected;
+                        } else if is_char_selected != current_is_selected {
+                            let mut s_style = span.style;
+                            if current_is_selected {
+                                s_style = s_style
+                                    .bg(ratatui::style::Color::Yellow)
+                                    .fg(ratatui::style::Color::Black);
+                            }
+                            cleaned_spans.push(ratatui::text::Span::styled(
+                                current_segment.clone(),
+                                s_style,
+                            ));
+                            current_segment.clear();
+                            current_is_selected = is_char_selected;
+                        }
+                        current_segment.push(c);
+                    }
+
+                    if !current_segment.is_empty() {
+                        let mut s_style = span.style;
+                        if current_is_selected {
+                            s_style = s_style
+                                .bg(ratatui::style::Color::Yellow)
+                                .fg(ratatui::style::Color::Black);
+                        }
+                        cleaned_spans.push(ratatui::text::Span::styled(current_segment, s_style));
+                    }
+                    current_char_in_line += text.chars().count();
+                }
+            } else {
+                for span in spans {
+                    let text = span.content.trim_end_matches(['\n', '\r']);
+                    if !text.is_empty() {
+                        cleaned_spans.push(ratatui::text::Span::styled(text.to_string(), span.style));
+                    }
                 }
             }
+
             lines.push(ratatui::text::Line::from(cleaned_spans));
         }
 
@@ -840,14 +969,14 @@ impl Editor {
         current_byte: &mut usize,
         spans: &mut Vec<ratatui::text::Span>,
     ) {
-        if node.start_byte() >= line_end || node.end_byte() <= line_start {
+        let node_start = node.start_byte();
+        let node_end = node.end_byte();
+
+        if node_start >= line_end || node_end <= line_start {
             return;
         }
 
         if node.child_count() == 0 {
-            let node_start = node.start_byte();
-            let node_end = node.end_byte();
-
             if node_start > *current_byte {
                 let gap_text = self.get_byte_range_text(*current_byte..node_start);
                 if !gap_text.is_empty() {
