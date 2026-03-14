@@ -1,4 +1,7 @@
 use crate::editor::Editor;
+use crate::events::klein_event::KleinEvent;
+use crate::lsp::actor::LspServerNotification;
+use crate::lsp::{LspManager, LspState};
 use crate::sidebar::Sidebar;
 use crate::tabs::TabState;
 use crate::terminal::Terminal;
@@ -121,6 +124,11 @@ impl App {
             },
             picker: crate::search::PickerState::default(),
             clipboard,
+            lsp_state: LspState::default(),
+            lsp_manager: LspManager::new(lsp_notification_tx.clone()),
+            lsp_notification_tx,
+            timer_manager: None,
+            event_tx,
         };
 
         if let Some(file) = cli_file {

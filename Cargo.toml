@@ -31,3 +31,9 @@ regex = "1.10"
 grep-searcher = "0.1"
 grep-regex = "0.1"
 rayon = "1.8"
+
+# LSP support
+lsp-types = "0.95"
+url = "2.5"
+log = "0.4"
+env_logger = "0.11"
