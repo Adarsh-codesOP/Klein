@@ -296,16 +296,14 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
         }
     }
 
-    if app.lsp_state.rename.is_some()
-        && handle_rename_keys(app, key)? {
-            return Ok(());
-        }
+    if app.lsp_state.rename.is_some() && handle_rename_keys(app, key)? {
+        return Ok(());
+    }
 
     // 1. If completion popup is open, it gets first dibs
-    if app.lsp_state.completion.is_some()
-        && handle_completion_keys(app, key)? {
-            return Ok(());
-        }
+    if app.lsp_state.completion.is_some() && handle_completion_keys(app, key)? {
+        return Ok(());
+    }
 
     if app.picker.active {
         match key.code {
@@ -1076,6 +1074,25 @@ fn handle_completion_keys(app: &mut App, key: KeyEvent) -> io::Result<bool> {
         }
         KeyCode::Enter | KeyCode::Tab => {
             if let Some(item) = state.items.get(state.selected_index) {
+                if let Some(range) = &item.replace_range {
+                    let buffer = &app.editor().buffer;
+                    let (start_line, start_col) = crate::lsp::router::from_lsp_position(&range.start, buffer);
+                    let (end_line, end_col) = crate::lsp::router::from_lsp_position(&range.end, buffer);
+                    
+                    let start_char = buffer.line_to_char(start_line) + start_col;
+                    let end_char = buffer.line_to_char(end_line) + end_col;
+                    
+                    if start_char <= end_char && end_char <= buffer.len_chars() {
+                        app.editor_mut().buffer.remove(start_char..end_char);
+                        app.editor_mut().cursor_x = start_col;
+                        app.editor_mut().cursor_y = start_line;
+                    }
+                } else {
+                    let diff = app.editor().cursor_x.saturating_sub(state.trigger_position.1);
+                    for _ in 0..diff {
+                        app.editor_mut().delete_char();
+                    }
+                }
                 app.editor_mut().insert_paste(&item.insert_text, 0);
                 schedule_document_sync(app);
             }
