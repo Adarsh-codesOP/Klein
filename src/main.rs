@@ -10,18 +10,11 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 
-mod app;
-mod config;
-mod editor;
-mod events;
-mod lsp;
-mod search;
-mod sidebar;
-mod tabs;
-mod terminal;
-mod ui;
-
-use crate::app::App;
+use klein_ide::app::App;
+use klein_ide::init_logging;
+use klein_ide::events;
+use klein_ide::ui;
+use klein_ide::lsp::actor::LspServerNotification;
 
 #[derive(Parser)]
 #[command(name = "klein")]
@@ -59,7 +52,7 @@ async fn main() -> Result<()> {
 
     // LSP notification sender (forwarded into KleinEvent::Lsp by bridge below).
     let (lsp_notification_tx, mut lsp_notification_rx) =
-        tokio::sync::mpsc::unbounded_channel::<lsp::actor::LspServerNotification>();
+        tokio::sync::mpsc::unbounded_channel::<klein_ide::lsp::actor::LspServerNotification>();
 
     // Bridge: LSP notifications → unified channel
     let lsp_event_tx = event_tx.clone();
@@ -145,9 +138,9 @@ async fn run_app<B: io::Write + ratatui::backend::Backend>(
         } else if !app.show_quit_confirm && !app.should_quit {
             app.terminal.restart();
             app.terminal_restarting = false;
-            app.active_panel = crate::app::Panel::Terminal;
+            app.active_panel = klein_ide::app::Panel::Terminal;
             app.show_terminal = true;
-            app.maximized = crate::app::Maximized::None;
+            app.maximized = klein_ide::app::Maximized::None;
         }
 
         // Drain all pending events (non-blocking)
@@ -199,42 +192,3 @@ async fn run_app<B: io::Write + ratatui::backend::Backend>(
     }
 }
 
-/// Initialize file-based logging.
-///
-/// Logs are written to the Klein config directory (e.g., `~/.config/Klein/klein.log`
-/// on Linux, `%APPDATA%/Klein/klein.log` on Windows). The log level defaults to
-/// `warn` but can be overridden via the `KLEIN_LOG` environment variable.
-fn init_logging() {
-    use std::io::Write;
-
-    let log_path = directories::ProjectDirs::from("", "", "Klein")
-        .map(|dirs| {
-            let log_dir = dirs.config_dir().to_path_buf();
-            let _ = std::fs::create_dir_all(&log_dir);
-            log_dir.join("klein.log")
-        });
-
-    if let Some(path) = log_path {
-        if let Ok(file) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-        {
-            let env_filter = std::env::var("KLEIN_LOG").unwrap_or_else(|_| "warn".to_string());
-            let _ = env_logger::Builder::new()
-                .parse_filters(&env_filter)
-                .target(env_logger::Target::Pipe(Box::new(file)))
-                .format(|buf, record| {
-                    writeln!(
-                        buf,
-                        "[{} {} {}] {}",
-                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                        record.level(),
-                        record.target(),
-                        record.args()
-                    )
-                })
-                .try_init();
-        }
-    }
-}
