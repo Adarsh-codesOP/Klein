@@ -1,7 +1,7 @@
 use crate::app::App;
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame,
@@ -59,29 +59,19 @@ pub fn render(f: &mut Frame, app: &App) {
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan))
+        .border_style(Style::default().fg(Color::DarkGray))
         .title(" Suggestions ");
 
     let items: Vec<ListItem> = state
         .items
         .iter()
-        .enumerate()
-        .map(|(i, item)| {
-            let style = if i == state.selected_index {
-                Style::default()
-                    .bg(Color::White)
-                    .fg(Color::Black)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default()
-            };
-
+        .map(|item| {
             let content = Line::from(vec![
                 Span::styled(
                     format!(" {} ", item.kind.icon()),
                     Style::default().fg(Color::Yellow),
                 ),
-                Span::styled(item.label.clone(), style),
+                Span::styled(item.label.clone(), Style::default()),
             ]);
             ListItem::new(content)
         })
@@ -92,10 +82,9 @@ pub fn render(f: &mut Frame, app: &App) {
 
     let list = List::new(items)
         .block(block)
-        .highlight_style(Style::default().bg(Color::White).fg(Color::Black))
-        .highlight_symbol(">");
+        .highlight_style(Style::default().bg(Color::DarkGray).fg(Color::White))
+        .highlight_symbol("▶ ");
 
-    // Manual scroll management because ListState is tricky with manual render calls
     f.render_stateful_widget(list, area, &mut list_state);
 
     // Optionally render documentation next to it if we have space
@@ -105,9 +94,7 @@ pub fn render(f: &mut Frame, app: &App) {
             if doc_width > 10 {
                 let doc_area = Rect::new(x + width, y, doc_width, height);
                 f.render_widget(ratatui::widgets::Clear, doc_area);
-                let doc_block = Block::default().borders(Borders::ALL).title(" Info ");
                 let doc_para = Paragraph::new(doc.as_str())
-                    .block(doc_block)
                     .wrap(ratatui::widgets::Wrap { trim: true });
                 f.render_widget(doc_para, doc_area);
             }

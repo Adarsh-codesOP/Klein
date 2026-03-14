@@ -1,8 +1,7 @@
 use crate::app::App;
 use ratatui::{
     layout::Rect,
-    style::{Color, Style},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Paragraph, Wrap},
     Frame,
 };
 
@@ -61,12 +60,7 @@ pub fn render(f: &mut Frame, app: &App) {
     let area = Rect::new(final_x, y, width, height);
     f.render_widget(ratatui::widgets::Clear, area);
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Magenta))
-        .title(" Documentation ");
-
-    let para = Paragraph::new(text).block(block).wrap(Wrap { trim: true });
+    let para = Paragraph::new(text).wrap(Wrap { trim: true });
 
     f.render_widget(para, area);
 }
