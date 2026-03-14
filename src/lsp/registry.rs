@@ -28,115 +28,179 @@ pub struct LspRegistry {
 
 impl LspRegistry {
     /// Create a new registry with built-in defaults.
-    pub fn new() -> Self {
+    pub fn new(enabled_lsps: Option<&Vec<String>>) -> Self {
         let mut servers = HashMap::new();
 
-        // Rust
-        let rust_config = ServerConfig {
-            command: "rust-analyzer".into(),
-            args: vec![],
-            language_id: "rust".into(),
-            root_markers: vec!["Cargo.toml".into()],
+        let is_enabled = |id: &str| {
+            if let Some(enabled) = enabled_lsps {
+                enabled.iter().any(|s| s.to_lowercase() == id.to_lowercase())
+            } else {
+                false // If no list, disable all or enable all? User says "user can addon this lsp only if he need it"
+                // So default should be none or only core ones. 
+                // Let's go with "if none provided, none enabled" for new installations, 
+                // but for backwards compatibility maybe enable Rust?
+                // Actually, the user wants a selection.
+            }
         };
-        servers.insert("rs".into(), rust_config);
+
+        // Rust
+        if is_enabled("rust") {
+            let rust_config = ServerConfig {
+                command: "rust-analyzer".into(),
+                args: vec![],
+                language_id: "rust".into(),
+                root_markers: vec!["Cargo.toml".into()],
+            };
+            servers.insert("rs".into(), rust_config);
+        }
 
         // Python
-        let python_config = ServerConfig {
-            command: "pyright-langserver".into(),
-            args: vec!["--stdio".into()],
-            language_id: "python".into(),
-            root_markers: vec![
-                "pyproject.toml".into(),
-                "setup.py".into(),
-                "requirements.txt".into(),
-            ],
-        };
-        servers.insert("py".into(), python_config);
+        if is_enabled("python") {
+            let python_config = ServerConfig {
+                command: "pyright-langserver".into(),
+                args: vec!["--stdio".into()],
+                language_id: "python".into(),
+                root_markers: vec![
+                    "pyproject.toml".into(),
+                    "setup.py".into(),
+                    "requirements.txt".into(),
+                ],
+            };
+            servers.insert("py".into(), python_config);
+        }
 
-        // JavaScript
-        let js_config = ServerConfig {
-            command: "typescript-language-server".into(),
-            args: vec!["--stdio".into()],
-            language_id: "javascript".into(),
-            root_markers: vec!["package.json".into()],
-        };
-        servers.insert("js".into(), js_config.clone());
-        servers.insert("jsx".into(), js_config);
+        // JavaScript / TypeScript
+        if is_enabled("javascript") || is_enabled("typescript") {
+            let js_config = ServerConfig {
+                command: "typescript-language-server".into(),
+                args: vec!["--stdio".into()],
+                language_id: "javascript".into(),
+                root_markers: vec!["package.json".into()],
+            };
+            servers.insert("js".into(), js_config.clone());
+            servers.insert("jsx".into(), js_config);
 
-        // TypeScript
-        let ts_config = ServerConfig {
-            command: "typescript-language-server".into(),
-            args: vec!["--stdio".into()],
-            language_id: "typescript".into(),
-            root_markers: vec!["tsconfig.json".into(), "package.json".into()],
-        };
-        servers.insert("ts".into(), ts_config.clone());
-        servers.insert("tsx".into(), ts_config);
+            let ts_config = ServerConfig {
+                command: "typescript-language-server".into(),
+                args: vec!["--stdio".into()],
+                language_id: "typescript".into(),
+                root_markers: vec!["tsconfig.json".into(), "package.json".into()],
+            };
+            servers.insert("ts".into(), ts_config.clone());
+            servers.insert("tsx".into(), ts_config);
+        }
 
         // C / C++
-        let c_config = ServerConfig {
-            command: "clangd".into(),
-            args: vec![],
-            language_id: "c".into(),
-            root_markers: vec!["compile_commands.json".into(), "CMakeLists.txt".into()],
-        };
-        servers.insert("c".into(), c_config.clone());
-        servers.insert("h".into(), c_config);
+        if is_enabled("c") {
+            let c_config = ServerConfig {
+                command: "clangd".into(),
+                args: vec![],
+                language_id: "c".into(),
+                root_markers: vec!["compile_commands.json".into(), "CMakeLists.txt".into()],
+            };
+            servers.insert("c".into(), c_config.clone());
+            servers.insert("h".into(), c_config);
 
-        let cpp_config = ServerConfig {
-            command: "clangd".into(),
-            args: vec![],
-            language_id: "cpp".into(),
-            root_markers: vec!["compile_commands.json".into(), "CMakeLists.txt".into()],
-        };
-        servers.insert("cpp".into(), cpp_config.clone());
-        servers.insert("hpp".into(), cpp_config.clone());
-        servers.insert("cc".into(), cpp_config);
+            let cpp_config = ServerConfig {
+                command: "clangd".into(),
+                args: vec![],
+                language_id: "cpp".into(),
+                root_markers: vec!["compile_commands.json".into(), "CMakeLists.txt".into()],
+            };
+            servers.insert("cpp".into(), cpp_config.clone());
+            servers.insert("hpp".into(), cpp_config.clone());
+            servers.insert("cc".into(), cpp_config);
+        }
 
         // Go
-        let go_config = ServerConfig {
-            command: "gopls".into(),
-            args: vec!["serve".into()],
-            language_id: "go".into(),
-            root_markers: vec!["go.mod".into()],
-        };
-        servers.insert("go".into(), go_config);
+        if is_enabled("go") {
+            let go_config = ServerConfig {
+                command: "gopls".into(),
+                args: vec!["serve".into()],
+                language_id: "go".into(),
+                root_markers: vec!["go.mod".into()],
+            };
+            servers.insert("go".into(), go_config);
+        }
 
-        // TOML
-        let toml_config = ServerConfig {
-            command: "taplo".into(),
-            args: vec!["lsp".into(), "stdio".into()],
-            language_id: "toml".into(),
-            root_markers: vec![],
-        };
-        servers.insert("toml".into(), toml_config);
+        // Java
+        if is_enabled("java") {
+            let java_config = ServerConfig {
+                command: "jdtls".into(),
+                args: vec![],
+                language_id: "java".into(),
+                root_markers: vec!["pom.xml".into(), "build.gradle".into()],
+            };
+            servers.insert("java".into(), java_config);
+        }
+
+        // HTML
+        if is_enabled("html") {
+            let html_config = ServerConfig {
+                command: "vscode-html-languageserver".into(),
+                args: vec!["--stdio".into()],
+                language_id: "html".into(),
+                root_markers: vec![],
+            };
+            servers.insert("html".into(), html_config);
+        }
+
+        // CSS
+        if is_enabled("css") {
+            let css_config = ServerConfig {
+                command: "vscode-css-languageserver".into(),
+                args: vec!["--stdio".into()],
+                language_id: "css".into(),
+                root_markers: vec![],
+            };
+            servers.insert("css".into(), css_config);
+        }
 
         // JSON
-        let json_config = ServerConfig {
-            command: "vscode-json-languageserver".into(),
-            args: vec!["--stdio".into()],
-            language_id: "json".into(),
-            root_markers: vec![],
-        };
-        servers.insert("json".into(), json_config);
+        if is_enabled("json") {
+            let json_config = ServerConfig {
+                command: "vscode-json-languageserver".into(),
+                args: vec!["--stdio".into()],
+                language_id: "json".into(),
+                root_markers: vec![],
+            };
+            servers.insert("json".into(), json_config);
+        }
 
-        // Lua
-        let lua_config = ServerConfig {
-            command: "lua-language-server".into(),
-            args: vec![],
-            language_id: "lua".into(),
-            root_markers: vec![".luarc.json".into()],
-        };
-        servers.insert("lua".into(), lua_config);
+        // YAML
+        if is_enabled("yaml") {
+            let yaml_config = ServerConfig {
+                command: "yaml-language-server".into(),
+                args: vec!["--stdio".into()],
+                language_id: "yaml".into(),
+                root_markers: vec![],
+            };
+            servers.insert("yaml".into(), yaml_config.clone());
+            servers.insert("yml".into(), yaml_config);
+        }
 
-        // Zig
-        let zig_config = ServerConfig {
-            command: "zls".into(),
-            args: vec![],
-            language_id: "zig".into(),
-            root_markers: vec!["build.zig".into()],
-        };
-        servers.insert("zig".into(), zig_config);
+        // Markdown
+        if is_enabled("markdown") {
+            let md_config = ServerConfig {
+                command: "marksman".into(),
+                args: vec!["server".into()],
+                language_id: "markdown".into(),
+                root_markers: vec![],
+            };
+            servers.insert("md".into(), md_config.clone());
+            servers.insert("markdown".into(), md_config);
+        }
+
+        // TOML (Enable by default if needed, or if in list)
+        if is_enabled("toml") {
+            let toml_config = ServerConfig {
+                command: "taplo".into(),
+                args: vec!["lsp".into(), "stdio".into()],
+                language_id: "toml".into(),
+                root_markers: vec![],
+            };
+            servers.insert("toml".into(), toml_config);
+        }
 
         LspRegistry { servers }
     }
@@ -164,6 +228,6 @@ impl LspRegistry {
 
 impl Default for LspRegistry {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }

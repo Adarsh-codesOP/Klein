@@ -223,7 +223,7 @@ function Install-FromSource {
         cargo install --git "https://github.com/$Repo" --root $AppDir
 
         # Cargo installs binaries into $AppDir/bin.
-        # Only copy when source != destination (on Windows $BinDir IS $AppDir\bin,
+        # Only copy when source != destination (on Windows $AppDir\bin IS $BinDir,
         # so src and dst are identical — copying to self throws and is unnecessary).
         $built = Join-Path (Join-Path $AppDir "bin") $BinName
         if ((Test-Path $built) -and ($built -ne $BinPath)) {
@@ -260,9 +260,13 @@ function Invoke-Configuration {
     }
     Write-Host "`n╭────────────┤ Configuration ├────────────╮" -ForegroundColor $Cyan
 
+    $availableLsps = @("Rust", "Python", "JavaScript", "TypeScript", "C", "Go", "Java", "HTML", "CSS", "JSON", "YAML", "Markdown", "TOML")
+    $enabledLsps = @()
+
     if ($Yes) {
         $workspace = $HomeDir
         $shell = "auto"
+        $enabledLsps = @("Rust") # Default enabled in non-interactive
     } else {
         if ($OnWindows) {
             $gitBashExists = (Test-Path "C:\Program Files\Git\bin\bash.exe") -or
@@ -282,12 +286,30 @@ function Invoke-Configuration {
             $create = Read-Host "Path '$workspace' does not exist. Create it? (y/N)"
             if ($create -eq 'y') { New-Item -ItemType Directory -Path $workspace | Out-Null }
         }
+
+        Write-Host "`nSelect Language Servers (LSPs) to enable (Add-ons):" -ForegroundColor $Cyan
+        for ($i = 0; $i -lt $availableLsps.Count; $i++) {
+            Write-Host "  [$($i + 1)] $($availableLsps[$i])" -ForegroundColor $White
+        }
+        $selection = Read-Host "Enter numbers separated by space (e.g. 1 2 5) [Default: 1]"
+        if ([string]::IsNullOrWhiteSpace($selection)) {
+            $enabledLsps = @("Rust")
+        } else {
+            foreach ($num in $selection.Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries)) {
+                if ([int]::TryParse($num, [ref]$idx) -and $idx -ge 1 -and $idx -le $availableLsps.Count) {
+                    $enabledLsps += $availableLsps[$idx - 1]
+                }
+            }
+        }
     }
+
+    $lspJson = "[$(($enabledLsps | ForEach-Object { '"{0}"' -f $_.ToLower() }) -join ', ')]"
 
     @"
 # Klein TIDE Configuration
 default_workspace = "$workspace"
 shell = "$shell"
+enabled_lsps = $lspJson
 "@ | Out-File -FilePath $ConfigPath -Encoding utf8
     Write-Host "Configuration written to $ConfigPath" -ForegroundColor $Green
 }

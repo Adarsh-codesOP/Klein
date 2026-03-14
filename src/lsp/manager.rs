@@ -28,9 +28,12 @@ struct ServerState {
 }
 
 impl LspManager {
-    pub fn new(event_tx: mpsc::UnboundedSender<LspServerNotification>) -> Self {
+    pub fn new(
+        event_tx: mpsc::UnboundedSender<LspServerNotification>,
+        config: &crate::config::AppConfig,
+    ) -> Self {
         Self {
-            registry: LspRegistry::new(),
+            registry: LspRegistry::new(config.enabled_lsps.as_ref()),
             servers: HashMap::new(),
             doc_sync: DocSyncEngine::new(),
             event_tx,

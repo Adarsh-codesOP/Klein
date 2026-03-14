@@ -127,7 +127,7 @@ impl App {
             picker: crate::search::PickerState::default(),
             clipboard,
             lsp_state: LspState::default(),
-            lsp_manager: LspManager::new(lsp_notification_tx.clone()),
+            lsp_manager: LspManager::new(lsp_notification_tx.clone(), &config),
             lsp_notification_tx,
             timer_manager: None,
             event_tx,
