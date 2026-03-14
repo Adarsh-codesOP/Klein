@@ -145,6 +145,32 @@ pub struct CompletionState {
     pub trigger_position: (usize, usize),
 }
 
+// ─── Rename State ──────────────────────────────────────────────────────
+
+/// State for an active rename operation.
+#[derive(Clone, Debug)]
+pub struct RenameState {
+    /// The (line, col) where rename was triggered.
+    pub trigger_position: (usize, usize),
+    /// The canonical path of the file where rename was triggered.
+    pub path: PathBuf,
+    /// The current user-inputted new name.
+    pub new_name: String,
+    /// Whether the prompt is active.
+    pub active: bool,
+}
+
+impl Default for RenameState {
+    fn default() -> Self {
+        Self {
+            trigger_position: (0, 0),
+            path: PathBuf::new(),
+            new_name: String::new(),
+            active: false,
+        }
+    }
+}
+
 // ─── Server Status ─────────────────────────────────────────────────────
 
 /// Status of a language server instance.
@@ -178,6 +204,8 @@ pub struct LspState {
 
     /// Status of each language server, keyed by language ID (e.g., "rust", "python").
     pub server_status: HashMap<String, ServerStatus>,
+    /// Active rename operation, if any.
+    pub rename: Option<RenameState>,
 }
 
 impl Default for LspState {
@@ -187,6 +215,7 @@ impl Default for LspState {
             completion: None,
             hover: None,
             server_status: HashMap::new(),
+            rename: None,
         }
     }
 }

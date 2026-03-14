@@ -7,6 +7,7 @@ pub mod help;
 pub mod hover;
 pub mod layout;
 pub mod picker;
+pub mod rename;
 pub mod sidebar;
 pub mod status_bar;
 pub mod tabs;
@@ -205,5 +206,7 @@ pub fn render(f: &mut Frame, app: &App) {
     if app.lsp_state.hover.is_some() {
         hover::render(f, app);
     }
->>>>>>> Stashed changes
+    if app.lsp_state.rename.is_some() {
+        rename::render(f, app);
+    }
 }
