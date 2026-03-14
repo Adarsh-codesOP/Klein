@@ -493,6 +493,22 @@ impl Editor {
         }
     }
 
+    pub fn replace_range(&mut self, start_char: usize, end_char: usize, text: &str) {
+        self.save_undo_state();
+        if start_char < end_char {
+            self.buffer_remove(start_char..end_char);
+        }
+        self.buffer_insert(start_char, text);
+
+        // Update cursor to end of inserted text
+        let new_char_idx = start_char + text.chars().count();
+        self.cursor_y = self.buffer.char_to_line(new_char_idx);
+        self.cursor_x = new_char_idx - self.buffer.line_to_char(self.cursor_y);
+
+        self.is_dirty = true;
+        self.ts_reparse();
+    }
+
     pub fn get_gutter_width(&self) -> usize {
         let lines = self.buffer.len_lines();
         lines.to_string().len() + 2
@@ -767,18 +783,46 @@ impl Editor {
     }
 
     pub fn get_max_cursor_x(&self, line_y: usize) -> usize {
-        if self.buffer.len_lines() == 0 {
+        if line_y >= self.buffer.len_lines() {
             return 0;
         }
         let line = self.buffer.line(line_y);
-        let line_len = line.len_chars();
-
-        let line_str = line.to_string();
-        if line_str.ends_with('\n') || line_str.ends_with('\r') {
-            line_len.saturating_sub(1)
-        } else {
-            line_len
+        let len = line.len_chars();
+        if len == 0 {
+            return 0;
         }
+
+        let mut max_x = len;
+        // Check for line terminators at the end
+        if max_x > 0 && line.char(max_x - 1) == '\n' {
+            max_x -= 1;
+            if max_x > 0 && line.char(max_x - 1) == '\r' {
+                max_x -= 1;
+            }
+        } else if max_x > 0 && line.char(max_x - 1) == '\r' {
+            max_x -= 1;
+        }
+        max_x
+    }
+
+    pub fn get_cursor_screen_column(&self) -> usize {
+        if self.cursor_y >= self.buffer.len_lines() {
+            return 0;
+        }
+        let line = self.buffer.line(self.cursor_y);
+        let mut screen_col = 0;
+        for (i, ch) in line.chars().enumerate() {
+            if i >= self.cursor_x {
+                break;
+            }
+            if ch == '\t' {
+                // Standard 4-space tab handling
+                screen_col += 4 - (screen_col % 4);
+            } else {
+                screen_col += 1;
+            }
+        }
+        screen_col
     }
 
     pub fn clamp_cursor_x(&mut self) {
