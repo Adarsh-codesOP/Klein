@@ -238,7 +238,7 @@ impl App {
             (editor.path.clone(), editor.buffer.to_string())
         };
         if let Some(path) = p {
-            self.lsp_manager.notify_did_open(&path, &content);
+            let _ = self.event_tx.send(crate::events::klein_event::KleinEvent::InitLsp(path.clone()));
         }
     }
 
@@ -328,11 +328,6 @@ impl App {
         if let Some(path) = &editor.path {
             // Trigger server start
             let _ = self.event_tx.send(KleinEvent::InitLsp(path.clone()));
-
-            // Send didOpen (will be ignored by manager if server not yet started,
-            // but that's okay because InitLsp handler will send didOpen once ready).
-            let content = editor.buffer.to_string();
-            self.lsp_manager.notify_did_open(path, &content);
         }
     }
 
