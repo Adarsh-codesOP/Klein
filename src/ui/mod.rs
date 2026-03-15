@@ -69,9 +69,10 @@ pub fn render(f: &mut Frame, app: &App) {
             .title(" Quit ")
             .borders(ratatui::widgets::Borders::ALL)
             .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Red))
-            .style(ratatui::style::Style::default().bg(ratatui::style::Color::Reset));
+            .style(ratatui::style::Style::default().bg(app.theme.editor.background));
         let paragraph = ratatui::widgets::Paragraph::new("Unsaved changes! Save? (y/n/c)")
             .block(block)
+            .style(ratatui::style::Style::default().fg(app.theme.editor.text))
             .alignment(ratatui::layout::Alignment::Center);
         f.render_widget(paragraph, area);
     }
@@ -84,11 +85,12 @@ pub fn render(f: &mut Frame, app: &App) {
             .title(" Unsaved Changes ")
             .borders(ratatui::widgets::Borders::ALL)
             .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Yellow))
-            .style(ratatui::style::Style::default().bg(ratatui::style::Color::Reset));
+            .style(ratatui::style::Style::default().bg(app.theme.editor.background));
         let paragraph = ratatui::widgets::Paragraph::new(
             "File has unsaved changes!\nSave (y), Discard (n), Cancel (c)",
         )
         .block(block)
+        .style(ratatui::style::Style::default().fg(app.theme.editor.text))
         .alignment(ratatui::layout::Alignment::Center);
         f.render_widget(paragraph, area);
     }
@@ -102,8 +104,8 @@ pub fn render(f: &mut Frame, app: &App) {
             .title(" Save As ")
             .borders(ratatui::widgets::Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
-            .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Cyan))
-            .style(ratatui::style::Style::default().bg(ratatui::style::Color::Black));
+            .border_style(ratatui::style::Style::default().fg(app.theme.top_bar.text))
+            .style(ratatui::style::Style::default().bg(app.theme.editor.background));
 
         let inner_area = block.inner(area);
         f.render_widget(block, area);
@@ -118,13 +120,13 @@ pub fn render(f: &mut Frame, app: &App) {
             ])
             .split(inner_area);
 
-        let dir_str = format!("Dir:  {}", app.save_as_state.cur_dir.display());
+        let dir_str = format!("  Dir:  {}", app.save_as_state.cur_dir.display());
         let dir_style = if !app.save_as_state.focus_filename {
             ratatui::style::Style::default()
-                .fg(ratatui::style::Color::Black)
-                .bg(ratatui::style::Color::White)
+                .fg(app.theme.editor.background)
+                .bg(app.theme.editor.text)
         } else {
-            ratatui::style::Style::default()
+            ratatui::style::Style::default().fg(app.theme.editor.text)
         };
         f.render_widget(
             ratatui::widgets::Paragraph::new(dir_str).style(dir_style),
@@ -145,10 +147,10 @@ pub fn render(f: &mut Frame, app: &App) {
 
         let file_style = if app.save_as_state.focus_filename {
             ratatui::style::Style::default()
-                .fg(ratatui::style::Color::Black)
-                .bg(ratatui::style::Color::White)
+                .fg(app.theme.editor.background)
+                .bg(app.theme.editor.text)
         } else {
-            ratatui::style::Style::default()
+            ratatui::style::Style::default().fg(app.theme.editor.text)
         };
 
         // For long filenames, we want to show the end of the string (where typing happens)
@@ -187,13 +189,14 @@ pub fn render(f: &mut Frame, app: &App) {
                 .title(" File Not Found ")
                 .borders(ratatui::widgets::Borders::ALL)
                 .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Yellow))
-                .style(ratatui::style::Style::default().bg(ratatui::style::Color::Reset));
+                .style(ratatui::style::Style::default().bg(app.theme.editor.background));
             let text = format!(
                 "File does not exist:\n{}\n\nCreate it? (y/n)",
                 path.display()
             );
             let paragraph = ratatui::widgets::Paragraph::new(text)
                 .block(block)
+                .style(ratatui::style::Style::default().fg(app.theme.editor.text))
                 .alignment(ratatui::layout::Alignment::Center);
             f.render_widget(paragraph, area);
         }

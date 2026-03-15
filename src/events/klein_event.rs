@@ -53,6 +53,8 @@ pub enum KleinEvent {
         std::path::PathBuf,
         (usize, usize),
     ),
+    /// Reload themes (hot-reload).
+    RefreshTheme,
 }
 
 /// Identifies which debounce timer fired.

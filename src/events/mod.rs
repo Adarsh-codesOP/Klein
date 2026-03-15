@@ -313,13 +313,13 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Down | KeyCode::Char('j') => {
                 let items_len =
-                    crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap()).len();
+                    crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap(), app).len();
                 app.top_bar.selected_index = (app.top_bar.selected_index + 1) % items_len;
                 return Ok(());
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 let items_len =
-                    crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap()).len();
+                    crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap(), app).len();
                 if app.top_bar.selected_index == 0 {
                     app.top_bar.selected_index = items_len - 1;
                 } else {

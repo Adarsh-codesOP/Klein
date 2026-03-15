@@ -1,5 +1,4 @@
 use crate::app::{App, Panel};
-use crate::config;
 use crate::lsp::types::DiagnosticSeverity;
 use ratatui::{
     layout::Rect,
@@ -18,7 +17,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let bg_color = if is_preview {
         ratatui::style::Color::Rgb(15, 15, 25) // Very dark blue for preview depth
     } else {
-        ratatui::style::Color::Black
+        app.theme.editor.background
     };
 
     let title = if is_preview {
@@ -34,7 +33,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     } else {
         format!(
             " {} - {} ",
-            config::APP_TITLE,
+            crate::config::APP_TITLE,
             editor
                 .path
                 .as_ref()
@@ -47,9 +46,9 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let border_color = if is_preview {
         ratatui::style::Color::DarkGray
     } else if matches!(app.active_panel, Panel::Editor) {
-        config::colors::EDITOR_FOCUS
+        app.theme.editor.cursor // Use cursor color for focus
     } else {
-        ratatui::style::Color::Indexed(240) // Subdued gray
+        app.theme.editor.text // Use plain text color for non-focus
     };
 
     let editor_block = Block::default()
@@ -118,7 +117,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
 
         let line_num_span = Span::styled(
             format!("{:>width$} ", i + 1, width = gutter_width - 3),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(app.theme.editor.text).add_modifier(ratatui::style::Modifier::DIM),
         );
 
         gutter_lines.push(Line::from(vec![icon_span, line_num_span]));
@@ -131,14 +130,14 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
 
     let gutter_widget = Paragraph::new(gutter_lines).style(
         ratatui::style::Style::default()
-            .fg(ratatui::style::Color::DarkGray)
+            .fg(app.theme.editor.text)
             .bg(bg_color),
     );
     f.render_widget(gutter_widget, gutter_area);
 
     // Render Editor Content
     let highlighted_lines =
-        editor.get_highlighted_lines(content_area.width as usize, content_area.height as usize);
+        editor.get_highlighted_lines(content_area.width as usize, content_area.height as usize, app.theme.editor.selection, app.theme.editor.background);
 
     let editor_widget =
         Paragraph::new(highlighted_lines).style(ratatui::style::Style::default().bg(bg_color));
