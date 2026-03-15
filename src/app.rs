@@ -562,6 +562,9 @@ impl App {
     }
 
     pub fn trigger_completion(&mut self) {
+        // Force document sync so LSP knows about the latest characters immediately
+        self.notify_lsp_did_change();
+
         let (path, line, col, buffer) = {
             let editor = &self.tabs[self.active_tab].editor;
             match &editor.path {

@@ -1060,7 +1060,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.lsp_state.hover = None;
                 return Ok(());
             }
-            KeyCode::Char(' ') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Null | KeyCode::Char(' ') if key.modifiers.contains(KeyModifiers::CONTROL) || key.code == KeyCode::Null => {
                 app.last_completion_trigger_char = None;
                 schedule_completion(app);
                 return Ok(());
