@@ -28,6 +28,9 @@ pub struct Editor {
     pub tree: Option<tree_sitter::Tree>,
     pub ts_lang: Option<tree_sitter::Language>,
     pub expansion_stack: Vec<((usize, usize), (usize, usize))>,
+    /// Track whether the file originally used CRLF line endings,
+    /// so we can restore them on save.
+    pub uses_crlf: bool,
 }
 
 impl Default for Editor {
@@ -52,6 +55,7 @@ impl Editor {
             tree: None,
             ts_lang: None,
             expansion_stack: Vec::new(),
+            uses_crlf: false,
         }
     }
 
@@ -361,7 +365,19 @@ impl Editor {
 
     pub fn open(&mut self, path: PathBuf, ts_manager: &crate::treesitter::TSManager) -> Result<()> {
         let content = fs::read_to_string(&path)?;
-        self.buffer = Rope::from_str(&content);
+
+        // Detect original line endings and normalize to LF.
+        // This is critical: tree-sitter byte offsets can drift from ropey's
+        // if the buffer contains \r\n, because they count bytes differently
+        // for line-to-char and char-to-byte conversions.
+        self.uses_crlf = content.contains("\r\n");
+        let normalized = if self.uses_crlf {
+            content.replace("\r\n", "\n")
+        } else {
+            content
+        };
+
+        self.buffer = Rope::from_str(&normalized);
         self.path = Some(path);
         self.cursor_x = 0;
         self.cursor_y = 0;
@@ -378,7 +394,12 @@ impl Editor {
 
     pub fn save(&mut self) -> Result<()> {
         if let Some(path) = &self.path {
-            fs::write(path, self.buffer.to_string())?;
+            let mut content = self.buffer.to_string();
+            // Restore original CRLF line endings on save if the file had them
+            if self.uses_crlf {
+                content = content.replace('\n', "\r\n");
+            }
+            fs::write(path, content)?;
             self.is_dirty = false;
         }
         Ok(())
@@ -765,6 +786,9 @@ impl Editor {
             self.delete_selection_internal();
         }
 
+        // Normalize CRLF → LF in pasted text to keep byte offsets consistent
+        let text = &text.replace("\r\n", "\n");
+
         let line_idx = self.buffer.line_to_char(self.cursor_y);
         let char_idx = line_idx + self.cursor_x;
         self.buffer_insert(char_idx, text);
@@ -941,7 +965,7 @@ impl Editor {
             self.walk_line_highlights(node, start_byte, end_byte, &mut current_byte, &mut spans);
 
             if current_byte < end_byte {
-                let remaining_text = self.get_byte_range_text(current_byte..end_byte);
+                let remaining_text = self.get_byte_range_text_clean(current_byte..end_byte);
                 if !remaining_text.is_empty() {
                     spans.push(ratatui::text::Span::styled(
                         remaining_text,
@@ -1051,29 +1075,40 @@ impl Editor {
         let node_start = node.start_byte();
         let node_end = node.end_byte();
 
+        // Skip nodes entirely outside the current line's byte range
         if node_start >= line_end || node_end <= line_start {
             return;
         }
 
         if node.child_count() == 0 {
+            // --- Gap fill ---
+            // Clip gap to the current line boundary [line_start, line_end)
             if node_start > *current_byte {
-                let gap_text = self.get_byte_range_text(*current_byte..node_start);
-                if !gap_text.is_empty() {
-                    spans.push(ratatui::text::Span::styled(
-                        gap_text,
-                        ratatui::style::Style::default().fg(ratatui::style::Color::White),
-                    ));
+                let gap_start = (*current_byte).max(line_start);
+                let gap_end = node_start.min(line_end);
+                if gap_start < gap_end {
+                    let gap_text = self.get_byte_range_text_clean(gap_start..gap_end);
+                    if !gap_text.is_empty() {
+                        spans.push(ratatui::text::Span::styled(
+                            gap_text,
+                            ratatui::style::Style::default().fg(ratatui::style::Color::White),
+                        ));
+                    }
                 }
             }
 
-            let start = node_start.max(*current_byte);
+            // --- Node text ---
+            // Clip node text to the current line boundary [line_start, line_end)
+            let start = node_start.max(*current_byte).max(line_start);
             let end = node_end.min(line_end);
             if start < end {
-                let text = self.get_byte_range_text(start..end);
-                spans.push(ratatui::text::Span::styled(
-                    text,
-                    self.get_ts_style(node.kind()),
-                ));
+                let text = self.get_byte_range_text_clean(start..end);
+                if !text.is_empty() {
+                    spans.push(ratatui::text::Span::styled(
+                        text,
+                        self.get_ts_style(node.kind()),
+                    ));
+                }
                 *current_byte = end;
             }
         } else {
@@ -1089,6 +1124,18 @@ impl Editor {
                 }
             }
         }
+    }
+
+    /// Extract text from a byte range and strip ALL newline / carriage-return
+    /// characters.  This prevents cross-line content from leaking into a
+    /// single rendered line, which is the root cause of "ghost text".
+    fn get_byte_range_text_clean(&self, range: std::ops::Range<usize>) -> String {
+        let start = self.buffer.byte_to_char(range.start);
+        let end = self.buffer.byte_to_char(range.end);
+        self.buffer
+            .slice(start..end)
+            .to_string()
+            .replace(['\n', '\r'], "")
     }
 
     fn get_byte_range_text(&self, range: std::ops::Range<usize>) -> String {
