@@ -518,7 +518,7 @@ impl Editor {
         let max_len = self.buffer.len_chars();
         start_char = start_char.min(max_len);
         end_char = end_char.min(max_len);
-        
+
         if start_char > end_char {
             std::mem::swap(&mut start_char, &mut end_char);
         }
@@ -1144,7 +1144,8 @@ impl Editor {
                     if !text.is_empty() {
                         let span_len = text.chars().count();
                         current_char_in_line += span_len;
-                        cleaned_spans.push(ratatui::text::Span::styled(text.to_string(), span.style));
+                        cleaned_spans
+                            .push(ratatui::text::Span::styled(text.to_string(), span.style));
                     }
                 }
             }

@@ -32,16 +32,14 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let tabs = Tabs::new(menus.clone())
         .select(if selected_tab == 999 { 0 } else { selected_tab })
         .style(Style::default().fg(Color::Gray))
-        .highlight_style(
-            if selected_tab == 999 {
-                Style::default().fg(Color::Gray)
-            } else {
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD)
-                    .add_modifier(Modifier::REVERSED)
-            }
-        )
+        .highlight_style(if selected_tab == 999 {
+            Style::default().fg(Color::Gray)
+        } else {
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
+                .add_modifier(Modifier::REVERSED)
+        })
         .divider("│");
 
     f.render_widget(tabs, area);
@@ -55,7 +53,13 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
             x_offset += menus[i].chars().count() as u16 + 1; // +1 for divider
         }
 
-        render_dropdown(f, area.y + 1, x_offset, active_menu, app.top_bar.selected_index);
+        render_dropdown(
+            f,
+            area.y + 1,
+            x_offset,
+            active_menu,
+            app.top_bar.selected_index,
+        );
     }
 }
 
@@ -108,24 +112,23 @@ pub fn get_menu_items(menu: TopBarMenu) -> Vec<(&'static str, &'static str)> {
             ("Alt+F", "Format document"),
             ("Alt+Enter", "Code actions"),
         ],
-        TopBarMenu::Help => vec![
-            ("Ctrl+H", "Toggle help overlay"),
-            ("Esc", "Close help"),
-        ],
+        TopBarMenu::Help => vec![("Ctrl+H", "Toggle help overlay"), ("Esc", "Close help")],
     }
 }
 
-fn render_dropdown(
-    f: &mut Frame,
-    y: u16,
-    x: u16,
-    menu: TopBarMenu,
-    selected_index: usize,
-) {
+fn render_dropdown(f: &mut Frame, y: u16, x: u16, menu: TopBarMenu, selected_index: usize) {
     let items = get_menu_items(menu);
 
-    let max_shortcut_len = items.iter().map(|(s, _)| s.chars().count()).max().unwrap_or(0);
-    let max_desc_len = items.iter().map(|(_, d)| d.chars().count()).max().unwrap_or(0);
+    let max_shortcut_len = items
+        .iter()
+        .map(|(s, _)| s.chars().count())
+        .max()
+        .unwrap_or(0);
+    let max_desc_len = items
+        .iter()
+        .map(|(_, d)| d.chars().count())
+        .max()
+        .unwrap_or(0);
     let width = (max_shortcut_len + max_desc_len + 6) as u16;
     let height = (items.len() + 2) as u16; // +2 for borders
 
@@ -150,16 +153,21 @@ fn render_dropdown(
     let mut lines = Vec::new();
     for (i, (shortcut, desc)) in items.iter().enumerate() {
         let style = if i == selected_index {
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::REVERSED)
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::REVERSED)
         } else {
             Style::default().fg(Color::White)
         };
 
         // Pad shortcut
         let padded_shortcut = format!("{:<1$}", shortcut, max_shortcut_len);
-        
+
         lines.push(Line::from(vec![
-            Span::styled(format!("  {}  ", padded_shortcut), style.add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("  {}  ", padded_shortcut),
+                style.add_modifier(Modifier::BOLD),
+            ),
             Span::styled(format!("{}  ", desc), style),
         ]));
     }

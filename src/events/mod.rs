@@ -271,16 +271,37 @@ fn trigger_picker_preview(app: &mut App) {
 
 fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     if key.modifiers.contains(KeyModifiers::ALT) {
-         match key.code {
-             KeyCode::Char('n') | KeyCode::Char('N') => { app.toggle_menu(crate::app::TopBarMenu::Navigation); return Ok(()); }
-             KeyCode::Char('e') | KeyCode::Char('E') => { app.toggle_menu(crate::app::TopBarMenu::Edit); return Ok(()); }
-             KeyCode::Char('f') | KeyCode::Char('F') => { app.toggle_menu(crate::app::TopBarMenu::Files); return Ok(()); }
-             KeyCode::Char('p') | KeyCode::Char('P') => { app.toggle_menu(crate::app::TopBarMenu::Panels); return Ok(()); }
-             KeyCode::Char('s') | KeyCode::Char('S') => { app.toggle_menu(crate::app::TopBarMenu::Sidebar); return Ok(()); }
-             KeyCode::Char('c') | KeyCode::Char('C') => { app.toggle_menu(crate::app::TopBarMenu::Code); return Ok(()); }
-             KeyCode::Char('h') | KeyCode::Char('H') => { app.toggle_menu(crate::app::TopBarMenu::Help); return Ok(()); }
-             _ => {}
-         }
+        match key.code {
+            KeyCode::Char('n') | KeyCode::Char('N') => {
+                app.toggle_menu(crate::app::TopBarMenu::Navigation);
+                return Ok(());
+            }
+            KeyCode::Char('e') | KeyCode::Char('E') => {
+                app.toggle_menu(crate::app::TopBarMenu::Edit);
+                return Ok(());
+            }
+            KeyCode::Char('f') | KeyCode::Char('F') => {
+                app.toggle_menu(crate::app::TopBarMenu::Files);
+                return Ok(());
+            }
+            KeyCode::Char('p') | KeyCode::Char('P') => {
+                app.toggle_menu(crate::app::TopBarMenu::Panels);
+                return Ok(());
+            }
+            KeyCode::Char('s') | KeyCode::Char('S') => {
+                app.toggle_menu(crate::app::TopBarMenu::Sidebar);
+                return Ok(());
+            }
+            KeyCode::Char('c') | KeyCode::Char('C') => {
+                app.toggle_menu(crate::app::TopBarMenu::Code);
+                return Ok(());
+            }
+            KeyCode::Char('h') | KeyCode::Char('H') => {
+                app.toggle_menu(crate::app::TopBarMenu::Help);
+                return Ok(());
+            }
+            _ => {}
+        }
     }
 
     if app.top_bar.active_menu.is_some() {
@@ -290,12 +311,14 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 return Ok(());
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                let items_len = crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap()).len();
+                let items_len =
+                    crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap()).len();
                 app.top_bar.selected_index = (app.top_bar.selected_index + 1) % items_len;
                 return Ok(());
             }
             KeyCode::Up | KeyCode::Char('k') => {
-                let items_len = crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap()).len();
+                let items_len =
+                    crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap()).len();
                 if app.top_bar.selected_index == 0 {
                     app.top_bar.selected_index = items_len - 1;
                 } else {
@@ -335,7 +358,9 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.execute_top_bar_action();
                 return Ok(());
             }
-            _ => { return Ok(()); } // Block other keys while menu is open
+            _ => {
+                return Ok(());
+            } // Block other keys while menu is open
         }
     }
 
@@ -1173,12 +1198,12 @@ fn handle_completion_keys(app: &mut App, key: KeyEvent) -> io::Result<bool> {
                     let buffer = &app.editor().buffer;
                     let cursor_y = app.editor().cursor_y;
                     let cursor_x = app.editor().cursor_x;
-                    
+
                     // Token-aware: find the start of the current word prefix
                     let line_idx = cursor_y.min(buffer.len_lines().saturating_sub(1));
                     let line = buffer.line(line_idx);
                     let mut start_col = cursor_x;
-                    
+
                     while start_col > 0 {
                         let ch = line.char(start_col - 1);
                         if ch.is_alphanumeric() || ch == '_' {
@@ -1187,7 +1212,7 @@ fn handle_completion_keys(app: &mut App, key: KeyEvent) -> io::Result<bool> {
                             break;
                         }
                     }
-                    
+
                     let start = buffer.line_to_char(line_idx) + start_col;
                     let end = buffer.line_to_char(line_idx) + cursor_x;
                     (start, end)

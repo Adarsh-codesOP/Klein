@@ -94,8 +94,8 @@ pub fn render(f: &mut Frame, app: &App) {
             if doc_width > 10 {
                 let doc_area = Rect::new(x + width, y, doc_width, height);
                 f.render_widget(ratatui::widgets::Clear, doc_area);
-                let doc_para = Paragraph::new(doc.as_str())
-                    .wrap(ratatui::widgets::Wrap { trim: true });
+                let doc_para =
+                    Paragraph::new(doc.as_str()).wrap(ratatui::widgets::Wrap { trim: true });
                 f.render_widget(doc_para, doc_area);
             }
         }
