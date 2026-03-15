@@ -1,4 +1,3 @@
-use crate::theme::ThemeConfig;
 use ratatui::style::Color;
 use anyhow::Result;
 use ropey::Rope;

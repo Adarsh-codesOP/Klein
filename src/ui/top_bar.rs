@@ -1,7 +1,7 @@
 use crate::app::{App, TopBarMenu};
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph, Tabs},
     Frame,

@@ -335,7 +335,8 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     crate::app::TopBarMenu::Panels => crate::app::TopBarMenu::Sidebar,
                     crate::app::TopBarMenu::Sidebar => crate::app::TopBarMenu::Code,
                     crate::app::TopBarMenu::Code => crate::app::TopBarMenu::Help,
-                    crate::app::TopBarMenu::Help => crate::app::TopBarMenu::Navigation,
+                    crate::app::TopBarMenu::Help => crate::app::TopBarMenu::Theme,
+                    crate::app::TopBarMenu::Theme => crate::app::TopBarMenu::Navigation,
                 };
                 app.top_bar.active_menu = Some(next);
                 app.top_bar.selected_index = 0;
@@ -343,13 +344,14 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Left | KeyCode::Char('h') => {
                 let prev = match app.top_bar.active_menu.unwrap() {
-                    crate::app::TopBarMenu::Navigation => crate::app::TopBarMenu::Help,
+                    crate::app::TopBarMenu::Navigation => crate::app::TopBarMenu::Theme,
                     crate::app::TopBarMenu::Edit => crate::app::TopBarMenu::Navigation,
                     crate::app::TopBarMenu::Files => crate::app::TopBarMenu::Edit,
                     crate::app::TopBarMenu::Panels => crate::app::TopBarMenu::Files,
                     crate::app::TopBarMenu::Sidebar => crate::app::TopBarMenu::Panels,
                     crate::app::TopBarMenu::Code => crate::app::TopBarMenu::Sidebar,
                     crate::app::TopBarMenu::Help => crate::app::TopBarMenu::Code,
+                    crate::app::TopBarMenu::Theme => crate::app::TopBarMenu::Help,
                 };
                 app.top_bar.active_menu = Some(prev);
                 app.top_bar.selected_index = 0;

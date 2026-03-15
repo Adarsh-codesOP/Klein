@@ -59,9 +59,9 @@ pub mod colors {
     pub const SEARCH_BORDER: Color = Color::Cyan;
 }
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Serialize, Default, Clone)]
 pub struct AppConfig {
     #[allow(dead_code)]
     pub default_workspace: Option<String>,
@@ -119,5 +119,20 @@ impl AppConfig {
         log::warn!("LSP: No config.toml found in search paths. LSP features will be DISABLED.");
         log::warn!("LSP: Please create a config.toml in the current directory or in %AppData%\\Klein\\config\\config.toml");
         AppConfig::default()
+    }
+
+    pub fn save(&self) -> std::io::Result<()> {
+        if let Some(proj_dirs) = directories::ProjectDirs::from("", "", "Klein") {
+            let config_dir = proj_dirs.config_dir();
+            if !config_dir.exists() {
+                std::fs::create_dir_all(config_dir)?;
+            }
+            let config_path = config_dir.join("config.toml");
+            let toml_str = toml::to_string_pretty(self).map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::Other, format!("TOML error: {}", e))
+            })?;
+            std::fs::write(config_path, toml_str)?;
+        }
+        Ok(())
     }
 }
