@@ -1,0 +1,25 @@
+name = "monokai"
+
+[editor]
+background = "#272822"
+text = "#f8f8f2"
+cursor = "#f8f8f0"
+selection = "#49483e"
+
+[sidebar]
+background = "#1e1f1c"
+text = "#cfcfc2"
+selected = "#75715e"
+
+[status_bar]
+background = "#1e1f1c"
+text = "#f8f8f2"
+
+[tabs]
+active_bg = "#272822"
+inactive_bg = "#1e1f1c"
+text = "#f8f8f2"
+
+[top_bar]
+background = "#1e1f1c"
+text = "#f8f8f2"

@@ -1,0 +1,10 @@
+name = "funky"
+extends = "dark"
+
+[editor]
+background = "#ff00ff"
+text = "#00ffff"
+cursor = "#ffff00"
+
+[sidebar]
+selected = "#00ff00"

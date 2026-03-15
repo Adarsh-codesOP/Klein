@@ -1,0 +1,25 @@
+name = "nord"
+
+[editor]
+background = "#2e3440"
+text = "#d8dee9"
+cursor = "#d8dee9"
+selection = "#434c5e"
+
+[sidebar]
+background = "#242933"
+text = "#d8dee9"
+selected = "#3b4252"
+
+[status_bar]
+background = "#3b4252"
+text = "#e5e9f0"
+
+[tabs]
+active_bg = "#2e3440"
+inactive_bg = "#242933"
+text = "#d8dee9"
+
+[top_bar]
+background = "#242933"
+text = "#d8dee9"

@@ -1,0 +1,25 @@
+name = "solarized-dark"
+
+[editor]
+background = "#002b36"
+text = "#839496"
+cursor = "#839496"
+selection = "#073642"
+
+[sidebar]
+background = "#00212b"
+text = "#839496"
+selected = "#073642"
+
+[status_bar]
+background = "#073642"
+text = "#93a1a1"
+
+[tabs]
+active_bg = "#002b36"
+inactive_bg = "#00212b"
+text = "#839496"
+
+[top_bar]
+background = "#00212b"
+text = "#839496"

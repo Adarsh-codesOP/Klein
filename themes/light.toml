@@ -1,0 +1,25 @@
+name = "light"
+
+[editor]
+background = "#ffffff"
+text = "#000000"
+cursor = "#000000"
+selection = "#add6ff"
+
+[sidebar]
+background = "#f3f3f3"
+text = "#616161"
+selected = "#e4e6f1"
+
+[status_bar]
+background = "#007acc"
+text = "#ffffff"
+
+[tabs]
+active_bg = "#ffffff"
+inactive_bg = "#ececec"
+text = "#333333"
+
+[top_bar]
+background = "#dddddd"
+text = "#333333"

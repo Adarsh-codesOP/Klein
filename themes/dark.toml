@@ -1,0 +1,25 @@
+name = "dark"
+
+[editor]
+background = "#1e1e1e"
+text = "#d4d4d4"
+cursor = "#ffffff"
+selection = "#264f78"
+
+[sidebar]
+background = "#252526"
+text = "#cccccc"
+selected = "#37373d"
+
+[status_bar]
+background = "#007acc"
+text = "#ffffff"
+
+[tabs]
+active_bg = "#1e1e1e"
+inactive_bg = "#2d2d2d"
+text = "#ffffff"
+
+[top_bar]
+background = "#3c3c3c"
+text = "#cccccc"

@@ -1,0 +1,25 @@
+name = "dracula"
+
+[editor]
+background = "#282a36"
+text = "#f8f8f2"
+cursor = "#ff79c6"
+selection = "#44475a"
+
+[sidebar]
+background = "#21222c"
+text = "#f8f8f2"
+selected = "#6272a4"
+
+[status_bar]
+background = "#44475a"
+text = "#f8f8f2"
+
+[tabs]
+active_bg = "#6272a4"
+inactive_bg = "#282a36"
+text = "#f8f8f2"
+
+[top_bar]
+background = "#21222c"
+text = "#f8f8f2"
