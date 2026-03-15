@@ -579,6 +579,7 @@ impl Editor {
             for (style, text) in highlights {
                 // Strip line terminators to prevent Ratatui from wrapping/double-spacing
                 let text = text.trim_end_matches(['\n', '\r']);
+                let text = &Self::expand_tabs(text);
                 if text.is_empty() {
                     continue;
                 }
@@ -1064,6 +1065,7 @@ impl Editor {
 
             if current_byte < end_byte {
                 let remaining_text = self.get_byte_range_text_clean(current_byte..end_byte);
+                let remaining_text = Self::expand_tabs(&remaining_text);
                 if !remaining_text.is_empty() {
                     spans.push(ratatui::text::Span::styled(
                         remaining_text,
@@ -1186,6 +1188,7 @@ impl Editor {
                 let gap_end = node_start.min(line_end);
                 if gap_start < gap_end {
                     let gap_text = self.get_byte_range_text_clean(gap_start..gap_end);
+                    let gap_text = Self::expand_tabs(&gap_text);
                     if !gap_text.is_empty() {
                         spans.push(ratatui::text::Span::styled(
                             gap_text,
@@ -1201,6 +1204,7 @@ impl Editor {
             let end = node_end.min(line_end);
             if start < end {
                 let text = self.get_byte_range_text_clean(start..end);
+                let text = Self::expand_tabs(&text);
                 if !text.is_empty() {
                     spans.push(ratatui::text::Span::styled(
                         text,
@@ -1216,6 +1220,12 @@ impl Editor {
                 }
             }
         }
+    }
+
+    /// Expand tab characters to 4 spaces for consistent rendering.
+    /// This ensures display-width tracking matches what the terminal renders.
+    fn expand_tabs(text: &str) -> String {
+        text.replace('\t', "    ")
     }
 
     /// Extract text from a byte range and strip ALL newline / carriage-return
