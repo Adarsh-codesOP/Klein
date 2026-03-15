@@ -9,6 +9,9 @@ pub mod tabs;
 pub mod terminal;
 pub mod treesitter;
 pub mod ui;
+pub mod theme;
+pub mod theme_loader;
+pub mod theme_registry;
 
 /// Initialize file-based logging.
 pub fn init_logging() {

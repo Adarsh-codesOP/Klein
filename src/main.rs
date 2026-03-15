@@ -202,6 +202,10 @@ async fn run_app<B: io::Write + ratatui::backend::Backend>(
                 events::klein_event::KleinEvent::CodeActionResponse(resp, path, pos) => {
                     app.handle_code_action_response(resp, path, pos);
                 }
+                events::klein_event::KleinEvent::RefreshTheme => {
+                    log::info!("Hot-reloading themes...");
+                    app.reload_themes();
+                }
             }
         }
 

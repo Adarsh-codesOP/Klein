@@ -67,6 +67,7 @@ pub struct AppConfig {
     pub default_workspace: Option<String>,
     pub shell: Option<String>,
     pub enabled_lsps: Option<Vec<String>>,
+    pub theme: Option<String>,
 }
 
 impl AppConfig {

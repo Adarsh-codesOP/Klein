@@ -1,3 +1,5 @@
+use crate::theme::ThemeConfig;
+use ratatui::style::Color;
 use anyhow::Result;
 use ropey::Rope;
 use std::fs;
@@ -547,9 +549,11 @@ impl Editor {
         &self,
         _width: usize,
         height: usize,
+        selection_bg: Color,
+        selection_fg: Color,
     ) -> Vec<ratatui::text::Line<'_>> {
         if let Some(tree) = &self.tree {
-            return self.get_ts_highlighted_lines(tree, _width, height);
+            return self.get_ts_highlighted_lines(tree, _width, height, selection_bg, selection_fg);
         }
 
         let syntax = if let Some(path) = &self.path {
@@ -621,8 +625,8 @@ impl Editor {
                             let mut s_style = span_style;
                             if current_is_selected {
                                 s_style = s_style
-                                    .bg(ratatui::style::Color::Yellow)
-                                    .fg(ratatui::style::Color::Black);
+                                    .bg(selection_bg)
+                                    .fg(selection_fg);
                             }
                             spans.push(ratatui::text::Span::styled(
                                 current_segment.clone(),
@@ -638,8 +642,8 @@ impl Editor {
                         let mut s_style = span_style;
                         if current_is_selected {
                             s_style = s_style
-                                .bg(ratatui::style::Color::Yellow)
-                                .fg(ratatui::style::Color::Black);
+                                .bg(selection_bg)
+                                .fg(selection_fg);
                         }
                         spans.push(ratatui::text::Span::styled(current_segment, s_style));
                     }
@@ -1044,6 +1048,8 @@ impl Editor {
         tree: &tree_sitter::Tree,
         width: usize,
         height: usize,
+        selection_bg: Color,
+        selection_fg: Color,
     ) -> Vec<ratatui::text::Line<'_>> {
         let start_line = self.scroll_y;
         let end_line = (start_line + height).min(self.buffer.len_lines());
@@ -1114,8 +1120,8 @@ impl Editor {
                             let mut s_style = span.style;
                             if current_is_selected {
                                 s_style = s_style
-                                    .bg(ratatui::style::Color::Yellow)
-                                    .fg(ratatui::style::Color::Black);
+                                    .bg(selection_bg)
+                                    .fg(selection_fg);
                             }
                             cleaned_spans.push(ratatui::text::Span::styled(
                                 current_segment.clone(),
@@ -1131,8 +1137,8 @@ impl Editor {
                         let mut s_style = span.style;
                         if current_is_selected {
                             s_style = s_style
-                                .bg(ratatui::style::Color::Yellow)
-                                .fg(ratatui::style::Color::Black);
+                                .bg(selection_bg)
+                                .fg(selection_fg);
                         }
                         cleaned_spans.push(ratatui::text::Span::styled(current_segment, s_style));
                     }
