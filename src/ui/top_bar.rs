@@ -16,6 +16,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         " Sidebar ",
         " Code ",
         " Help ",
+        " Theme ",
     ];
 
     let selected_tab = match app.top_bar.active_menu {
@@ -26,19 +27,20 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         Some(TopBarMenu::Sidebar) => 4,
         Some(TopBarMenu::Code) => 5,
         Some(TopBarMenu::Help) => 6,
+        Some(TopBarMenu::Theme) => 7,
         None => 999, // Nothing selected
     };
 
     let tabs = Tabs::new(menus.clone())
         .select(if selected_tab == 999 { 0 } else { selected_tab })
-        .style(Style::default().fg(Color::Gray))
+        .style(Style::default().fg(app.theme.top_bar.text))
         .highlight_style(if selected_tab == 999 {
-            Style::default().fg(Color::Gray)
+            Style::default().fg(app.theme.top_bar.text)
         } else {
             Style::default()
-                .fg(Color::Yellow)
+                .fg(app.theme.top_bar.background)
+                .bg(app.theme.top_bar.text)
                 .add_modifier(Modifier::BOLD)
-                .add_modifier(Modifier::REVERSED)
         })
         .divider("│");
 
@@ -59,65 +61,74 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
             x_offset,
             active_menu,
             app.top_bar.selected_index,
+            app,
         );
     }
 }
 
-pub fn get_menu_items(menu: TopBarMenu) -> Vec<(&'static str, &'static str)> {
+pub fn get_menu_items(menu: TopBarMenu, app: &App) -> Vec<(String, String)> {
     match menu {
         TopBarMenu::Navigation => vec![
-            ("Home / End", "Start / End of line"),
-            ("Ctrl+Home / Ctrl+End", "Top / Bottom of file"),
-            ("PgUp / PgDn", "Scroll page"),
-            ("Ctrl+D / Ctrl+U", "Page down / up"),
-            ("Shift+Arrows", "Extend selection"),
+            ("Home / End".to_string(), "Start / End of line".to_string()),
+            ("Ctrl+Home / Ctrl+End".to_string(), "Top / Bottom of file".to_string()),
+            ("PgUp / PgDn".to_string(), "Scroll page".to_string()),
+            ("Ctrl+D / Ctrl+U".to_string(), "Page down / up".to_string()),
+            ("Shift+Arrows".to_string(), "Extend selection".to_string()),
         ],
         TopBarMenu::Edit => vec![
-            ("Delete", "Forward delete"),
-            ("Ctrl+X", "Cut"),
-            ("Ctrl+C", "Copy"),
-            ("Ctrl+V", "Paste"),
-            ("Ctrl+A", "Select all"),
-            ("Ctrl+Z", "Undo"),
+            ("Delete".to_string(), "Forward delete".to_string()),
+            ("Ctrl+X".to_string(), "Cut".to_string()),
+            ("Ctrl+C".to_string(), "Copy".to_string()),
+            ("Ctrl+V".to_string(), "Paste".to_string()),
+            ("Ctrl+A".to_string(), "Select all".to_string()),
+            ("Ctrl+Z".to_string(), "Undo".to_string()),
         ],
         TopBarMenu::Files => vec![
-            ("Ctrl+P", "Find file (fzf)"),
-            ("Ctrl+G", "Project search (rg)"),
-            ("Ctrl+S", "Save file"),
-            ("Ctrl+W", "Close file"),
-            ("Ctrl+Shift+Z", "Next tab"),
-            ("Ctrl+Shift+X", "Close tab"),
+            ("Ctrl+P".to_string(), "Find file (fzf)".to_string()),
+            ("Ctrl+G".to_string(), "Project search (rg)".to_string()),
+            ("Ctrl+S".to_string(), "Save file".to_string()),
+            ("Ctrl+W".to_string(), "Close file".to_string()),
+            ("Ctrl+Shift+Z".to_string(), "Next tab".to_string()),
+            ("Ctrl+Shift+X".to_string(), "Close tab".to_string()),
         ],
         TopBarMenu::Panels => vec![
-            ("Ctrl+F", "Focus sidebar"),
-            ("Ctrl+E", "Focus editor"),
-            ("Ctrl+T", "Focus terminal"),
-            ("Ctrl+B", "Toggle sidebar"),
-            ("Ctrl+J", "Toggle terminal"),
-            ("Esc", "Restore layout"),
+            ("Ctrl+F".to_string(), "Focus sidebar".to_string()),
+            ("Ctrl+E".to_string(), "Focus editor".to_string()),
+            ("Ctrl+T".to_string(), "Focus terminal".to_string()),
+            ("Ctrl+B".to_string(), "Toggle sidebar".to_string()),
+            ("Ctrl+J".to_string(), "Toggle terminal".to_string()),
+            ("Esc".to_string(), "Restore layout".to_string()),
         ],
         TopBarMenu::Sidebar => vec![
-            (".", "Toggle hidden files"),
-            ("Enter", "Open file / toggle folder"),
-            ("Home", "Jump to top"),
-            ("End", "Jump to bottom"),
-            ("Ctrl+D", "Page down"),
-            ("Ctrl+U", "Page up"),
+            (".".to_string(), "Toggle hidden files".to_string()),
+            ("Enter".to_string(), "Open file / toggle folder".to_string()),
+            ("Home".to_string(), "Jump to top".to_string()),
+            ("End".to_string(), "Jump to bottom".to_string()),
+            ("Ctrl+D".to_string(), "Page down".to_string()),
+            ("Ctrl+U".to_string(), "Page up".to_string()),
         ],
         TopBarMenu::Code => vec![
-            ("Ctrl+Space", "Autocomplete"),
-            ("Alt+G d", "Go to definition"),
-            ("Alt+G r", "References"),
-            ("Alt+G n", "Rename symbol"),
-            ("Alt+F", "Format document"),
-            ("Alt+Enter", "Code actions"),
+            ("Ctrl+Space".to_string(), "Autocomplete".to_string()),
+            ("Alt+G d".to_string(), "Go to definition".to_string()),
+            ("Alt+G r".to_string(), "References".to_string()),
+            ("Alt+G n".to_string(), "Rename symbol".to_string()),
+            ("Alt+F".to_string(), "Format document".to_string()),
+            ("Alt+Enter".to_string(), "Code actions".to_string()),
         ],
-        TopBarMenu::Help => vec![("Ctrl+H", "Toggle help overlay"), ("Esc", "Close help")],
+        TopBarMenu::Help => vec![
+            ("Ctrl+H".to_string(), "Toggle help overlay".to_string()), 
+            ("Esc".to_string(), "Close help".to_string())
+        ],
+        TopBarMenu::Theme => app
+            .available_themes
+            .iter()
+            .map(|t| (t.clone(), "Theme".to_string()))
+            .collect(),
     }
 }
 
-fn render_dropdown(f: &mut Frame, y: u16, x: u16, menu: TopBarMenu, selected_index: usize) {
-    let items = get_menu_items(menu);
+fn render_dropdown(f: &mut Frame, y: u16, x: u16, menu: TopBarMenu, selected_index: usize, app: &App) {
+    let items = get_menu_items(menu, app);
 
     let max_shortcut_len = items
         .iter()
@@ -147,17 +158,18 @@ fn render_dropdown(f: &mut Frame, y: u16, x: u16, menu: TopBarMenu, selected_ind
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .style(Style::default().bg(Color::Black));
+        .border_style(Style::default().fg(app.theme.top_bar.text))
+        .style(Style::default().bg(app.theme.top_bar.background));
 
     let mut lines = Vec::new();
     for (i, (shortcut, desc)) in items.iter().enumerate() {
         let style = if i == selected_index {
             Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::REVERSED)
+                .fg(app.theme.top_bar.background)
+                .bg(app.theme.top_bar.text)
+                .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(app.theme.top_bar.text)
         };
 
         // Pad shortcut
@@ -166,7 +178,7 @@ fn render_dropdown(f: &mut Frame, y: u16, x: u16, menu: TopBarMenu, selected_ind
         lines.push(Line::from(vec![
             Span::styled(
                 format!("  {}  ", padded_shortcut),
-                style.add_modifier(Modifier::BOLD),
+                style,
             ),
             Span::styled(format!("{}  ", desc), style),
         ]));

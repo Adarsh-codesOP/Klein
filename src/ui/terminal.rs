@@ -1,5 +1,4 @@
 use crate::app::{App, Panel};
-use crate::config;
 use ratatui::{
     layout::Rect,
     widgets::{Block, Borders, Paragraph},
@@ -101,7 +100,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                                 }
                                 _ => {
                                     // Default foreground for terminal segments that don't have explicit color
-                                    style = style.fg(ratatui::style::Color::White);
+                                    style = style.fg(app.theme.editor.text);
                                 }
                             }
                             match attrs.bgcolor() {
@@ -112,7 +111,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                                     style = style.bg(ratatui::style::Color::Rgb(r, g, b))
                                 }
                                 _ => {
-                                    style = style.bg(ratatui::style::Color::Black);
+                                    style = style.bg(app.theme.editor.background);
                                 }
                             }
                             if attrs.bold() {
@@ -120,8 +119,8 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                             }
                             if was_selected {
                                 style = style
-                                    .bg(ratatui::style::Color::White)
-                                    .fg(ratatui::style::Color::Black);
+                                    .bg(app.theme.editor.selection)
+                                    .fg(app.theme.editor.background);
                             }
                             spans.push(ratatui::text::Span::styled(current_text.clone(), style));
                             current_text.clear();
@@ -143,7 +142,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                             style = style.fg(ratatui::style::Color::Rgb(r, g, b))
                         }
                         _ => {
-                            style = style.fg(ratatui::style::Color::White);
+                            style = style.fg(app.theme.editor.text);
                         }
                     }
                     match attrs.bgcolor() {
@@ -154,7 +153,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                             style = style.bg(ratatui::style::Color::Rgb(r, g, b))
                         }
                         _ => {
-                            style = style.bg(ratatui::style::Color::Black);
+                            style = style.bg(app.theme.editor.background);
                         }
                     }
                     if attrs.bold() {
@@ -162,8 +161,8 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                     }
                     if was_selected {
                         style = style
-                            .bg(ratatui::style::Color::White)
-                            .fg(ratatui::style::Color::Black);
+                            .bg(app.theme.editor.selection)
+                            .fg(app.theme.editor.background);
                     }
                 }
                 spans.push(ratatui::text::Span::styled(current_text, style));
@@ -181,11 +180,11 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         .title(" Terminal ")
         .borders(Borders::ALL)
         .border_style(if matches!(app.active_panel, Panel::Terminal) {
-            ratatui::style::Style::default().fg(config::colors::TERMINAL_FOCUS)
+            ratatui::style::Style::default().fg(app.theme.editor.cursor) // Use cursor color for focus
         } else {
-            ratatui::style::Style::default()
+            ratatui::style::Style::default().fg(app.theme.editor.text)
         })
-        .style(ratatui::style::Style::default().bg(ratatui::style::Color::Black));
+        .style(ratatui::style::Style::default().bg(app.theme.editor.background));
 
     let terminal_widget = Paragraph::new(terminal_lines).block(terminal_block);
     f.render_widget(terminal_widget, area);

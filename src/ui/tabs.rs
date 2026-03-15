@@ -1,7 +1,7 @@
 use crate::app::App;
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
     Frame,
@@ -31,17 +31,17 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                 Span::styled(
                     label,
                     Style::default()
-                        .fg(Color::Black)
-                        .bg(Color::Cyan)
+                        .fg(app.theme.tabs.text)
+                        .bg(app.theme.tabs.active_bg)
                         .add_modifier(Modifier::BOLD),
                 )
             } else {
-                Span::styled(label, Style::default().fg(Color::DarkGray))
+                Span::styled(label, Style::default().fg(app.theme.tabs.text).bg(app.theme.tabs.inactive_bg))
             }
         })
         .collect();
 
     let line = Line::from(tabs);
-    let widget = Paragraph::new(line).style(Style::default().bg(Color::Black));
+    let widget = Paragraph::new(line).style(Style::default().bg(app.theme.tabs.inactive_bg));
     f.render_widget(widget, area);
 }

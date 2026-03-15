@@ -1,5 +1,4 @@
 use crate::app::{App, Panel};
-use crate::config;
 use crate::lsp::types::DiagnosticSeverity;
 use ratatui::{
     layout::Rect,
@@ -12,7 +11,7 @@ use ratatui::{
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let status_bar = Block::default()
         .borders(Borders::TOP)
-        .border_style(ratatui::style::Style::default().fg(config::colors::STATUS_BG));
+        .border_style(ratatui::style::Style::default().fg(app.theme.status_bar.background));
 
     let empty_vec = Vec::new();
     let file_diagnostics = app
@@ -78,8 +77,8 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
 
     let status_paragraph = Paragraph::new(Line::from(spans)).block(status_bar).style(
         ratatui::style::Style::default()
-            .fg(config::colors::STATUS_FG)
-            .bg(config::colors::STATUS_BG),
+            .fg(app.theme.status_bar.text)
+            .bg(app.theme.status_bar.background),
     );
 
     f.render_widget(status_paragraph, area);

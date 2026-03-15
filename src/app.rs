@@ -5,6 +5,8 @@ use crate::lsp::{LspManager, LspState};
 use crate::sidebar::Sidebar;
 use crate::tabs::TabState;
 use crate::terminal::Terminal;
+use crate::theme::Theme;
+use notify::{Watcher, RecursiveMode};
 use std::cell::Cell;
 use std::path::PathBuf;
 
@@ -60,6 +62,7 @@ pub enum TopBarMenu {
     Sidebar,
     Code,
     Help,
+    Theme,
 }
 
 #[derive(Default)]
@@ -104,6 +107,11 @@ pub struct App {
     pub ts_manager: crate::treesitter::TSManager,
     pub last_completion_trigger_char: Option<char>,
     pub top_bar: TopBarState,
+    pub theme: Theme,
+    pub available_themes: Vec<String>,
+    pub theme_name: String,
+    pub config: crate::config::AppConfig,
+    _theme_watcher: Option<notify::RecommendedWatcher>,
 }
 
 impl App {
@@ -116,6 +124,10 @@ impl App {
         let config = crate::config::AppConfig::load();
 
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+
+        let theme_name = config.theme.clone().unwrap_or_else(|| "dark".to_string());
+        let theme = crate::theme_loader::load_theme(&theme_name);
+        let available_themes = crate::theme_registry::list_themes();
 
         let mut app = App {
             active_panel: Panel::Sidebar,
@@ -150,13 +162,34 @@ impl App {
             lsp_manager: LspManager::new(lsp_notification_tx.clone(), &config),
             lsp_notification_tx,
             timer_manager: None,
-            event_tx,
+            event_tx: event_tx.clone(), // Cloned for the watcher
             g_mode: false,
             code_actions: Vec::new(),
             ts_manager: crate::treesitter::TSManager::new(),
             last_completion_trigger_char: None,
             top_bar: TopBarState::default(),
+            theme,
+            available_themes,
+            theme_name: theme_name.clone(),
+            config,
+            _theme_watcher: None,
         };
+
+        if let Some(user_theme_dir) = crate::theme_loader::get_user_theme_dir() {
+            let tx = event_tx.clone();
+            let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+                if let Ok(event) = res {
+                    if event.kind.is_modify() || event.kind.is_create() || event.kind.is_remove() {
+                        let _ = tx.send(crate::events::klein_event::KleinEvent::RefreshTheme);
+                    }
+                }
+            }).ok();
+
+            if let Some(ref mut w) = watcher {
+                let _ = w.watch(&user_theme_dir, RecursiveMode::NonRecursive);
+            }
+            app._theme_watcher = watcher;
+        }
 
         if let Some(file) = cli_file {
             let path = current_dir.join(&file);
@@ -170,6 +203,22 @@ impl App {
         }
 
         app
+    }
+
+    pub fn set_theme(&mut self, name: &str) {
+        let new_theme = crate::theme_loader::load_theme(name);
+        self.theme = new_theme;
+        self.theme_name = name.to_string();
+        self.config.theme = Some(name.to_string());
+        let _ = self.config.save();
+    }
+
+    pub fn reload_themes(&mut self) {
+        self.available_themes = crate::theme_registry::list_themes();
+        // Re-load current theme in case it was edited
+        let current_name = self.theme_name.clone();
+        let new_theme = crate::theme_loader::load_theme(&current_name);
+        self.theme = new_theme;
     }
 
     /// Get a reference to the editor that should be displayed.
@@ -354,6 +403,12 @@ impl App {
                     }
                     _ => {}
                 },
+                TopBarMenu::Theme => {
+                    if let Some(theme_name) = self.available_themes.get(idx) {
+                        let name = theme_name.clone();
+                        self.set_theme(&name);
+                    }
+                }
             }
         }
     }
