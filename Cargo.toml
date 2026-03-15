@@ -1,6 +1,6 @@
 [package]
 name = "klein-ide"
-version = "0.5.0"
+version = "0.4.1"
 edition = "2021"
 authors = ["Adarsh"]
 license = "Apache-2.0"
