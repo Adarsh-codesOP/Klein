@@ -237,7 +237,11 @@ impl App {
             .open(path, &self.ts_manager);
         let p = self.tabs[self.active_tab].editor.path.clone();
         if let Some(path) = p {
-            let _ = self.event_tx.send(crate::events::klein_event::KleinEvent::InitLsp(path.clone()));
+            let _ = self
+                .event_tx
+                .send(crate::events::klein_event::KleinEvent::InitLsp(
+                    path.clone(),
+                ));
         }
     }
 
@@ -343,7 +347,10 @@ impl App {
     }
 
     pub fn notify_lsp_did_open_for_path(&mut self, path: &std::path::Path) {
-        log::warn!("LSP: notify_lsp_did_open_for_path called for {}", path.display());
+        log::warn!(
+            "LSP: notify_lsp_did_open_for_path called for {}",
+            path.display()
+        );
         // Find if this path is open in any tab
         for (i, tab) in self.tabs.iter().enumerate() {
             if let Some(p) = &tab.editor.path {
@@ -375,8 +382,13 @@ impl App {
             }
         };
 
-        log::warn!("LSP: requesting completions for {} at Ln {}, Col {}", path.display(), line + 1, col + 1);
-        
+        log::warn!(
+            "LSP: requesting completions for {} at Ln {}, Col {}",
+            path.display(),
+            line + 1,
+            col + 1
+        );
+
         let handle = match self.lsp_manager.server_handle_for_file(&path) {
             Some(h) => h.clone(),
             None => return,
@@ -385,9 +397,14 @@ impl App {
             Some(c) => c,
             None => return,
         };
-        if !caps.completion { return; }
+        if !caps.completion {
+            return;
+        }
 
-        let params = match self.lsp_manager.text_doc_position(&path, line, col, &buffer) {
+        let params = match self
+            .lsp_manager
+            .text_doc_position(&path, line, col, &buffer)
+        {
             Some(p) => p,
             None => return,
         };
@@ -395,7 +412,7 @@ impl App {
         if let Some(mut params_obj) = params.as_object().cloned() {
             let (trigger_kind, trigger_char) = match self.last_completion_trigger_char.take() {
                 Some(c) => (2, Some(c.to_string())), // TriggerCharacter
-                None => (1, None),                  // Invoked
+                None => (1, None),                   // Invoked
             };
 
             let mut context = serde_json::json!({
@@ -423,7 +440,12 @@ impl App {
         }
     }
 
-    pub fn handle_completion_response(&mut self, response: Option<serde_json::Value>, _path: std::path::PathBuf, trigger_position: (usize, usize)) {
+    pub fn handle_completion_response(
+        &mut self,
+        response: Option<serde_json::Value>,
+        _path: std::path::PathBuf,
+        trigger_position: (usize, usize),
+    ) {
         let response = match response {
             Some(r) => r,
             None => {
@@ -434,7 +456,8 @@ impl App {
 
         // Parse response (can be Array or List or null)
         let items: Vec<crate::lsp::types::KleinCompletion> =
-            match serde_json::from_value::<Option<lsp_types::CompletionResponse>>(response.clone()) {
+            match serde_json::from_value::<Option<lsp_types::CompletionResponse>>(response.clone())
+            {
                 Ok(Some(lsp_types::CompletionResponse::Array(arr))) => arr
                     .into_iter()
                     .map(|i| crate::lsp::router::to_klein_completion(&i))
@@ -446,7 +469,11 @@ impl App {
                     .collect(),
                 Ok(None) => Vec::new(),
                 Err(e) => {
-                    log::error!("failed to parse completion response: {}. Raw response: {}", e, response);
+                    log::error!(
+                        "failed to parse completion response: {}. Raw response: {}",
+                        e,
+                        response
+                    );
                     Vec::new()
                 }
             };
@@ -455,7 +482,7 @@ impl App {
             let editor = self.editor();
             let (line_idx, col_idx) = (editor.cursor_y, editor.cursor_x);
             let (start_line, start_col) = trigger_position;
-            
+
             if start_line != line_idx || start_col > col_idx {
                 items
             } else {
@@ -507,9 +534,14 @@ impl App {
             Some(c) => c,
             None => return,
         };
-        if !caps.hover { return; }
+        if !caps.hover {
+            return;
+        }
 
-        let params = match self.lsp_manager.text_doc_position(&path, line, col, &buffer) {
+        let params = match self
+            .lsp_manager
+            .text_doc_position(&path, line, col, &buffer)
+        {
             Some(p) => p,
             None => return,
         };
@@ -517,11 +549,20 @@ impl App {
         let tx = self.event_tx.clone();
         tokio::spawn(async move {
             let response = handle.send_request("textDocument/hover", params).await.ok();
-            let _ = tx.send(crate::events::klein_event::KleinEvent::HoverResponse(response, path, (line, col)));
+            let _ = tx.send(crate::events::klein_event::KleinEvent::HoverResponse(
+                response,
+                path,
+                (line, col),
+            ));
         });
     }
 
-    pub fn handle_hover_response(&mut self, response: Option<serde_json::Value>, _path: std::path::PathBuf, _pos: (usize, usize)) {
+    pub fn handle_hover_response(
+        &mut self,
+        response: Option<serde_json::Value>,
+        _path: std::path::PathBuf,
+        _pos: (usize, usize),
+    ) {
         let response = match response {
             Some(r) => r,
             None => {
@@ -551,7 +592,14 @@ impl App {
                 if !contents.is_empty() {
                     self.lsp_state.hover = Some(crate::lsp::types::KleinHoverInfo {
                         contents,
-                        range: hover.range.map(|r| (r.start.line as usize, r.start.character as usize, r.end.line as usize, r.end.character as usize)),
+                        range: hover.range.map(|r| {
+                            (
+                                r.start.line as usize,
+                                r.start.character as usize,
+                                r.end.line as usize,
+                                r.end.character as usize,
+                            )
+                        }),
                     });
                 } else {
                     self.lsp_state.hover = None;
@@ -561,12 +609,15 @@ impl App {
                 self.lsp_state.hover = None;
             }
             Err(e) => {
-                log::error!("failed to parse hover response: {}. Raw response: {}", e, response);
+                log::error!(
+                    "failed to parse hover response: {}. Raw response: {}",
+                    e,
+                    response
+                );
                 self.lsp_state.hover = None;
             }
         }
     }
-
 
     pub fn trigger_goto_definition(&mut self) {
         let (path, line, col, buffer) = {
@@ -590,41 +641,61 @@ impl App {
             Some(c) => c,
             None => return,
         };
-        if !caps.definition { return; }
+        if !caps.definition {
+            return;
+        }
 
-        let params = match self.lsp_manager.text_doc_position(&path, line, col, &buffer) {
+        let params = match self
+            .lsp_manager
+            .text_doc_position(&path, line, col, &buffer)
+        {
             Some(p) => p,
             None => return,
         };
 
         let tx = self.event_tx.clone();
         tokio::spawn(async move {
-            let response = handle.send_request("textDocument/definition", params).await.ok();
-            let _ = tx.send(crate::events::klein_event::KleinEvent::DefinitionResponse(response, path));
+            let response = handle
+                .send_request("textDocument/definition", params)
+                .await
+                .ok();
+            let _ = tx.send(crate::events::klein_event::KleinEvent::DefinitionResponse(
+                response, path,
+            ));
         });
     }
 
-    pub fn handle_definition_response(&mut self, response: Option<serde_json::Value>, _path: std::path::PathBuf) {
+    pub fn handle_definition_response(
+        &mut self,
+        response: Option<serde_json::Value>,
+        _path: std::path::PathBuf,
+    ) {
         let resp = match response {
             Some(r) => r,
             None => return,
         };
 
-        let loc = match serde_json::from_value::<Option<lsp_types::GotoDefinitionResponse>>(resp.clone()) {
-            Ok(Some(lsp_types::GotoDefinitionResponse::Scalar(l))) => Some(l),
-            Ok(Some(lsp_types::GotoDefinitionResponse::Array(a))) => a.into_iter().next(),
-            Ok(Some(lsp_types::GotoDefinitionResponse::Link(l))) => {
-                l.into_iter().next().map(|link| lsp_types::Location {
-                    uri: link.target_uri,
-                    range: link.target_range,
-                })
-            }
-            Ok(None) => None,
-            Err(e) => {
-                log::error!("failed to parse definition response: {}. Raw response: {}", e, resp);
-                None
-            }
-        };
+        let loc =
+            match serde_json::from_value::<Option<lsp_types::GotoDefinitionResponse>>(resp.clone())
+            {
+                Ok(Some(lsp_types::GotoDefinitionResponse::Scalar(l))) => Some(l),
+                Ok(Some(lsp_types::GotoDefinitionResponse::Array(a))) => a.into_iter().next(),
+                Ok(Some(lsp_types::GotoDefinitionResponse::Link(l))) => {
+                    l.into_iter().next().map(|link| lsp_types::Location {
+                        uri: link.target_uri,
+                        range: link.target_range,
+                    })
+                }
+                Ok(None) => None,
+                Err(e) => {
+                    log::error!(
+                        "failed to parse definition response: {}. Raw response: {}",
+                        e,
+                        resp
+                    );
+                    None
+                }
+            };
 
         if let Some(loc) = loc {
             if let Some(target_path) = crate::lsp::router::uri_to_path(&loc.uri) {
@@ -642,7 +713,6 @@ impl App {
             }
         }
     }
-
 
     pub fn trigger_find_references(&mut self) {
         let (path, line, col, buffer) = {
@@ -666,9 +736,14 @@ impl App {
             Some(c) => c,
             None => return,
         };
-        if !caps.references { return; }
+        if !caps.references {
+            return;
+        }
 
-        let params = match self.lsp_manager.text_doc_position(&path, line, col, &buffer) {
+        let params = match self
+            .lsp_manager
+            .text_doc_position(&path, line, col, &buffer)
+        {
             Some(p) => p,
             None => return,
         };
@@ -682,13 +757,22 @@ impl App {
 
             let tx = self.event_tx.clone();
             tokio::spawn(async move {
-                let response = handle.send_request("textDocument/references", params_with_context).await.ok();
-                let _ = tx.send(crate::events::klein_event::KleinEvent::ReferencesResponse(response, path));
+                let response = handle
+                    .send_request("textDocument/references", params_with_context)
+                    .await
+                    .ok();
+                let _ = tx.send(crate::events::klein_event::KleinEvent::ReferencesResponse(
+                    response, path,
+                ));
             });
         }
     }
 
-    pub fn handle_references_response(&mut self, response: Option<serde_json::Value>, _path: std::path::PathBuf) {
+    pub fn handle_references_response(
+        &mut self,
+        response: Option<serde_json::Value>,
+        _path: std::path::PathBuf,
+    ) {
         let resp = match response {
             Some(r) => r,
             None => return,
@@ -737,7 +821,9 @@ impl App {
             Some(c) => c,
             None => return,
         };
-        if !caps.formatting { return; }
+        if !caps.formatting {
+            return;
+        }
 
         let uri = match crate::lsp::router::path_to_uri(&path) {
             Some(u) => u,
@@ -753,18 +839,29 @@ impl App {
 
         let tx = self.event_tx.clone();
         tokio::spawn(async move {
-            let response = handle.send_request("textDocument/formatting", params).await.ok();
-            let _ = tx.send(crate::events::klein_event::KleinEvent::FormatResponse(response, path));
+            let response = handle
+                .send_request("textDocument/formatting", params)
+                .await
+                .ok();
+            let _ = tx.send(crate::events::klein_event::KleinEvent::FormatResponse(
+                response, path,
+            ));
         });
     }
 
-    pub fn handle_format_response(&mut self, response: Option<serde_json::Value>, path: std::path::PathBuf) {
+    pub fn handle_format_response(
+        &mut self,
+        response: Option<serde_json::Value>,
+        path: std::path::PathBuf,
+    ) {
         let resp = match response {
             Some(r) => r,
             None => return,
         };
         let edits: Vec<lsp_types::TextEdit> = serde_json::from_value(resp).unwrap_or_default();
-        if edits.is_empty() { return; }
+        if edits.is_empty() {
+            return;
+        }
 
         let mut sorted_edits = edits;
         sorted_edits.sort_by(|a, b| b.range.start.cmp(&a.range.start));
@@ -824,9 +921,16 @@ impl App {
             Some(c) => c,
             None => return,
         };
-        if !caps.rename { return; }
+        if !caps.rename {
+            return;
+        }
 
-        let params = match self.lsp_manager.text_doc_position(&state.path, state.trigger_position.0, state.trigger_position.1, &buffer) {
+        let params = match self.lsp_manager.text_doc_position(
+            &state.path,
+            state.trigger_position.0,
+            state.trigger_position.1,
+            &buffer,
+        ) {
             Some(p) => p,
             None => return,
         };
@@ -834,19 +938,32 @@ impl App {
         let new_name = state.new_name.clone(); // Clone new_name for the async block
 
         if let Some(mut params_obj) = params.as_object().cloned() {
-            params_obj.insert("newName".to_string(), serde_json::Value::String(new_name.clone()));
+            params_obj.insert(
+                "newName".to_string(),
+                serde_json::Value::String(new_name.clone()),
+            );
             let params_with_name = serde_json::Value::Object(params_obj);
 
             let tx = self.event_tx.clone();
             let path_clone = state.path.clone();
             tokio::spawn(async move {
-                let response = handle.send_request("textDocument/rename", params_with_name).await.ok();
-                let _ = tx.send(crate::events::klein_event::KleinEvent::RenameResponse(response, path_clone, new_name));
+                let response = handle
+                    .send_request("textDocument/rename", params_with_name)
+                    .await
+                    .ok();
+                let _ = tx.send(crate::events::klein_event::KleinEvent::RenameResponse(
+                    response, path_clone, new_name,
+                ));
             });
         }
     }
 
-    pub fn handle_rename_response(&mut self, response: Option<serde_json::Value>, _path: std::path::PathBuf, _new_name: String) {
+    pub fn handle_rename_response(
+        &mut self,
+        response: Option<serde_json::Value>,
+        _path: std::path::PathBuf,
+        _new_name: String,
+    ) {
         let resp = match response {
             Some(r) => r,
             None => return,
@@ -856,7 +973,11 @@ impl App {
             Ok(Some(v)) => v,
             Ok(None) => return,
             Err(e) => {
-                log::error!("failed to parse rename response: {}. Raw response: {}", e, resp);
+                log::error!(
+                    "failed to parse rename response: {}. Raw response: {}",
+                    e,
+                    resp
+                );
                 return;
             }
         };
@@ -875,11 +996,16 @@ impl App {
             match doc_changes {
                 lsp_types::DocumentChanges::Edits(edits) => {
                     for edit in edits {
-                        if let Some(path) = crate::lsp::router::uri_to_path(&edit.text_document.uri) {
-                            let text_edits = edit.edits.into_iter().map(|e| match e {
-                                lsp_types::OneOf::Left(te) => te,
-                                lsp_types::OneOf::Right(ae) => ae.text_edit,
-                            }).collect();
+                        if let Some(path) = crate::lsp::router::uri_to_path(&edit.text_document.uri)
+                        {
+                            let text_edits = edit
+                                .edits
+                                .into_iter()
+                                .map(|e| match e {
+                                    lsp_types::OneOf::Left(te) => te,
+                                    lsp_types::OneOf::Right(ae) => ae.text_edit,
+                                })
+                                .collect();
                             self.apply_workspace_edits_to_file(path, text_edits);
                         }
                     }
@@ -958,9 +1084,14 @@ impl App {
             Some(c) => c,
             None => return,
         };
-        if !caps.code_action { return; }
+        if !caps.code_action {
+            return;
+        }
 
-        let params = match self.lsp_manager.text_doc_position(&path, line, col, &buffer) {
+        let params = match self
+            .lsp_manager
+            .text_doc_position(&path, line, col, &buffer)
+        {
             Some(p) => p,
             None => return,
         };
@@ -999,7 +1130,12 @@ impl App {
         }
     }
 
-    pub fn handle_code_action_response(&mut self, response: Option<serde_json::Value>, path: std::path::PathBuf, pos: (usize, usize)) {
+    pub fn handle_code_action_response(
+        &mut self,
+        response: Option<serde_json::Value>,
+        path: std::path::PathBuf,
+        pos: (usize, usize),
+    ) {
         let resp = match response {
             Some(r) => r,
             None => return,

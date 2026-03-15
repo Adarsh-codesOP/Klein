@@ -132,7 +132,10 @@ impl LspManager {
         };
 
         if self.doc_sync.is_open(path) {
-            log::warn!("LSP: document {} is already open in doc_sync, skipping didOpen", path.display());
+            log::warn!(
+                "LSP: document {} is already open in doc_sync, skipping didOpen",
+                path.display()
+            );
             return;
         }
 
@@ -145,7 +148,11 @@ impl LspManager {
             }
         };
 
-        log::warn!("LSP: sending textDocument/didOpen for {} (lang: {})", path.display(), language_id);
+        log::warn!(
+            "LSP: sending textDocument/didOpen for {} (lang: {})",
+            path.display(),
+            language_id
+        );
 
         if let Some(server) = self.servers.get(&lang_id) {
             let _ = server.handle.send_notification(

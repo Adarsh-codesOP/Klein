@@ -85,8 +85,12 @@ impl AppConfig {
 
         // 3. KleinLocal (Used by local installer)
         if let Some(user_dirs) = directories::UserDirs::new() {
-             let app_data_local = user_dirs.home_dir().join("AppData").join("Local").join("KleinLocal");
-             search_paths.push(app_data_local.join("config.toml"));
+            let app_data_local = user_dirs
+                .home_dir()
+                .join("AppData")
+                .join("Local")
+                .join("KleinLocal");
+            search_paths.push(app_data_local.join("config.toml"));
         }
 
         // 4. Standard Home Dir fallback
@@ -103,7 +107,10 @@ impl AppConfig {
                         return config;
                     }
                 } else {
-                    log::error!("LSP: found config but could not read file at {}", config_path.display());
+                    log::error!(
+                        "LSP: found config but could not read file at {}",
+                        config_path.display()
+                    );
                 }
             }
         }

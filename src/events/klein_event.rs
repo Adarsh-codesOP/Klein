@@ -28,9 +28,17 @@ pub enum KleinEvent {
     /// Request code actions for cursor position.
     CodeAction,
     /// Response from a completion request.
-    CompletionResponse(Option<serde_json::Value>, std::path::PathBuf, (usize, usize)),
+    CompletionResponse(
+        Option<serde_json::Value>,
+        std::path::PathBuf,
+        (usize, usize),
+    ),
     /// Response from a hover request.
-    HoverResponse(Option<serde_json::Value>, std::path::PathBuf, (usize, usize)),
+    HoverResponse(
+        Option<serde_json::Value>,
+        std::path::PathBuf,
+        (usize, usize),
+    ),
     /// Response from a definition request.
     DefinitionResponse(Option<serde_json::Value>, std::path::PathBuf),
     /// Response from a references request.
@@ -40,7 +48,11 @@ pub enum KleinEvent {
     /// Response from a rename request.
     RenameResponse(Option<serde_json::Value>, std::path::PathBuf, String),
     /// Response from a code action request.
-    CodeActionResponse(Option<serde_json::Value>, std::path::PathBuf, (usize, usize)),
+    CodeActionResponse(
+        Option<serde_json::Value>,
+        std::path::PathBuf,
+        (usize, usize),
+    ),
 }
 
 /// Identifies which debounce timer fired.

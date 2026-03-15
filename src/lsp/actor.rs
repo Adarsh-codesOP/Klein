@@ -291,7 +291,12 @@ fn handle_server_message(
                     .get("result")
                     .cloned()
                     .unwrap_or(serde_json::Value::Null);
-                log::warn!("[{}] ← response #{}: ok | result: {}", server_name, id, result);
+                log::warn!(
+                    "[{}] ← response #{}: ok | result: {}",
+                    server_name,
+                    id,
+                    result
+                );
                 let _ = tx.send(Ok(result));
             }
         } else {

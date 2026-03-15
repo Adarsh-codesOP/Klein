@@ -475,14 +475,14 @@ impl Editor {
                 self.cursor_x = sx;
                 self.selection_start = None;
                 self.is_dirty = true;
-                
+
                 // Ensure cursor is within new buffer bounds
                 let num_lines = self.buffer.len_lines();
                 if self.cursor_y >= num_lines {
                     self.cursor_y = num_lines.saturating_sub(1);
                 }
                 self.clamp_cursor_x();
-                
+
                 // Reset scroll if we deleted everything or large chunks
                 if self.cursor_y < self.scroll_y {
                     self.scroll_y = self.cursor_y;
@@ -837,37 +837,127 @@ impl Editor {
         let style = Style::default();
         match kind {
             // Keywords
-            "keyword" | "storage_class" | "type_qualifier" | "repeat" | "conditional"
-            | "exception" | "include" | "statement" | "use" | "pub" | "struct" | "enum"
-            | "impl" | "fn" | "let" | "mut" | "match" | "if" | "else" | "elif" | "for"
-            | "while" | "loop" | "return" | "break" | "continue" | "async" | "await" | "crate"
-            | "super" | "self" | "mod" | "trait" | "where" | "const" | "static" | "unsafe"
-            | "extern" | "as" | "move" | "dyn" | "def" | "class" | "import" | "from" | "yield"
-            | "try" | "except" | "finally" | "with" | "lambda" | "pass" | "var" | "switch"
-            | "case" | "default" | "throw" | "new" | "typeof" | "instanceof" | "void"
-            | "delete" | "in" | "of" | "export" | "interface" | "namespace" | "implements"
-            | "extends" | "public" | "private" | "protected" | "readonly" | "abstract"
-            | "declare" | "package" | "go" | "chan" | "select" | "defer" | "fallthrough"
-            | "range" | "extern_crate_declaration" => style.fg(Color::Magenta).add_modifier(Modifier::BOLD),
+            "keyword"
+            | "storage_class"
+            | "type_qualifier"
+            | "repeat"
+            | "conditional"
+            | "exception"
+            | "include"
+            | "statement"
+            | "use"
+            | "pub"
+            | "struct"
+            | "enum"
+            | "impl"
+            | "fn"
+            | "let"
+            | "mut"
+            | "match"
+            | "if"
+            | "else"
+            | "elif"
+            | "for"
+            | "while"
+            | "loop"
+            | "return"
+            | "break"
+            | "continue"
+            | "async"
+            | "await"
+            | "crate"
+            | "super"
+            | "self"
+            | "mod"
+            | "trait"
+            | "where"
+            | "const"
+            | "static"
+            | "unsafe"
+            | "extern"
+            | "as"
+            | "move"
+            | "dyn"
+            | "def"
+            | "class"
+            | "import"
+            | "from"
+            | "yield"
+            | "try"
+            | "except"
+            | "finally"
+            | "with"
+            | "lambda"
+            | "pass"
+            | "var"
+            | "switch"
+            | "case"
+            | "default"
+            | "throw"
+            | "new"
+            | "typeof"
+            | "instanceof"
+            | "void"
+            | "delete"
+            | "in"
+            | "of"
+            | "export"
+            | "interface"
+            | "namespace"
+            | "implements"
+            | "extends"
+            | "public"
+            | "private"
+            | "protected"
+            | "readonly"
+            | "abstract"
+            | "declare"
+            | "package"
+            | "go"
+            | "chan"
+            | "select"
+            | "defer"
+            | "fallthrough"
+            | "range"
+            | "extern_crate_declaration" => style.fg(Color::Magenta).add_modifier(Modifier::BOLD),
 
             // Types
             "type" | "primitive_type" | "type_identifier" | "builtin_type" | "class_name"
-            | "struct_name" | "type_name" | "user_type" | "type_parameter" => style.fg(Color::LightBlue),
+            | "struct_name" | "type_name" | "user_type" | "type_parameter" => {
+                style.fg(Color::LightBlue)
+            }
 
             // Functions / Methods
-            "function" | "method" | "function_item" | "call_expression" | "function_declarator"
-            | "field_identifier" | "function_definition" | "method_definition" | "method_declaration"
+            "function"
+            | "method"
+            | "function_item"
+            | "call_expression"
+            | "function_declarator"
+            | "field_identifier"
+            | "function_definition"
+            | "method_definition"
+            | "method_declaration"
             | "constructor" => style.fg(Color::Cyan),
 
             // Variables / Properties
-            "variable" | "variable_parameter" | "parameter" | "property" | "field"
-            | "shorthand_field_identifier" | "field_name" | "variable_name" => style.fg(Color::White),
+            "variable"
+            | "variable_parameter"
+            | "parameter"
+            | "property"
+            | "field"
+            | "shorthand_field_identifier"
+            | "field_name"
+            | "variable_name" => style.fg(Color::White),
 
             // Constants
-            "constant" | "constant_identifier" | "const_parameter" => style.fg(Color::Yellow).add_modifier(Modifier::BOLD),
+            "constant" | "constant_identifier" | "const_parameter" => {
+                style.fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            }
 
             // HTML / XML
-            "tag_name" | "start_tag" | "end_tag" | "self_closing_tag" | "tag" => style.fg(Color::LightBlue),
+            "tag_name" | "start_tag" | "end_tag" | "self_closing_tag" | "tag" => {
+                style.fg(Color::LightBlue)
+            }
             "attribute_name" => style.fg(Color::Cyan),
             "attribute_value" => style.fg(Color::Yellow),
 
@@ -886,16 +976,24 @@ impl Editor {
             "attribute" | "attribute_item" | "meta" | "preproc_directive" | "preproc_arg" => {
                 style.fg(Color::Green).add_modifier(Modifier::ITALIC)
             }
-            "macro_definition" | "macro_invocation" | "macro_call" | "g_attribute" | "function_macro" => {
-                style.fg(Color::LightCyan)
-            }
+            "macro_definition" | "macro_invocation" | "macro_call" | "g_attribute"
+            | "function_macro" => style.fg(Color::LightCyan),
 
             // Operators & Punctuation
-            "operator" | "binary_expression" | "unary_expression" | "assignment_expression"
-            | "pointer_expression" | "reference_expression" => style.fg(Color::LightCyan),
+            "operator"
+            | "binary_expression"
+            | "unary_expression"
+            | "assignment_expression"
+            | "pointer_expression"
+            | "reference_expression" => style.fg(Color::LightCyan),
 
-            "punctuation" | "delimiter" | "bracket" | "parenthesized_expression"
-            | "list" | "parameters" | "arguments" => style.fg(Color::Gray),
+            "punctuation"
+            | "delimiter"
+            | "bracket"
+            | "parenthesized_expression"
+            | "list"
+            | "parameters"
+            | "arguments" => style.fg(Color::Gray),
 
             "identifier" => style.fg(Color::White),
             _ => style.fg(Color::White),
@@ -1003,7 +1101,8 @@ impl Editor {
                 for span in spans {
                     let text = span.content.trim_end_matches(['\n', '\r']);
                     if !text.is_empty() {
-                        cleaned_spans.push(ratatui::text::Span::styled(text.to_string(), span.style));
+                        cleaned_spans
+                            .push(ratatui::text::Span::styled(text.to_string(), span.style));
                     }
                 }
             }
@@ -1056,13 +1155,7 @@ impl Editor {
         } else {
             for i in 0..node.child_count() {
                 if let Some(child) = node.child(i) {
-                    self.walk_line_highlights(
-                        child,
-                        line_start,
-                        line_end,
-                        current_byte,
-                        spans,
-                    );
+                    self.walk_line_highlights(child, line_start, line_end, current_byte, spans);
                 }
             }
         }

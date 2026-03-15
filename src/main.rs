@@ -152,16 +152,19 @@ async fn run_app<B: io::Write + ratatui::backend::Backend>(
                 events::klein_event::KleinEvent::InitLsp(path) => {
                     log::warn!("LSP: received InitLsp for {}", path.display());
                     if app
-                         .lsp_manager
-                         .ensure_server_for_file(&path)
-                         .await
-                         .is_some()
-                     {
-                         log::warn!("LSP: server confirmed for {}", path.display());
-                         app.notify_lsp_did_open_for_path(&path);
-                     } else {
-                         log::error!("LSP: server NOT found or failed to start for {}", path.display());
-                     }
+                        .lsp_manager
+                        .ensure_server_for_file(&path)
+                        .await
+                        .is_some()
+                    {
+                        log::warn!("LSP: server confirmed for {}", path.display());
+                        app.notify_lsp_did_open_for_path(&path);
+                    } else {
+                        log::error!(
+                            "LSP: server NOT found or failed to start for {}",
+                            path.display()
+                        );
+                    }
                 }
                 events::klein_event::KleinEvent::GotoDefinition => {
                     app.trigger_goto_definition();

@@ -33,7 +33,10 @@ impl LspRegistry {
 
         // If config.enabled_lsps is None, we assume no servers are enabled.
         // The user must explicitly opt-in to LSP servers via config.toml
-        log::warn!("LSP: Initializing LspRegistry with enabled_lsps: {:?}", enabled_lsps);
+        log::warn!(
+            "LSP: Initializing LspRegistry with enabled_lsps: {:?}",
+            enabled_lsps
+        );
         let is_enabled = |id: &str| {
             if let Some(enabled) = enabled_lsps {
                 enabled

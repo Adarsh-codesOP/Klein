@@ -1,8 +1,8 @@
+use klein_ide::config::AppConfig;
+use klein_ide::lsp::actor::LspServerNotification;
+use klein_ide::lsp::manager::LspManager;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
-use klein_ide::lsp::manager::LspManager;
-use klein_ide::lsp::actor::LspServerNotification;
-use klein_ide::config::AppConfig;
 
 #[tokio::main]
 async fn main() {
@@ -11,15 +11,15 @@ async fn main() {
         enabled_lsps: Some(vec!["rust".to_string()]),
         ..Default::default()
     };
-    
+
     let mut manager = LspManager::new(tx, &config);
     let sample_path = PathBuf::from("src/main.rs");
     let absolute_path = std::fs::canonicalize(&sample_path).unwrap();
-    
+
     println!("Starting rust-analyzer...");
     let lang_id = manager.ensure_server_for_file(&absolute_path).await;
     println!("Server started with lang_id: {:?}", lang_id);
-    
+
     assert_eq!(lang_id.as_deref(), Some("rust"));
 
     // Wait a bit for initialization

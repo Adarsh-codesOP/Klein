@@ -59,7 +59,9 @@ pub fn from_lsp_position(pos: &Position, buffer: &Rope) -> (usize, usize) {
 
     // character offset is at or past end of line
     let mut max_col = rope_line.len_chars();
-    while max_col > 0 && (rope_line.char(max_col - 1) == '\n' || rope_line.char(max_col - 1) == '\r') {
+    while max_col > 0
+        && (rope_line.char(max_col - 1) == '\n' || rope_line.char(max_col - 1) == '\r')
+    {
         max_col -= 1;
     }
     (line, max_col)

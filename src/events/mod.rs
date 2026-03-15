@@ -1090,14 +1090,25 @@ fn handle_completion_keys(app: &mut App, key: KeyEvent) -> io::Result<bool> {
                     let buffer = &app.editor().buffer;
                     let (sl, sc) = crate::lsp::router::from_lsp_position(&range.start, buffer);
                     let (el, ec) = crate::lsp::router::from_lsp_position(&range.end, buffer);
-                    
-                    let start = buffer.line_to_char(sl.min(buffer.len_lines().saturating_sub(1))) + sc;
-                    let end = buffer.line_to_char(el.min(buffer.len_lines().saturating_sub(1))) + ec;
+
+                    let start =
+                        buffer.line_to_char(sl.min(buffer.len_lines().saturating_sub(1))) + sc;
+                    let end =
+                        buffer.line_to_char(el.min(buffer.len_lines().saturating_sub(1))) + ec;
                     (start, end)
                 } else {
                     let buffer = &app.editor().buffer;
-                    let start = buffer.line_to_char(state.trigger_position.0.min(buffer.len_lines().saturating_sub(1))) + state.trigger_position.1;
-                    let end = buffer.line_to_char(app.editor().cursor_y.min(buffer.len_lines().saturating_sub(1))) + app.editor().cursor_x;
+                    let start = buffer.line_to_char(
+                        state
+                            .trigger_position
+                            .0
+                            .min(buffer.len_lines().saturating_sub(1)),
+                    ) + state.trigger_position.1;
+                    let end = buffer.line_to_char(
+                        app.editor()
+                            .cursor_y
+                            .min(buffer.len_lines().saturating_sub(1)),
+                    ) + app.editor().cursor_x;
                     (start, end)
                 };
 
@@ -1105,7 +1116,7 @@ fn handle_completion_keys(app: &mut App, key: KeyEvent) -> io::Result<bool> {
                 app.editor_mut().replace_range(
                     start_char.min(buffer_len),
                     end_char.min(buffer_len),
-                    &item.insert_text
+                    &item.insert_text,
                 );
                 schedule_document_sync(app);
             }
