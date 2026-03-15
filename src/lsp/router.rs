@@ -42,7 +42,7 @@ pub fn to_lsp_position(line: usize, col: usize, buffer: &Rope) -> Position {
 ///
 /// The UTF-16 character offset is converted back to a Unicode scalar (char) index.
 pub fn from_lsp_position(pos: &Position, buffer: &Rope) -> (usize, usize) {
-    let mut line = pos.line as usize;
+    let line = pos.line as usize;
     if line >= buffer.len_lines() {
         return (buffer.len_lines().saturating_sub(1), 0);
     }

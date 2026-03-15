@@ -49,8 +49,8 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         // Calculate the starting x position of the selected tab approximately
         // Each tab name length + divider. Let's do a simple calculation.
         let mut x_offset = area.x;
-        for i in 0..selected_tab {
-            x_offset += menus[i].chars().count() as u16 + 1; // +1 for divider
+        for menu in menus.iter().take(selected_tab) {
+            x_offset += menu.chars().count() as u16 + 1; // +1 for divider
         }
 
         render_dropdown(

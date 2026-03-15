@@ -1240,12 +1240,6 @@ impl Editor {
             .to_string()
             .replace(['\n', '\r'], "")
     }
-
-    fn get_byte_range_text(&self, range: std::ops::Range<usize>) -> String {
-        let start = self.buffer.byte_to_char(range.start);
-        let end = self.buffer.byte_to_char(range.end);
-        self.buffer.slice(start..end).to_string()
-    }
 }
 
 #[cfg(test)]

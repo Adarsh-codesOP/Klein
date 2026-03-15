@@ -75,6 +75,7 @@ fn schedule_completion(app: &mut App) {
     }
 }
 
+#[allow(dead_code)]
 fn schedule_hover(app: &mut App) {
     if let Some(ref mut tm) = app.timer_manager {
         tm.schedule(

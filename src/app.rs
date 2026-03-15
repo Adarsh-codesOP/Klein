@@ -62,18 +62,10 @@ pub enum TopBarMenu {
     Help,
 }
 
+#[derive(Default)]
 pub struct TopBarState {
     pub active_menu: Option<TopBarMenu>,
     pub selected_index: usize,
-}
-
-impl Default for TopBarState {
-    fn default() -> Self {
-        Self {
-            active_menu: None,
-            selected_index: 0,
-        }
-    }
 }
 
 pub struct App {
