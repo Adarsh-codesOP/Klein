@@ -1,9 +1,88 @@
+pub mod klein_event;
+pub mod timers;
+
 use crate::app::{App, Panel};
+use crate::lsp::actor::LspServerNotification;
 use crossterm::event::{
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
 };
 use std::io;
 
+pub fn handle_lsp_notification(app: &mut App, notification: LspServerNotification) {
+    match notification.method.as_str() {
+        "textDocument/publishDiagnostics" => {
+            if let Ok(params) =
+                serde_json::from_value::<lsp_types::PublishDiagnosticsParams>(notification.params)
+            {
+                if let Some(path) = crate::lsp::router::uri_to_path(&params.uri) {
+                    // Find the buffer for this file to do position conversion
+                    let mut diagnostics = Vec::new();
+                    let mut buffer = None;
+
+                    for tab in &app.tabs {
+                        if tab.editor.path.as_ref() == Some(&path) {
+                            buffer = Some(tab.editor.buffer.clone());
+                            break;
+                        }
+                    }
+
+                    if let Some(buf) = buffer {
+                        for diag in params.diagnostics {
+                            diagnostics.push(crate::lsp::router::to_klein_diagnostic(&diag, &buf));
+                        }
+                        app.lsp_state.diagnostics.insert(path, diagnostics);
+                    }
+                }
+            }
+        }
+        _ => {
+            log::trace!("unhandled LSP notification: {}", notification.method);
+        }
+    }
+}
+
+pub fn handle_timer_event(app: &mut App, kind: klein_event::TimerKind) {
+    match kind {
+        klein_event::TimerKind::DocumentSync => {
+            app.notify_lsp_did_change();
+        }
+        klein_event::TimerKind::CompletionTrigger => {
+            app.trigger_completion();
+        }
+        klein_event::TimerKind::HoverTrigger => {
+            app.trigger_hover();
+        }
+    }
+}
+
+fn schedule_document_sync(app: &mut App) {
+    if let Some(ref mut tm) = app.timer_manager {
+        log::warn!("LSP: scheduling document sync timer");
+        tm.schedule(
+            klein_event::TimerKind::DocumentSync,
+            std::time::Duration::from_millis(150),
+        );
+    }
+}
+
+fn schedule_completion(app: &mut App) {
+    if let Some(ref mut tm) = app.timer_manager {
+        log::warn!("LSP: scheduling completion timer");
+        tm.schedule(
+            klein_event::TimerKind::CompletionTrigger,
+            std::time::Duration::from_millis(50),
+        );
+    }
+}
+
+fn schedule_hover(app: &mut App) {
+    if let Some(ref mut tm) = app.timer_manager {
+        tm.schedule(
+            klein_event::TimerKind::HoverTrigger,
+            std::time::Duration::from_millis(400),
+        );
+    }
+}
 pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
     match event {
         Event::Key(key) => {
@@ -18,6 +97,7 @@ pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
             if matches!(app.active_panel, Panel::Editor) {
                 let h = app.last_editor_height.get();
                 app.insert_paste(&text, h);
+                schedule_document_sync(app);
             } else if matches!(app.active_panel, Panel::Terminal) {
                 app.terminal.write(&text);
             }
@@ -166,7 +246,7 @@ fn load_preview(app: &mut App, path: std::path::PathBuf) {
         }
     }
     let mut preview_editor = crate::editor::Editor::new();
-    let _ = preview_editor.open(path);
+    let _ = preview_editor.open(path, &app.ts_manager);
     app.preview = Some(preview_editor);
 }
 
@@ -190,6 +270,43 @@ fn trigger_picker_preview(app: &mut App) {
 }
 
 fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
+    // 0. Handle g_mode
+    if app.g_mode {
+        app.g_mode = false;
+        match key.code {
+            KeyCode::Char('d') => {
+                let _ = app.event_tx.send(klein_event::KleinEvent::GotoDefinition);
+                return Ok(());
+            }
+            KeyCode::Char('r') => {
+                let _ = app.event_tx.send(klein_event::KleinEvent::FindReferences);
+                return Ok(());
+            }
+            KeyCode::Char('f') => {
+                let _ = app.event_tx.send(klein_event::KleinEvent::FormatDocument);
+                return Ok(());
+            }
+            KeyCode::Char('n') => {
+                app.trigger_rename();
+                return Ok(());
+            }
+            KeyCode::Char('a') => {
+                let _ = app.event_tx.send(klein_event::KleinEvent::CodeAction);
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
+    if app.lsp_state.rename.is_some() && handle_rename_keys(app, key)? {
+        return Ok(());
+    }
+
+    // 1. If completion popup is open, it gets first dibs
+    if app.lsp_state.completion.is_some() && handle_completion_keys(app, key)? {
+        return Ok(());
+    }
+
     if app.picker.active {
         match key.code {
             KeyCode::Esc => {
@@ -202,6 +319,11 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     let line = res.line;
                     app.picker.active = false;
                     app.picker.preview = None;
+
+                    if app.picker.mode == crate::search::SearchMode::CodeAction {
+                        app.apply_code_action(app.picker.selected_index);
+                        return Ok(());
+                    }
 
                     // Open the file
                     app.open_file(path);
@@ -252,6 +374,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     crate::search::SearchMode::Grep => {
                         app.picker.results = crate::search::run_grep(&app.picker.query);
                     }
+                    crate::search::SearchMode::Lsp | crate::search::SearchMode::CodeAction => {}
                 }
                 app.picker.selected_index = 0;
                 app.picker.scroll = 0;
@@ -274,6 +397,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     crate::search::SearchMode::Grep => {
                         app.picker.results = crate::search::run_grep(&app.picker.query);
                     }
+                    crate::search::SearchMode::Lsp | crate::search::SearchMode::CodeAction => {}
                 }
                 app.picker.selected_index = 0;
                 app.picker.scroll = 0;
@@ -503,6 +627,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Char('z') => {
                 app.editor_mut().undo();
+                schedule_document_sync(app);
             }
             KeyCode::Char('b') => app.show_sidebar = !app.show_sidebar,
             KeyCode::Char('j') => app.show_terminal = !app.show_terminal,
@@ -546,15 +671,21 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Char('c') => {
                 app.copy_selection();
+                return Ok(());
             }
             KeyCode::Char('v') => {
                 let h = app.last_editor_height.get();
                 app.paste_clipboard(h);
+                return Ok(());
             }
             KeyCode::Char('a') => {
                 app.editor_mut().select_all();
+                return Ok(());
             }
-            KeyCode::Char('h') => app.show_help = !app.show_help,
+            KeyCode::Char('h') => {
+                app.show_help = !app.show_help;
+                return Ok(());
+            }
             KeyCode::Right | KeyCode::Left => {
                 app.active_panel = match app.active_panel {
                     Panel::Sidebar => Panel::Editor,
@@ -683,6 +814,15 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
 
         match key.code {
             KeyCode::Down => {
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    if key.modifiers.contains(KeyModifiers::SHIFT) {
+                        app.editor_mut().move_block(true);
+                        schedule_document_sync(app);
+                        return Ok(());
+                    }
+                    app.editor_mut().shrink_selection();
+                    return Ok(());
+                }
                 if is_selecting {
                     app.editor_mut().toggle_selection();
                 } else {
@@ -690,29 +830,57 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 }
                 let h = app.last_editor_height.get();
                 app.editor_mut().move_cursor_down(h);
+                app.lsp_state.hover = None;
+                schedule_hover(app);
                 return Ok(());
             }
             KeyCode::Up => {
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    if key.modifiers.contains(KeyModifiers::SHIFT) {
+                        app.editor_mut().move_block(false);
+                        schedule_document_sync(app);
+                        return Ok(());
+                    }
+                    app.editor_mut().expand_selection();
+                    return Ok(());
+                }
                 if is_selecting {
                     app.editor_mut().toggle_selection();
                 } else {
                     app.editor_mut().clear_selection();
                 }
                 app.editor_mut().move_cursor_up();
+                app.lsp_state.hover = None;
+                schedule_hover(app);
                 return Ok(());
             }
             KeyCode::Left => {
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    app.editor_mut().swap_nodes(false);
+                    schedule_document_sync(app);
+                    return Ok(());
+                }
                 app.editor_mut().clear_selection();
                 app.editor_mut().move_cursor_left();
+                app.lsp_state.hover = None;
+                schedule_hover(app);
                 return Ok(());
             }
             KeyCode::Right => {
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    app.editor_mut().swap_nodes(true);
+                    schedule_document_sync(app);
+                    return Ok(());
+                }
                 app.editor_mut().clear_selection();
                 app.editor_mut().move_cursor_right();
+                app.lsp_state.hover = None;
+                schedule_hover(app);
                 return Ok(());
             }
             KeyCode::Tab => {
                 app.editor_mut().insert_tab();
+                schedule_document_sync(app);
                 return Ok(());
             }
             KeyCode::Char('c') if app.editor().selection_start.is_some() => {
@@ -782,14 +950,24 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
             KeyCode::Delete => {
                 app.editor_mut().delete_forward_char();
+                schedule_document_sync(app);
                 return Ok(());
             }
             KeyCode::Char('x') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 app.cut_selection();
+                schedule_document_sync(app);
                 return Ok(());
             }
             KeyCode::Backspace => {
                 app.editor_mut().delete_char();
+                schedule_document_sync(app);
+                app.lsp_state.completion = None;
+                app.lsp_state.hover = None;
+                return Ok(());
+            }
+            KeyCode::Char(' ') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.last_completion_trigger_char = None;
+                schedule_completion(app);
                 return Ok(());
             }
             KeyCode::Enter => {
@@ -798,10 +976,27 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.editor_mut().cursor_x = 0;
                 let h = app.last_editor_height.get();
                 app.editor_mut().ensure_cursor_visible(h);
+                schedule_document_sync(app);
+                return Ok(());
+            }
+            KeyCode::Char('g') if key.modifiers.contains(KeyModifiers::ALT) => {
+                app.g_mode = true;
+                return Ok(());
+            }
+            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::ALT) => {
+                let _ = app.event_tx.send(klein_event::KleinEvent::FormatDocument);
                 return Ok(());
             }
             KeyCode::Char(c) => {
+                log::warn!("LSP: KeyCode::Char('{}') pressed", c);
                 app.editor_mut().insert_char(c);
+                schedule_document_sync(app);
+                app.lsp_state.hover = None;
+                if c == '.' || c == ':' || app.lsp_state.completion.is_some() {
+                    log::warn!("LSP: Triggering schedule_completion for '{}'", c);
+                    app.last_completion_trigger_char = Some(c);
+                    schedule_completion(app);
+                }
                 return Ok(());
             }
             _ => {}
@@ -840,12 +1035,12 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             }
         }
         KeyCode::Down if matches!(app.active_panel, Panel::Sidebar) => {
-            if let Some(path) = app.sidebar.next() {
+            if let Some(path) = app.sidebar.select_next() {
                 load_preview(app, path);
             }
         }
         KeyCode::Up if matches!(app.active_panel, Panel::Sidebar) => {
-            if let Some(path) = app.sidebar.previous() {
+            if let Some(path) = app.sidebar.select_previous() {
                 load_preview(app, path);
             }
         }
@@ -860,4 +1055,107 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+fn handle_completion_keys(app: &mut App, key: KeyEvent) -> io::Result<bool> {
+    let mut state = match app.lsp_state.completion.take() {
+        Some(s) => s,
+        None => return Ok(false),
+    };
+
+    let mut handled = true;
+    match key.code {
+        KeyCode::Esc => {
+            // Already taken out of state, so it closes.
+        }
+        KeyCode::Up => {
+            if state.selected_index > 0 {
+                state.selected_index -= 1;
+            } else {
+                state.selected_index = state.items.len().saturating_sub(1);
+            }
+            app.lsp_state.completion = Some(state);
+        }
+        KeyCode::Down => {
+            if !state.items.is_empty() && state.selected_index < state.items.len() - 1 {
+                state.selected_index += 1;
+            } else {
+                state.selected_index = 0;
+            }
+            app.lsp_state.completion = Some(state);
+        }
+        KeyCode::Enter | KeyCode::Tab => {
+            if let Some(item) = state.items.get(state.selected_index) {
+                let (start_char, end_char) = if let Some(range) = &item.replace_range {
+                    let buffer = &app.editor().buffer;
+                    let (sl, sc) = crate::lsp::router::from_lsp_position(&range.start, buffer);
+                    let (el, ec) = crate::lsp::router::from_lsp_position(&range.end, buffer);
+
+                    let start =
+                        buffer.line_to_char(sl.min(buffer.len_lines().saturating_sub(1))) + sc;
+                    let end =
+                        buffer.line_to_char(el.min(buffer.len_lines().saturating_sub(1))) + ec;
+                    (start, end)
+                } else {
+                    let buffer = &app.editor().buffer;
+                    let start = buffer.line_to_char(
+                        state
+                            .trigger_position
+                            .0
+                            .min(buffer.len_lines().saturating_sub(1)),
+                    ) + state.trigger_position.1;
+                    let end = buffer.line_to_char(
+                        app.editor()
+                            .cursor_y
+                            .min(buffer.len_lines().saturating_sub(1)),
+                    ) + app.editor().cursor_x;
+                    (start, end)
+                };
+
+                let buffer_len = app.editor().buffer.len_chars();
+                app.editor_mut().replace_range(
+                    start_char.min(buffer_len),
+                    end_char.min(buffer_len),
+                    &item.insert_text,
+                );
+                schedule_document_sync(app);
+            }
+        }
+        _ => {
+            app.lsp_state.completion = Some(state);
+            handled = false;
+        }
+    }
+
+    Ok(handled)
+}
+fn handle_rename_keys(app: &mut App, key: KeyEvent) -> io::Result<bool> {
+    let mut state = match app.lsp_state.rename.take() {
+        Some(s) => s,
+        None => return Ok(false),
+    };
+
+    match key.code {
+        KeyCode::Esc => {
+            state.active = false;
+            app.lsp_state.rename = None;
+            return Ok(true);
+        }
+        KeyCode::Enter => {
+            state.active = true; // Still active but we are sending
+            app.lsp_state.rename = Some(state);
+            let _ = app.event_tx.send(klein_event::KleinEvent::Rename);
+            return Ok(true);
+        }
+        KeyCode::Backspace => {
+            state.new_name.pop();
+        }
+        KeyCode::Char(c) => {
+            state.new_name.push(c);
+        }
+        _ => {}
+    }
+
+    app.lsp_state.rename = Some(state);
+    Ok(true)
 }

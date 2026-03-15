@@ -125,7 +125,7 @@ impl Sidebar {
         }
     }
 
-    pub fn next(&mut self) -> Option<PathBuf> {
+    pub fn select_next(&mut self) -> Option<PathBuf> {
         if !self.flat_list.is_empty() {
             self.selected_index = (self.selected_index + 1) % self.flat_list.len();
             self.adjust_scroll();
@@ -137,7 +137,7 @@ impl Sidebar {
         None
     }
 
-    pub fn previous(&mut self) -> Option<PathBuf> {
+    pub fn select_previous(&mut self) -> Option<PathBuf> {
         if !self.flat_list.is_empty() {
             if self.selected_index > 0 {
                 self.selected_index -= 1;

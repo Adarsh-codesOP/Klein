@@ -11,12 +11,15 @@ use std::sync::{Arc, Mutex};
 pub enum SearchMode {
     File,
     Grep,
+    Lsp,
+    CodeAction,
 }
 
 #[derive(Clone, Debug)]
 pub struct SearchResult {
     pub path: PathBuf,
     pub line: Option<usize>,
+    pub content: Option<String>,
 }
 
 pub struct PickerState {
@@ -114,6 +117,7 @@ impl<'a> Sink for SearchSink<'a> {
         self.results.push(SearchResult {
             path: self.path.to_path_buf(),
             line: Some(line.line_number().unwrap_or(1).saturating_sub(1) as usize),
+            content: None,
         });
         Ok(true)
     }
@@ -143,7 +147,11 @@ pub fn run_file_search(query: &str) -> Vec<SearchResult> {
         return file_paths
             .into_iter()
             .take(1000)
-            .map(|path| SearchResult { path, line: None })
+            .map(|path| SearchResult {
+                path,
+                line: None,
+                content: None,
+            })
             .collect();
     }
 
@@ -152,9 +160,16 @@ pub fn run_file_search(query: &str) -> Vec<SearchResult> {
         .into_par_iter()
         .filter_map(|path| {
             let path_str = path.to_string_lossy().to_string();
-            matcher
-                .fuzzy_match(&path_str, query)
-                .map(|score| (score, SearchResult { path, line: None }))
+            matcher.fuzzy_match(&path_str, query).map(|score| {
+                (
+                    score,
+                    SearchResult {
+                        path,
+                        line: None,
+                        content: None,
+                    },
+                )
+            })
         })
         .collect();
 
@@ -162,6 +177,28 @@ pub fn run_file_search(query: &str) -> Vec<SearchResult> {
     scored_files.par_sort_by(|a, b| b.0.cmp(&a.0));
 
     scored_files.into_iter().take(1000).map(|f| f.1).collect()
+}
+
+pub fn fuzzy_filter(
+    prefix: &str,
+    items: Vec<crate::lsp::types::KleinCompletion>,
+) -> Vec<crate::lsp::types::KleinCompletion> {
+    if prefix.is_empty() {
+        return items;
+    }
+
+    let matcher = SkimMatcherV2::default();
+    let mut scored: Vec<(i64, crate::lsp::types::KleinCompletion)> = items
+        .into_iter()
+        .filter_map(|item| {
+            matcher
+                .fuzzy_match(&item.label, prefix)
+                .map(|score| (score, item))
+        })
+        .collect();
+
+    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.into_iter().map(|(_, item)| item).collect()
 }
 
 pub fn load_preview_lines(path: &Path, line: usize, radius: usize) -> Option<Vec<String>> {
