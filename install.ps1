@@ -295,6 +295,7 @@ function Invoke-Configuration {
         if ([string]::IsNullOrWhiteSpace($selection)) {
             $enabledLsps = @("Rust")
         } else {
+            $idx = 0
             foreach ($num in $selection.Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries)) {
                 if ([int]::TryParse($num, [ref]$idx) -and $idx -ge 1 -and $idx -le $availableLsps.Count) {
                     $enabledLsps += $availableLsps[$idx - 1]
