@@ -6,7 +6,7 @@ use crate::sidebar::Sidebar;
 use crate::tabs::TabState;
 use crate::terminal::Terminal;
 use crate::theme::Theme;
-use notify::{Watcher, RecursiveMode};
+use notify::{RecursiveMode, Watcher};
 use std::cell::Cell;
 use std::path::PathBuf;
 
@@ -177,13 +177,18 @@ impl App {
 
         if let Some(user_theme_dir) = crate::theme_loader::get_user_theme_dir() {
             let tx = event_tx.clone();
-            let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
-                if let Ok(event) = res {
-                    if event.kind.is_modify() || event.kind.is_create() || event.kind.is_remove() {
-                        let _ = tx.send(crate::events::klein_event::KleinEvent::RefreshTheme);
+            let mut watcher =
+                notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+                    if let Ok(event) = res {
+                        if event.kind.is_modify()
+                            || event.kind.is_create()
+                            || event.kind.is_remove()
+                        {
+                            let _ = tx.send(crate::events::klein_event::KleinEvent::RefreshTheme);
+                        }
                     }
-                }
-            }).ok();
+                })
+                .ok();
 
             if let Some(ref mut w) = watcher {
                 let _ = w.watch(&user_theme_dir, RecursiveMode::NonRecursive);
@@ -303,6 +308,9 @@ impl App {
                 },
                 TopBarMenu::Files => match idx {
                     0 => {
+                        self.new_untitled_tab();
+                    }
+                    1 => {
                         self.picker.active = true;
                         self.picker.mode = crate::search::SearchMode::File;
                         self.picker.query.clear();
@@ -310,7 +318,7 @@ impl App {
                         self.picker.selected_index = 0;
                         self.picker.scroll = 0;
                     }
-                    1 => {
+                    2 => {
                         self.picker.active = true;
                         self.picker.mode = crate::search::SearchMode::Grep;
                         self.picker.query.clear();
@@ -318,17 +326,14 @@ impl App {
                         self.picker.selected_index = 0;
                         self.picker.scroll = 0;
                     }
-                    2 => {
+                    3 => {
                         self.save_current_file();
                     }
-                    3 => {
-                        self.close_tab();
-                    }
                     4 => {
-                        self.next_tab();
+                        self.close_tab();
                     }
                     5 => {
-                        self.close_tab();
+                        self.next_tab();
                     }
                     _ => {}
                 },
@@ -476,6 +481,12 @@ impl App {
         self.lsp_did_open_for_editor(&tab.editor);
         self.tabs.push(tab);
         self.active_tab = self.tabs.len() - 1;
+    }
+
+    pub fn new_untitled_tab(&mut self) {
+        self.tabs.push(TabState::new());
+        self.active_tab = self.tabs.len() - 1;
+        self.active_panel = Panel::Editor;
     }
 
     #[allow(dead_code)]

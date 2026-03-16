@@ -36,7 +36,12 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                         .add_modifier(Modifier::BOLD),
                 )
             } else {
-                Span::styled(label, Style::default().fg(app.theme.tabs.text).bg(app.theme.tabs.inactive_bg))
+                Span::styled(
+                    label,
+                    Style::default()
+                        .fg(app.theme.tabs.text)
+                        .bg(app.theme.tabs.inactive_bg),
+                )
             }
         })
         .collect();

@@ -1,5 +1,5 @@
-use ratatui::style::Color;
 use anyhow::Result;
+use ratatui::style::Color;
 use ropey::Rope;
 use std::fs;
 use std::path::PathBuf;
@@ -623,9 +623,7 @@ impl Editor {
                         } else if is_char_selected != current_is_selected {
                             let mut s_style = span_style;
                             if current_is_selected {
-                                s_style = s_style
-                                    .bg(selection_bg)
-                                    .fg(selection_fg);
+                                s_style = s_style.bg(selection_bg).fg(selection_fg);
                             }
                             spans.push(ratatui::text::Span::styled(
                                 current_segment.clone(),
@@ -640,9 +638,7 @@ impl Editor {
                     if !current_segment.is_empty() {
                         let mut s_style = span_style;
                         if current_is_selected {
-                            s_style = s_style
-                                .bg(selection_bg)
-                                .fg(selection_fg);
+                            s_style = s_style.bg(selection_bg).fg(selection_fg);
                         }
                         spans.push(ratatui::text::Span::styled(current_segment, s_style));
                     }
@@ -1118,9 +1114,7 @@ impl Editor {
                         } else if is_char_selected != current_is_selected {
                             let mut s_style = span.style;
                             if current_is_selected {
-                                s_style = s_style
-                                    .bg(selection_bg)
-                                    .fg(selection_fg);
+                                s_style = s_style.bg(selection_bg).fg(selection_fg);
                             }
                             cleaned_spans.push(ratatui::text::Span::styled(
                                 current_segment.clone(),
@@ -1135,9 +1129,7 @@ impl Editor {
                     if !current_segment.is_empty() {
                         let mut s_style = span.style;
                         if current_is_selected {
-                            s_style = s_style
-                                .bg(selection_bg)
-                                .fg(selection_fg);
+                            s_style = s_style.bg(selection_bg).fg(selection_fg);
                         }
                         cleaned_spans.push(ratatui::text::Span::styled(current_segment, s_style));
                     }

@@ -70,7 +70,10 @@ pub fn get_menu_items(menu: TopBarMenu, app: &App) -> Vec<(String, String)> {
     match menu {
         TopBarMenu::Navigation => vec![
             ("Home / End".to_string(), "Start / End of line".to_string()),
-            ("Ctrl+Home / Ctrl+End".to_string(), "Top / Bottom of file".to_string()),
+            (
+                "Ctrl+Home / Ctrl+End".to_string(),
+                "Top / Bottom of file".to_string(),
+            ),
             ("PgUp / PgDn".to_string(), "Scroll page".to_string()),
             ("Ctrl+D / Ctrl+U".to_string(), "Page down / up".to_string()),
             ("Shift+Arrows".to_string(), "Extend selection".to_string()),
@@ -84,12 +87,12 @@ pub fn get_menu_items(menu: TopBarMenu, app: &App) -> Vec<(String, String)> {
             ("Ctrl+Z".to_string(), "Undo".to_string()),
         ],
         TopBarMenu::Files => vec![
+            ("Ctrl+N".to_string(), "New file".to_string()),
             ("Ctrl+P".to_string(), "Find file (fzf)".to_string()),
             ("Ctrl+G".to_string(), "Project search (rg)".to_string()),
             ("Ctrl+S".to_string(), "Save file".to_string()),
-            ("Ctrl+W".to_string(), "Close file".to_string()),
-            ("Ctrl+Shift+Z".to_string(), "Next tab".to_string()),
             ("Ctrl+Shift+X".to_string(), "Close tab".to_string()),
+            ("Ctrl+Shift+Z".to_string(), "Next tab".to_string()),
         ],
         TopBarMenu::Panels => vec![
             ("Ctrl+F".to_string(), "Focus sidebar".to_string()),
@@ -116,8 +119,8 @@ pub fn get_menu_items(menu: TopBarMenu, app: &App) -> Vec<(String, String)> {
             ("Alt+Enter".to_string(), "Code actions".to_string()),
         ],
         TopBarMenu::Help => vec![
-            ("Ctrl+H".to_string(), "Toggle help overlay".to_string()), 
-            ("Esc".to_string(), "Close help".to_string())
+            ("Ctrl+H".to_string(), "Toggle help overlay".to_string()),
+            ("Esc".to_string(), "Close help".to_string()),
         ],
         TopBarMenu::Theme => app
             .available_themes
@@ -127,7 +130,14 @@ pub fn get_menu_items(menu: TopBarMenu, app: &App) -> Vec<(String, String)> {
     }
 }
 
-fn render_dropdown(f: &mut Frame, y: u16, x: u16, menu: TopBarMenu, selected_index: usize, app: &App) {
+fn render_dropdown(
+    f: &mut Frame,
+    y: u16,
+    x: u16,
+    menu: TopBarMenu,
+    selected_index: usize,
+    app: &App,
+) {
     let items = get_menu_items(menu, app);
 
     let max_shortcut_len = items
@@ -176,10 +186,7 @@ fn render_dropdown(f: &mut Frame, y: u16, x: u16, menu: TopBarMenu, selected_ind
         let padded_shortcut = format!("{:<1$}", shortcut, max_shortcut_len);
 
         lines.push(Line::from(vec![
-            Span::styled(
-                format!("  {}  ", padded_shortcut),
-                style,
-            ),
+            Span::styled(format!("  {}  ", padded_shortcut), style),
             Span::styled(format!("{}  ", desc), style),
         ]));
     }

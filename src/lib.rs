@@ -7,11 +7,11 @@ pub mod search;
 pub mod sidebar;
 pub mod tabs;
 pub mod terminal;
-pub mod treesitter;
-pub mod ui;
 pub mod theme;
 pub mod theme_loader;
 pub mod theme_registry;
+pub mod treesitter;
+pub mod ui;
 
 /// Initialize file-based logging.
 pub fn init_logging() {

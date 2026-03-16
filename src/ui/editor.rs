@@ -117,7 +117,9 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
 
         let line_num_span = Span::styled(
             format!("{:>width$} ", i + 1, width = gutter_width - 3),
-            Style::default().fg(app.theme.editor.text).add_modifier(ratatui::style::Modifier::DIM),
+            Style::default()
+                .fg(app.theme.editor.text)
+                .add_modifier(ratatui::style::Modifier::DIM),
         );
 
         gutter_lines.push(Line::from(vec![icon_span, line_num_span]));
@@ -136,8 +138,12 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(gutter_widget, gutter_area);
 
     // Render Editor Content
-    let highlighted_lines =
-        editor.get_highlighted_lines(content_area.width as usize, content_area.height as usize, app.theme.editor.selection, app.theme.editor.background);
+    let highlighted_lines = editor.get_highlighted_lines(
+        content_area.width as usize,
+        content_area.height as usize,
+        app.theme.editor.selection,
+        app.theme.editor.background,
+    );
 
     let editor_widget =
         Paragraph::new(highlighted_lines).style(ratatui::style::Style::default().bg(bg_color));

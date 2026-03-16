@@ -701,6 +701,10 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
         }
 
         match key.code {
+            KeyCode::Char('n') => {
+                app.new_untitled_tab();
+                return Ok(());
+            }
             KeyCode::Char('g') => {
                 app.picker.active = true;
                 app.picker.mode = crate::search::SearchMode::Grep;
@@ -1062,7 +1066,9 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 app.lsp_state.hover = None;
                 return Ok(());
             }
-            KeyCode::Null | KeyCode::Char(' ') if key.modifiers.contains(KeyModifiers::CONTROL) || key.code == KeyCode::Null => {
+            KeyCode::Null | KeyCode::Char(' ')
+                if key.modifiers.contains(KeyModifiers::CONTROL) || key.code == KeyCode::Null =>
+            {
                 app.last_completion_trigger_char = None;
                 schedule_completion(app);
                 return Ok(());

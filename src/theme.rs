@@ -144,58 +144,86 @@ impl Theme {
 
         if let Some(c) = &config.editor {
             if let Some(bg) = &c.background {
-                if let Some(color) = parse_hex_color(bg) { self.editor.background = color; }
+                if let Some(color) = parse_hex_color(bg) {
+                    self.editor.background = color;
+                }
             }
             if let Some(fg) = &c.text {
-                if let Some(color) = parse_hex_color(fg) { self.editor.text = color; }
+                if let Some(color) = parse_hex_color(fg) {
+                    self.editor.text = color;
+                }
             }
             if let Some(cur) = &c.cursor {
-                if let Some(color) = parse_hex_color(cur) { self.editor.cursor = color; }
+                if let Some(color) = parse_hex_color(cur) {
+                    self.editor.cursor = color;
+                }
             }
             if let Some(sel) = &c.selection {
-                if let Some(color) = parse_hex_color(sel) { self.editor.selection = color; }
+                if let Some(color) = parse_hex_color(sel) {
+                    self.editor.selection = color;
+                }
             }
         }
 
         if let Some(c) = &config.sidebar {
             if let Some(bg) = &c.background {
-                if let Some(color) = parse_hex_color(bg) { self.sidebar.background = color; }
+                if let Some(color) = parse_hex_color(bg) {
+                    self.sidebar.background = color;
+                }
             }
             if let Some(fg) = &c.text {
-                if let Some(color) = parse_hex_color(fg) { self.sidebar.text = color; }
+                if let Some(color) = parse_hex_color(fg) {
+                    self.sidebar.text = color;
+                }
             }
             if let Some(sel) = &c.selected {
-                if let Some(color) = parse_hex_color(sel) { self.sidebar.selected = color; }
+                if let Some(color) = parse_hex_color(sel) {
+                    self.sidebar.selected = color;
+                }
             }
         }
 
         if let Some(c) = &config.status_bar {
             if let Some(bg) = &c.background {
-                if let Some(color) = parse_hex_color(bg) { self.status_bar.background = color; }
+                if let Some(color) = parse_hex_color(bg) {
+                    self.status_bar.background = color;
+                }
             }
             if let Some(fg) = &c.text {
-                if let Some(color) = parse_hex_color(fg) { self.status_bar.text = color; }
+                if let Some(color) = parse_hex_color(fg) {
+                    self.status_bar.text = color;
+                }
             }
         }
 
         if let Some(c) = &config.tabs {
             if let Some(bg) = &c.active_bg {
-                if let Some(color) = parse_hex_color(bg) { self.tabs.active_bg = color; }
+                if let Some(color) = parse_hex_color(bg) {
+                    self.tabs.active_bg = color;
+                }
             }
             if let Some(bg) = &c.inactive_bg {
-                if let Some(color) = parse_hex_color(bg) { self.tabs.inactive_bg = color; }
+                if let Some(color) = parse_hex_color(bg) {
+                    self.tabs.inactive_bg = color;
+                }
             }
             if let Some(fg) = &c.text {
-                if let Some(color) = parse_hex_color(fg) { self.tabs.text = color; }
+                if let Some(color) = parse_hex_color(fg) {
+                    self.tabs.text = color;
+                }
             }
         }
 
         if let Some(c) = &config.top_bar {
             if let Some(bg) = &c.background {
-                if let Some(color) = parse_hex_color(bg) { self.top_bar.background = color; }
+                if let Some(color) = parse_hex_color(bg) {
+                    self.top_bar.background = color;
+                }
             }
             if let Some(fg) = &c.text {
-                if let Some(color) = parse_hex_color(fg) { self.top_bar.text = color; }
+                if let Some(color) = parse_hex_color(fg) {
+                    self.top_bar.text = color;
+                }
             }
         }
     }

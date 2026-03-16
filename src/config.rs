@@ -128,9 +128,7 @@ impl AppConfig {
                 std::fs::create_dir_all(config_dir)?;
             }
             let config_path = config_dir.join("config.toml");
-            let toml_str = toml::to_string_pretty(self).map_err(|e| {
-                std::io::Error::new(std::io::ErrorKind::Other, format!("TOML error: {}", e))
-            })?;
+            let toml_str = toml::to_string_pretty(self).map_err(std::io::Error::other)?;
             std::fs::write(config_path, toml_str)?;
         }
         Ok(())
