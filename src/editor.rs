@@ -6,6 +6,12 @@ use std::path::PathBuf;
 use std::fs;
 use anyhow::Result;
 
+struct UndoState {
+    buffer: String,
+    cursor_y: usize,
+    cursor_x: usize,
+}
+
 pub struct Editor {
     pub buffer: Rope,
     pub path: Option<PathBuf>,
@@ -17,6 +23,7 @@ pub struct Editor {
     pub clipboard: Option<arboard::Clipboard>,
     pub selection_start: Option<(usize, usize)>,
     pub is_dirty: bool,
+    undo_stack: Vec<UndoState>,
 }
 
 impl Editor {
@@ -32,6 +39,31 @@ impl Editor {
             clipboard: arboard::Clipboard::new().ok(),
             selection_start: None,
             is_dirty: false,
+            undo_stack: Vec::new(),
+        }
+    }
+
+    /// Push the current buffer + cursor onto the undo stack (capped at 200 entries).
+    fn save_undo_state(&mut self) {
+        if self.undo_stack.len() >= 200 {
+            self.undo_stack.remove(0);
+        }
+        self.undo_stack.push(UndoState {
+            buffer: self.buffer.to_string(),
+            cursor_y: self.cursor_y,
+            cursor_x: self.cursor_x,
+        });
+    }
+
+    /// Restore the most recent undo snapshot.
+    pub fn undo(&mut self, height: usize) {
+        if let Some(state) = self.undo_stack.pop() {
+            self.buffer = Rope::from_str(&state.buffer);
+            self.cursor_y = state.cursor_y;
+            self.cursor_x = state.cursor_x;
+            self.selection_start = None;
+            self.is_dirty = true;
+            self.ensure_cursor_visible(height);
         }
     }
 
@@ -44,6 +76,7 @@ impl Editor {
         self.scroll_y = 0;
         self.is_dirty = false;
         self.selection_start = None;
+        self.undo_stack.clear();
         Ok(())
     }
 
@@ -56,6 +89,11 @@ impl Editor {
     }
 
     pub fn insert_char(&mut self, c: char) {
+        self.save_undo_state();
+        self.insert_char_raw(c);
+    }
+
+    fn insert_char_raw(&mut self, c: char) {
         let line_idx = self.buffer.line_to_char(self.cursor_y);
         let char_idx = line_idx + self.cursor_x;
         self.buffer.insert_char(char_idx, c);
@@ -64,7 +102,48 @@ impl Editor {
         self.selection_start = None;
     }
 
+    /// Delete the character to the right of the cursor (Delete key behaviour).
+    pub fn delete_char_forward(&mut self) {
+        self.save_undo_state();
+        if self.selection_start.is_some() {
+            self.delete_selection();
+            return;
+        }
+        let line_idx = self.buffer.line_to_char(self.cursor_y);
+        let char_idx = line_idx + self.cursor_x;
+        let total_chars = self.buffer.len_chars();
+        if char_idx < total_chars {
+            self.buffer.remove(char_idx..char_idx + 1);
+            self.is_dirty = true;
+        }
+    }
+
+    /// Copy selection (or current line) to clipboard, then delete it.
+    pub fn cut(&mut self) {
+        self.save_undo_state();
+        self.copy();
+        if self.selection_start.is_some() {
+            self.delete_selection();
+        } else {
+            // Cut the entire current line including its newline
+            let line_start = self.buffer.line_to_char(self.cursor_y);
+            let line_end = if self.cursor_y + 1 < self.buffer.len_lines() {
+                self.buffer.line_to_char(self.cursor_y + 1)
+            } else {
+                self.buffer.len_chars()
+            };
+            if line_start < line_end {
+                self.buffer.remove(line_start..line_end);
+                self.cursor_x = 0;
+                let max_y = self.buffer.len_lines().saturating_sub(1);
+                if self.cursor_y > max_y { self.cursor_y = max_y; }
+                self.is_dirty = true;
+            }
+        }
+    }
+
     pub fn delete_char(&mut self) {
+        self.save_undo_state();
         if self.selection_start.is_some() {
             self.delete_selection();
             return;
@@ -133,53 +212,81 @@ impl Editor {
         for i in start_line..end_line {
             let line = self.buffer.line(i).to_string();
             let highlights = h.highlight_line(&line, &self.syntax_set).unwrap_or_default();
-            
-            let mut current_char_in_line = 0;
-            let spans: Vec<ratatui::text::Span> = highlights
-                .into_iter()
-                .map(|(style, text)| {
-                    let mut span_style = ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(
-                        style.foreground.r,
-                        style.foreground.g,
-                        style.foreground.b,
-                    ));
 
-                    // Check for selection
-                    if let Some((start_y, start_x)) = self.selection_start {
-                        let (sy, sx, ey, ex) = if (start_y, start_x) < (self.cursor_y, self.cursor_x) {
-                            (start_y, start_x, self.cursor_y, self.cursor_x)
-                        } else {
-                            (self.cursor_y, self.cursor_x, start_y, start_x)
-                        };
+            // Resolve selection to a char-offset range for this line, or None if
+            // this line has no selected characters.
+            // sel_end == usize::MAX means "to end of line" (interior of multi-line selection).
+            let line_sel: Option<(usize, usize)> = if let Some((start_y, start_x)) = self.selection_start {
+                let (sy, sx, ey, ex) = if (start_y, start_x) < (self.cursor_y, self.cursor_x) {
+                    (start_y, start_x, self.cursor_y, self.cursor_x)
+                } else {
+                    (self.cursor_y, self.cursor_x, start_y, start_x)
+                };
+                if i < sy || i > ey {
+                    None
+                } else {
+                    let sel_start = if i == sy { sx } else { 0 };
+                    let sel_end   = if i == ey { ex } else { usize::MAX };
+                    Some((sel_start, sel_end))
+                }
+            } else {
+                None
+            };
 
-                        let text_len = text.chars().count();
-                        let span_range_start = current_char_in_line;
-                        let span_range_end = current_char_in_line + text_len;
+            let mut spans: Vec<ratatui::text::Span> = Vec::new();
+            let mut char_pos = 0usize;
 
-                        let line_idx = i;
-                        
-                        let is_selected = if line_idx > sy && line_idx < ey {
-                            true
-                        } else if line_idx == sy && line_idx == ey {
-                            span_range_start < ex && span_range_end > sx
-                        } else if line_idx == sy {
-                            span_range_end > sx
-                        } else if line_idx == ey {
-                            span_range_start < ex
-                        } else {
-                            false
-                        };
+            for (style, text) in highlights {
+                let base_style = ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(
+                    style.foreground.r,
+                    style.foreground.g,
+                    style.foreground.b,
+                ));
+                let sel_style = base_style
+                    .bg(ratatui::style::Color::Yellow)
+                    .fg(ratatui::style::Color::Black);
 
-                        if is_selected {
-                            span_style = span_style.bg(ratatui::style::Color::Yellow).fg(ratatui::style::Color::Black);
-                        }
-                        current_char_in_line += text_len;
+                let chars: Vec<char> = text.chars().collect();
+                let text_len = chars.len();
+                let span_start = char_pos;
+                let span_end   = char_pos + text_len;
+
+                match line_sel {
+                    None => {
+                        spans.push(ratatui::text::Span::styled(text.to_string(), base_style));
                     }
+                    Some((sel_start, sel_end)) => {
+                        // Before selection
+                        if span_start < sel_start {
+                            let end = sel_start.min(span_end);
+                            let s: String = chars[..end - span_start].iter().collect();
+                            if !s.is_empty() {
+                                spans.push(ratatui::text::Span::styled(s, base_style));
+                            }
+                        }
+                        // Within selection
+                        let ov_start = sel_start.max(span_start);
+                        let ov_end   = sel_end.min(span_end);
+                        if ov_start < ov_end {
+                            let s: String = chars[ov_start - span_start..ov_end - span_start].iter().collect();
+                            if !s.is_empty() {
+                                spans.push(ratatui::text::Span::styled(s, sel_style));
+                            }
+                        }
+                        // After selection
+                        if span_end > sel_end && sel_end != usize::MAX {
+                            let start = sel_end.max(span_start);
+                            let s: String = chars[start - span_start..].iter().collect();
+                            if !s.is_empty() {
+                                spans.push(ratatui::text::Span::styled(s, base_style));
+                            }
+                        }
+                    }
+                }
 
-                    ratatui::text::Span::styled(text.to_string(), span_style)
-                })
-                .collect();
-            
+                char_pos += text_len;
+            }
+
             lines.push(ratatui::text::Line::from(spans));
         }
 
@@ -235,10 +342,11 @@ impl Editor {
     }
 
     pub fn insert_tab(&mut self) {
-        self.insert_char(' ');
-        self.insert_char(' ');
-        self.insert_char(' ');
-        self.insert_char(' ');
+        self.save_undo_state();
+        self.insert_char_raw(' ');
+        self.insert_char_raw(' ');
+        self.insert_char_raw(' ');
+        self.insert_char_raw(' ');
     }
 
     pub fn select_all(&mut self) {
@@ -269,30 +377,32 @@ impl Editor {
     pub fn paste(&mut self, height: usize) {
         if let Some(clipboard) = &mut self.clipboard {
             if let Ok(text) = clipboard.get_text() {
-                if self.selection_start.is_some() {
-                    self.delete_selection();
-                }
-                
-                let line_idx = self.buffer.line_to_char(self.cursor_y);
-                let char_idx = line_idx + self.cursor_x;
-                self.buffer.insert(char_idx, &text);
-                
-                // Update cursor after paste
-                let text_rope = Rope::from_str(&text);
-                if text_rope.len_lines() > 1 {
-                    self.cursor_y += text_rope.len_lines() - 1;
-                    self.cursor_x = text_rope.line(text_rope.len_lines() - 1).len_chars();
-                } else {
-                    self.cursor_x += text.len();
-                }
-                self.is_dirty = true;
-                self.clamp_cursor_x();
-                
-                // Ensure the cursor (at the end of the paste) is visible.
-                // This naturally pushes the view down for large pastes, showing the text.
-                self.ensure_cursor_visible(height);
+                self.insert_paste(&text, height);
             }
         }
+    }
+
+    /// Insert arbitrary text at the cursor (used for bracketed paste events).
+    pub fn insert_paste(&mut self, text: &str, height: usize) {
+        self.save_undo_state();
+        if self.selection_start.is_some() {
+            self.delete_selection();
+        }
+
+        let line_idx = self.buffer.line_to_char(self.cursor_y);
+        let char_idx = line_idx + self.cursor_x;
+        self.buffer.insert(char_idx, text);
+
+        let text_rope = Rope::from_str(text);
+        if text_rope.len_lines() > 1 {
+            self.cursor_y += text_rope.len_lines() - 1;
+            self.cursor_x = text_rope.line(text_rope.len_lines() - 1).len_chars();
+        } else {
+            self.cursor_x += text.len();
+        }
+        self.is_dirty = true;
+        self.clamp_cursor_x();
+        self.ensure_cursor_visible(height);
     }
 
     pub fn ensure_cursor_visible(&mut self, height: usize) {
@@ -325,6 +435,42 @@ impl Editor {
         if self.cursor_x > max_x {
             self.cursor_x = max_x;
         }
+    }
+
+    pub fn move_to_line_start(&mut self) {
+        self.cursor_x = 0;
+    }
+
+    pub fn move_to_line_end(&mut self) {
+        self.cursor_x = self.get_max_cursor_x(self.cursor_y);
+    }
+
+    pub fn move_to_file_start(&mut self) {
+        self.cursor_y = 0;
+        self.cursor_x = 0;
+        self.scroll_y = 0;
+    }
+
+    pub fn move_to_file_end(&mut self, height: usize) {
+        let last_line = self.buffer.len_lines().saturating_sub(1);
+        self.cursor_y = last_line;
+        self.cursor_x = self.get_max_cursor_x(last_line);
+        self.ensure_cursor_visible(height);
+    }
+
+    pub fn page_up(&mut self, height: usize) {
+        if height == 0 { return; }
+        self.cursor_y = self.cursor_y.saturating_sub(height);
+        self.clamp_cursor_x();
+        self.ensure_cursor_visible(height);
+    }
+
+    pub fn page_down(&mut self, height: usize) {
+        if height == 0 { return; }
+        let last_line = self.buffer.len_lines().saturating_sub(1);
+        self.cursor_y = (self.cursor_y + height).min(last_line);
+        self.clamp_cursor_x();
+        self.ensure_cursor_visible(height);
     }
 }
 

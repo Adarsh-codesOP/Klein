@@ -8,11 +8,12 @@ pub const HELP_TEXT: &str = r#"
 [Enter] Expand Folder (Sidebar) / New Line (Editor)
 
 --- FOCUS CONTROL ---
-[Ctrl + R] Focus Explorer (Sidebar)
-[Ctrl + E] Focus Editor
-[Ctrl + T] Focus Terminal
-[Ctrl + B] Toggle Sidebar Visibility
-[Ctrl + `] Toggle Terminal Visibility
+[Ctrl + R]  Focus Explorer (Sidebar)
+[Ctrl + E]  Focus Editor / Maximize Editor (if already focused)
+[Ctrl + T]  Focus Terminal / Maximize Terminal (if already focused)
+[Ctrl + B]  Toggle Sidebar Visibility
+[Ctrl + J]  Toggle Terminal Visibility
+[Esc]       Restore 3-pane view (when maximized)
 
 --- TAB MANAGEMENT ---
 [Ctrl + Shift + Z] Next Tab
@@ -20,17 +21,33 @@ pub const HELP_TEXT: &str = r#"
 
 --- FILE OPERATIONS ---
 [Ctrl + S] Save Current File
+[Ctrl + W] Close Current File
 [Ctrl + Q] Quit Application
 
+--- SIDEBAR ---
+[Up/Down]   Navigate File Tree
+[Ctrl+D/U]  Page Down/Up in File Tree
+[Home/End]  Jump to First/Last Entry
+[PageUp/Dn] Page Up/Down in File Tree
+[.]         Toggle Hidden Files/Folders
+
 --- EDITOR FEATURES ---
-[Ctrl + C] Copy Selection
+[Ctrl + Z] Undo
+[Ctrl + X] Cut Selection (or current line)
+[Ctrl + C] Copy Selection (or current line)
 [Ctrl + V] Paste
 [Ctrl + A] Select All
-[Ctrl + Shift + Up/Down] Multiline Selection
-[Backspace] Delete Character
+[Shift + Arrows] Extend Selection
+[Backspace] Delete Character (left)
+[Delete]    Delete Character (right)
+[Home]      Go to Start of Line
+[End]       Go to End of Line
+[Ctrl+Home] Go to Top of File
+[Ctrl+End]  Go to Bottom of File
+[PageUp/Dn] Page Up/Down in Editor
 
 --- HELP ---
-[Ctrl + H] Toggle this help overlay
+[Ctrl + H] Toggle Help
 "#;
 
 

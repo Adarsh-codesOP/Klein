@@ -30,6 +30,22 @@ pub fn get_editor_layout(area: Rect, show_sidebar: bool) -> Vec<Rect> {
         .to_vec()
 }
 
+/// Layout used when the terminal panel is maximized (fills all available height).
+/// Slot indices match get_main_layout: [0]=hint [1]=tabs [2]=workspace(0) [3]=terminal [4]=status.
+pub fn get_maximized_terminal_layout(area: Rect) -> Vec<Rect> {
+    Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // help hint
+            Constraint::Length(1), // tab bar
+            Constraint::Length(0), // workspace (hidden)
+            Constraint::Fill(1),   // terminal fills remaining space
+            Constraint::Length(1), // status bar
+        ])
+        .split(area)
+        .to_vec()
+}
+
 pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)

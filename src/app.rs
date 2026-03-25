@@ -5,6 +5,65 @@ use crate::editor::Editor;
 use crate::terminal::Terminal;
 use crate::tabs::TabState;
 
+#[derive(PartialEq)]
+pub enum Maximized {
+    None,
+    Editor,
+    Terminal,
+}
+
+/// What to do once a save-as completes (or a normal save for named files).
+pub enum SaveAsContext {
+    JustSave,
+    SaveAndQuit,
+    SaveAndClose,
+    SaveAndSwitch,
+}
+
+pub struct SaveAsState {
+    pub folder: String,
+    pub filename: String,
+    pub active_field: usize, // 0 = folder, 1 = filename
+    pub context: SaveAsContext,
+}
+
+/// Generate a default filename like "untitled-DD-MM-YY-HHMMSS.txt" from UTC time.
+pub fn default_save_filename() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let (y, mo, d, h, mi, s) = secs_to_utc(secs);
+    format!("untitled-{:02}-{:02}-{:02}-{:02}{:02}{:02}.txt", d, mo, y % 100, h, mi, s)
+}
+
+fn secs_to_utc(secs: u64) -> (u64, u64, u64, u64, u64, u64) {
+    let sec  = secs % 60;
+    let min  = (secs / 60) % 60;
+    let hour = (secs / 3600) % 24;
+    let mut days = secs / 86400;
+    let mut year = 1970u64;
+    loop {
+        let dy = if leap(year) { 366 } else { 365 };
+        if days < dy { break; }
+        days -= dy;
+        year += 1;
+    }
+    let month_lengths: [u64; 12] = [31, if leap(year) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let mut month = 1u64;
+    for &ml in &month_lengths {
+        if days < ml { break; }
+        days -= ml;
+        month += 1;
+    }
+    (year, month, days + 1, hour, min, sec)
+}
+
+fn leap(y: u64) -> bool {
+    (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0)
+}
+
 pub enum Panel {
     Sidebar,
     Editor,
@@ -23,31 +82,49 @@ pub struct App {
     pub terminal: Terminal,
     pub last_editor_height: Cell<usize>,
     pub editor_area: Cell<ratatui::layout::Rect>,
+    pub terminal_area: Cell<ratatui::layout::Rect>,
+    /// Active mouse selection in the terminal: ((col,row),(col,row)) in inner-area coords.
+    pub terminal_sel: Option<((u16, u16), (u16, u16))>,
     pub show_help: bool,
+    pub help_scroll: usize,
     pub terminal_scroll: usize,
     pub show_quit_confirm: bool,
     pub show_unsaved_confirm: bool,
+    pub show_close_confirm: bool,
+    pub terminal_triggered_quit: bool,
     pub pending_open_path: Option<PathBuf>,
+    pub save_as: Option<SaveAsState>,
+    pub cwd: PathBuf,
+    pub maximized: Maximized,
+    /// Non-existent file passed via CLI argument. Triggers a "create it?" prompt on startup.
+    pub create_file_prompt: Option<PathBuf>,
 }
 
 impl App {
-    pub fn new() -> App {
+    pub fn new(initial_file: Option<PathBuf>, clipboard: Option<arboard::Clipboard>) -> App {
         let config = crate::config::AppConfig::load();
-        
-        // Try to respect workspace from config first, fallback to current_dir
-        let current_dir = if let Some(ws) = config.default_workspace {
-            let path = std::path::PathBuf::from(ws);
-            if path.exists() {
-               path
-            } else {
-               std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
-            }
+
+        // Always open in the directory where Klein was launched.
+        // Only fall back to the configured default_workspace if current_dir() fails.
+        let launch_dir = std::env::current_dir().unwrap_or_else(|_| {
+            config.default_workspace.as_deref()
+                .map(std::path::PathBuf::from)
+                .filter(|p| p.exists())
+                .unwrap_or_else(|| std::path::PathBuf::from("."))
+        });
+
+        // If a file was provided, root the sidebar/terminal in its parent directory.
+        let current_dir = if let Some(ref file) = initial_file {
+            file.parent()
+                .map(|p| p.to_path_buf())
+                .filter(|p| p != &PathBuf::from(""))
+                .unwrap_or_else(|| launch_dir.clone())
         } else {
-            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+            launch_dir
         };
-        
-        App {
-            active_panel: Panel::Editor,
+
+        let mut app = App {
+            active_panel: Panel::Sidebar,
             show_sidebar: true,
             show_terminal: true,
             should_quit: false,
@@ -58,12 +135,44 @@ impl App {
             terminal: Terminal::new(current_dir.clone(), config.shell.clone()),
             last_editor_height: Cell::new(20),
             editor_area: Cell::new(ratatui::layout::Rect::default()),
+            terminal_area: Cell::new(ratatui::layout::Rect::default()),
+            terminal_sel: None,
             show_help: false,
+            help_scroll: 0,
             terminal_scroll: 0,
             show_quit_confirm: false,
             show_unsaved_confirm: false,
+            show_close_confirm: false,
+            terminal_triggered_quit: false,
             pending_open_path: None,
+            save_as: None,
+            cwd: current_dir.clone(),
+            maximized: Maximized::None,
+            create_file_prompt: None,
+        };
+
+        // Give the first editor the pre-initialized clipboard (created before raw mode).
+        if let Some(cb) = clipboard {
+            app.tabs[0].editor.clipboard = Some(cb);
         }
+
+        // Send a clear command so the terminal panel opens with a clean slate
+        // instead of showing shell startup noise or DA-query responses.
+        app.terminal.send_clear();
+
+        if let Some(file) = initial_file {
+            if file.exists() {
+                // Existing file — load its contents and focus the editor.
+                app.open_in_current_tab(file);
+                app.active_panel = Panel::Editor;
+            } else {
+                // Non-existent file: prompt the user before creating anything.
+                // Sidebar keeps focus until they confirm.
+                app.create_file_prompt = Some(file);
+            }
+        }
+
+        app
     }
 
     /// Get a reference to the editor that should be displayed.
