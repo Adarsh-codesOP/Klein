@@ -42,7 +42,10 @@ pub fn render(f: &mut Frame, app: &App) {
         let main_chunks = layout::get_editor_layout(chunks[2], show_sidebar);
 
         if show_sidebar {
+            app.sidebar_area.set(main_chunks[0]);
             sidebar::render(f, main_chunks[0], app);
+        } else {
+            app.sidebar_area.set(ratatui::layout::Rect::default());
         }
 
         editor::render(f, main_chunks[1], app);
