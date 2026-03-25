@@ -108,48 +108,160 @@ pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
     Ok(())
 }
 
+fn point_in_rect(col: u16, row: u16, r: ratatui::layout::Rect) -> bool {
+    r.width > 0 && r.height > 0
+        && col >= r.x && col < r.x + r.width
+        && row >= r.y && row < r.y + r.height
+}
+
 fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
     let area = app.editor_area.get();
-    let is_in_editor = mouse.column >= area.x
-        && mouse.column < area.x + area.width
-        && mouse.row >= area.y
-        && mouse.row < area.y + area.height;
+    let is_in_editor = point_in_rect(mouse.column, mouse.row, area);
 
     let term_area = app.terminal_area.get();
-    let is_in_terminal = mouse.column >= term_area.x
-        && mouse.column < term_area.x + term_area.width
-        && mouse.row >= term_area.y
-        && mouse.row < term_area.y + term_area.height;
+    let is_in_terminal = point_in_rect(mouse.column, mouse.row, term_area);
+
+    let sidebar_area = app.sidebar_area.get();
+    let is_in_sidebar = point_in_rect(mouse.column, mouse.row, sidebar_area);
+
+    let top_bar_area = app.top_bar_area.get();
+    let is_in_top_bar = point_in_rect(mouse.column, mouse.row, top_bar_area);
+
+    let dropdown_area = app.dropdown_area.get();
+    let is_in_dropdown = dropdown_area
+        .map(|r| point_in_rect(mouse.column, mouse.row, r))
+        .unwrap_or(false);
 
     match mouse.kind {
         MouseEventKind::ScrollUp => {
-            if matches!(app.active_panel, Panel::Terminal) {
+            if is_in_terminal || matches!(app.active_panel, Panel::Terminal) {
                 app.terminal_scroll = app.terminal_scroll.saturating_add(3);
             }
         }
         MouseEventKind::ScrollDown => {
-            if matches!(app.active_panel, Panel::Terminal) {
+            if is_in_terminal || matches!(app.active_panel, Panel::Terminal) {
                 app.terminal_scroll = app.terminal_scroll.saturating_sub(3);
             }
         }
-        MouseEventKind::Down(crossterm::event::MouseButton::Left) if is_in_editor => {
-            app.active_panel = Panel::Editor;
-            let new_y = (mouse.row - area.y) as usize + app.editor().scroll_y;
-            let new_x = (mouse.column - area.x) as usize;
-
-            if new_y < app.editor().buffer.len_lines() {
-                if mouse.modifiers.contains(KeyModifiers::SHIFT) {
-                    if app.editor().selection_start.is_none() {
-                        app.editor_mut().toggle_selection();
+        MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
+            // Click on dropdown item
+            if is_in_dropdown {
+                if let Some(dd) = dropdown_area {
+                    // Row within dropdown content (subtract border)
+                    let item_row = mouse.row.saturating_sub(dd.y + 1) as usize;
+                    let items_len = if let Some(menu) = app.top_bar.active_menu {
+                        crate::ui::top_bar::get_menu_items(menu, app).len()
+                    } else {
+                        0
+                    };
+                    if item_row < items_len {
+                        app.top_bar.selected_index = item_row;
+                        app.execute_top_bar_action();
                     }
-                } else {
-                    app.editor_mut().clear_selection();
                 }
+            }
+            // Click on top bar menu label
+            else if is_in_top_bar {
+                let positions = app.top_bar_positions.take();
+                let menus = [
+                    crate::app::TopBarMenu::Navigation,
+                    crate::app::TopBarMenu::Edit,
+                    crate::app::TopBarMenu::Files,
+                    crate::app::TopBarMenu::Panels,
+                    crate::app::TopBarMenu::Sidebar,
+                    crate::app::TopBarMenu::Code,
+                    crate::app::TopBarMenu::Help,
+                    crate::app::TopBarMenu::Theme,
+                ];
+                let mut clicked_menu = None;
+                for (i, &(start, end)) in positions.iter().enumerate() {
+                    if mouse.column >= start && mouse.column < end {
+                        clicked_menu = Some(menus[i]);
+                        break;
+                    }
+                }
+                app.top_bar_positions.set(positions);
+                if let Some(menu) = clicked_menu {
+                    if app.top_bar.active_menu == Some(menu) {
+                        app.close_menu();
+                    } else {
+                        app.top_bar.active_menu = Some(menu);
+                        app.top_bar.selected_index = 0;
+                    }
+                }
+            }
+            // Click in sidebar
+            else if is_in_sidebar {
+                // Close any open menu
+                if app.top_bar.active_menu.is_some() {
+                    app.close_menu();
+                }
+                app.active_panel = Panel::Sidebar;
+                app.terminal_sel = None;
+                // Account for top border (+1) when mapping click to entry
+                let clicked_row = (mouse.row.saturating_sub(sidebar_area.y + 1)) as usize;
+                let target_index = app.sidebar.offset + clicked_row;
+                if target_index < app.sidebar.flat_list.len() {
+                    app.sidebar.selected_index = target_index;
 
-                app.editor_mut().cursor_y =
-                    new_y.min(app.editor().buffer.len_lines().saturating_sub(1));
-                app.editor_mut().cursor_x = new_x;
-                app.editor_mut().clamp_cursor_x();
+                    // Detect double-click (same position within 400ms)
+                    let now = std::time::Instant::now();
+                    let is_double_click = app
+                        .last_click
+                        .map(|(t, col, row)| {
+                            now.duration_since(t).as_millis() < 400
+                                && col == mouse.column
+                                && row == mouse.row
+                        })
+                        .unwrap_or(false);
+                    app.last_click = Some((now, mouse.column, mouse.row));
+
+                    if is_double_click {
+                        // Toggle folder or open file (same as Enter)
+                        if let Ok(Some(path)) = app.sidebar.toggle_selected() {
+                            app.preview = None;
+                            open_tab_from_path(app, path);
+                        }
+                        app.last_click = None; // Reset to prevent triple-click
+                    }
+                }
+            }
+            // Click in editor
+            else if is_in_editor {
+                if app.top_bar.active_menu.is_some() {
+                    app.close_menu();
+                }
+                app.active_panel = Panel::Editor;
+                app.terminal_sel = None;
+                let new_y = (mouse.row - area.y) as usize + app.editor().scroll_y;
+                let new_x = (mouse.column - area.x) as usize;
+
+                if new_y < app.editor().buffer.len_lines() {
+                    if mouse.modifiers.contains(KeyModifiers::SHIFT) {
+                        if app.editor().selection_start.is_none() {
+                            app.editor_mut().toggle_selection();
+                        }
+                    } else {
+                        app.editor_mut().clear_selection();
+                    }
+
+                    app.editor_mut().cursor_y =
+                        new_y.min(app.editor().buffer.len_lines().saturating_sub(1));
+                    app.editor_mut().cursor_x = new_x;
+                    app.editor_mut().clamp_cursor_x();
+                }
+            }
+            // Click in terminal
+            else if is_in_terminal {
+                if app.top_bar.active_menu.is_some() {
+                    app.close_menu();
+                }
+                app.active_panel = Panel::Terminal;
+                app.terminal_sel = None;
+            }
+            // Click elsewhere closes menu
+            else if app.top_bar.active_menu.is_some() {
+                app.close_menu();
             }
         }
         MouseEventKind::Drag(crossterm::event::MouseButton::Left) => {
@@ -157,8 +269,6 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
                 let term_y = mouse.row.saturating_sub(term_area.y).saturating_sub(1) as usize;
                 let term_x = mouse.column.saturating_sub(term_area.x).saturating_sub(1) as usize;
 
-                // For simplicity, we just use term_y as the absolute Y within the grid
-                // This means selection highlights will be restricted to the active screen view.
                 let abs_y = term_y;
 
                 if let Some((sel_start, _)) = app.terminal_sel {
@@ -167,7 +277,6 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
                     app.terminal_sel = Some(((abs_y, term_x), (abs_y, term_x)));
                 }
 
-                // Copy selection immediately on drag like most modern terminals
                 copy_terminal_selection(app);
             } else if is_in_editor {
                 if app.editor().selection_start.is_none() {
@@ -177,13 +286,11 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
                 let new_x = (mouse.column.saturating_sub(area.x)) as usize;
 
                 if mouse.row < area.y {
-                    // Dragging above the editor area
                     let scroll_y = app.editor().scroll_y;
                     app.editor_mut().scroll_y = scroll_y.saturating_sub(1);
                     let scroll_y = app.editor().scroll_y;
                     app.editor_mut().cursor_y = scroll_y;
                 } else if mouse.row >= area.y + area.height {
-                    // Dragging below the editor area
                     let scroll_y = app.editor().scroll_y;
                     let buf_len = app.editor().buffer.len_lines();
                     if scroll_y + (area.height as usize) < buf_len {
@@ -194,7 +301,6 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
                         .saturating_sub(1)
                         .min(buf_len.saturating_sub(1));
                 } else {
-                    // Within editor area y-bounds
                     let scroll_y = app.editor().scroll_y;
                     let target_y = (mouse.row - area.y) as usize + scroll_y;
                     app.editor_mut().cursor_y =
@@ -684,7 +790,13 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
     }
 
     // Global Control shortcuts
-    if key.modifiers.contains(KeyModifiers::CONTROL) {
+    // Let Ctrl(+Shift)+Home/End and Ctrl+Shift+Left/Right fall through to editor handler
+    let ctrl_nav_to_editor = key.modifiers.contains(KeyModifiers::CONTROL)
+        && matches!(app.active_panel, Panel::Editor)
+        && (matches!(key.code, KeyCode::Home | KeyCode::End | KeyCode::PageUp | KeyCode::PageDown)
+            || (key.modifiers.contains(KeyModifiers::SHIFT)
+                && matches!(key.code, KeyCode::Left | KeyCode::Right)));
+    if key.modifiers.contains(KeyModifiers::CONTROL) && !ctrl_nav_to_editor {
         // Ctrl+Shift combos
         if key.modifiers.contains(KeyModifiers::SHIFT) {
             match key.code {
@@ -963,8 +1075,37 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     schedule_document_sync(app);
                     return Ok(());
                 }
-                app.editor_mut().clear_selection();
-                app.editor_mut().move_cursor_left();
+                if is_selecting {
+                    app.editor_mut().toggle_selection();
+                } else {
+                    app.editor_mut().clear_selection();
+                }
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    // Word-left: skip whitespace then non-whitespace
+                    let editor = app.editor_mut();
+                    let line = editor.buffer.line(editor.cursor_y);
+                    let text: String = line.chars().collect();
+                    if editor.cursor_x == 0 {
+                        if editor.cursor_y > 0 {
+                            editor.cursor_y -= 1;
+                            editor.cursor_x = editor.get_max_cursor_x(editor.cursor_y);
+                        }
+                    } else {
+                        let mut x = editor.cursor_x;
+                        let chars: Vec<char> = text.chars().collect();
+                        // Skip whitespace backwards
+                        while x > 0 && chars.get(x - 1).map_or(false, |c| c.is_whitespace()) {
+                            x -= 1;
+                        }
+                        // Skip word chars backwards
+                        while x > 0 && chars.get(x - 1).map_or(false, |c| !c.is_whitespace()) {
+                            x -= 1;
+                        }
+                        editor.cursor_x = x;
+                    }
+                } else {
+                    app.editor_mut().move_cursor_left();
+                }
                 app.lsp_state.hover = None;
                 return Ok(());
             }
@@ -974,8 +1115,39 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     schedule_document_sync(app);
                     return Ok(());
                 }
-                app.editor_mut().clear_selection();
-                app.editor_mut().move_cursor_right();
+                if is_selecting {
+                    app.editor_mut().toggle_selection();
+                } else {
+                    app.editor_mut().clear_selection();
+                }
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    // Word-right: skip non-whitespace then whitespace
+                    let editor = app.editor_mut();
+                    let line = editor.buffer.line(editor.cursor_y);
+                    let text: String = line.chars().collect();
+                    let max_x = editor.get_max_cursor_x(editor.cursor_y);
+                    if editor.cursor_x >= max_x {
+                        let total_lines = editor.buffer.len_lines();
+                        if editor.cursor_y + 1 < total_lines {
+                            editor.cursor_y += 1;
+                            editor.cursor_x = 0;
+                        }
+                    } else {
+                        let mut x = editor.cursor_x;
+                        let chars: Vec<char> = text.chars().collect();
+                        // Skip word chars forward
+                        while x < max_x && chars.get(x).map_or(false, |c| !c.is_whitespace()) {
+                            x += 1;
+                        }
+                        // Skip whitespace forward
+                        while x < max_x && chars.get(x).map_or(false, |c| c.is_whitespace()) {
+                            x += 1;
+                        }
+                        editor.cursor_x = x;
+                    }
+                } else {
+                    app.editor_mut().move_cursor_right();
+                }
                 app.lsp_state.hover = None;
                 return Ok(());
             }

@@ -8,7 +8,7 @@ use ratatui::{
 };
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
-    let menus = vec![
+    let menu_labels = vec![
         " Navigation ",
         " Edit ",
         " Files ",
@@ -31,28 +31,76 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         None => 999, // Nothing selected
     };
 
-    let tabs = Tabs::new(menus.clone())
-        .select(if selected_tab == 999 { 0 } else { selected_tab })
-        .style(Style::default().fg(app.theme.top_bar.text))
-        .highlight_style(if selected_tab == 999 {
-            Style::default().fg(app.theme.top_bar.text)
-        } else {
-            Style::default()
-                .fg(app.theme.top_bar.background)
-                .bg(app.theme.top_bar.text)
-                .add_modifier(Modifier::BOLD)
+    // Build styled menu labels with underlined first letter (the Alt shortcut key)
+    let menus: Vec<Line> = menu_labels
+        .iter()
+        .enumerate()
+        .map(|(i, label)| {
+            let trimmed = label.trim_start();
+            let leading_spaces = label.len() - trimmed.len();
+            let prefix = &label[..leading_spaces];
+            let first_char = &trimmed[..1];
+            let rest = &trimmed[1..];
+
+            let is_selected = i == selected_tab;
+            let base_style = if is_selected {
+                Style::default()
+                    .fg(ratatui::style::Color::Black)
+                    .bg(app.theme.top_bar.text)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(app.theme.top_bar.text)
+            };
+
+            Line::from(vec![
+                Span::styled(prefix, base_style),
+                Span::styled(first_char, base_style.add_modifier(Modifier::UNDERLINED)),
+                Span::styled(rest, base_style),
+            ])
         })
+        .collect();
+
+    // We style each tab manually in the Line construction above,
+    // so set highlight_style same as base to avoid Tabs widget double-highlighting.
+    let tabs = Tabs::new(menus)
+        .select(selected_tab)
+        .style(Style::default().fg(app.theme.top_bar.text))
+        .highlight_style(
+            Style::default()
+                .fg(ratatui::style::Color::Black)
+                .bg(app.theme.top_bar.text)
+                .add_modifier(Modifier::BOLD),
+        )
         .divider("│");
 
     f.render_widget(tabs, area);
 
-    // If a menu is active, render the dropdown
+    // Store menu positions for mouse click detection
+    // Tabs widget layout: padding_left(1) + tab + padding_right(1) + divider(1) + padding_left(1) + tab + ...
+    {
+        let mut positions = Vec::new();
+        let mut x = area.x;
+        for (i, label) in menu_labels.iter().enumerate() {
+            if i == 0 {
+                x += 1; // initial left padding
+            }
+            let w = label.chars().count() as u16;
+            positions.push((x, x + w));
+            x += w + 3; // right_padding(1) + divider(1) + left_padding(1)
+        }
+        app.top_bar_positions.set(positions);
+        app.top_bar_area.set(area);
+    }
+
+    // If a menu is active, render the dropdown; otherwise clear dropdown area
+    if app.top_bar.active_menu.is_none() {
+        app.dropdown_area.set(None);
+    }
     if let Some(active_menu) = app.top_bar.active_menu {
         // Calculate the starting x position of the selected tab approximately
-        // Each tab name length + divider. Let's do a simple calculation.
         let mut x_offset = area.x;
-        for menu in menus.iter().take(selected_tab) {
-            x_offset += menu.chars().count() as u16 + 1; // +1 for divider
+        for label in menu_labels.iter().take(selected_tab) {
+            x_offset += label.chars().count() as u16 + 1; // +1 for divider
         }
 
         render_dropdown(
@@ -137,7 +185,8 @@ fn render_dropdown(
     menu: TopBarMenu,
     selected_index: usize,
     app: &App,
-) {
+)
+ {
     let items = get_menu_items(menu, app);
 
     let max_shortcut_len = items
@@ -163,6 +212,8 @@ fn render_dropdown(
         width,
         height,
     };
+
+    app.dropdown_area.set(Some(dropdown_area));
 
     f.render_widget(Clear, dropdown_area);
 

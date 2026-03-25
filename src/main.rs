@@ -3,6 +3,7 @@ use clap::Parser;
 use crossterm::{
     event::{
         self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+        KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
     },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -83,6 +84,12 @@ async fn main() -> Result<()> {
         EnableMouseCapture,
         EnableBracketedPaste
     )?;
+    // Best-effort: enable enhanced keyboard protocol for terminals that support it
+    let has_keyboard_enhancement = execute!(
+        stdout,
+        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+    )
+    .is_ok();
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -95,6 +102,9 @@ async fn main() -> Result<()> {
 
     // Restore terminal
     disable_raw_mode()?;
+    if has_keyboard_enhancement {
+        let _ = execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags);
+    }
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
