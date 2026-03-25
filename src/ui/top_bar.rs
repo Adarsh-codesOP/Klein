@@ -63,9 +63,14 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     // We style each tab manually in the Line construction above,
     // so set highlight_style same as base to avoid Tabs widget double-highlighting.
     let tabs = Tabs::new(menus)
-        .select(selected_tab.min(7))
+        .select(selected_tab)
         .style(Style::default().fg(app.theme.top_bar.text))
-        .highlight_style(Style::default().fg(app.theme.top_bar.text))
+        .highlight_style(
+            Style::default()
+                .fg(ratatui::style::Color::Black)
+                .bg(app.theme.top_bar.text)
+                .add_modifier(Modifier::BOLD),
+        )
         .divider("│");
 
     f.render_widget(tabs, area);

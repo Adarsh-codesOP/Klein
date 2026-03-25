@@ -7,6 +7,7 @@ pub const HELP_TEXT: &str = r#"
 [Ctrl+U / PgUp] Page Up
 [Home / End] Jump to Top/Bottom
 [Enter] Open File / Toggle Folder
+[Double-Click] Open File / Toggle Folder
 
 --- EDITOR ---
 [Home / End] Start/End of Line
@@ -14,12 +15,21 @@ pub const HELP_TEXT: &str = r#"
 [PgUp / PgDn] Scroll Page
 [Delete] Forward Delete / Delete Selection
 [Shift+Arrows] Extend Selection
+[Shift+Home / Shift+End] Select to Line Start/End
+[Shift+PgUp / Shift+PgDn] Select by Page
+[Ctrl+Shift+Home / End] Select to File Start/End
+[Ctrl+Shift+Left / Right] Select Word by Word
+[Ctrl+Shift+PgUp / PgDn] Select Page
 [Ctrl+X] Cut Line / Selection
 [Ctrl+C / Ctrl+V] Copy / Paste
 [Ctrl+A] Select All
 [Ctrl+Z] Undo
+[Alt+Up / Alt+Down] Expand / Shrink Selection
+[Alt+Left / Alt+Right] Swap Nodes
+[Alt+Shift+Up / Down] Move Block
 
 --- FILE MANAGEMENT ---
+[Ctrl+N] New File
 [Ctrl+P] Find File (fzf)
 [Ctrl+G] Project Search (rg)
 [Ctrl+W] Close Current File
@@ -29,11 +39,25 @@ pub const HELP_TEXT: &str = r#"
 
 --- FOCUS CONTROL ---
 [Ctrl+F] Focus Sidebar
-[Ctrl+E] Focus Editor
-[Ctrl+T] Focus Terminal
+[Ctrl+E] Focus / Maximize Editor
+[Ctrl+T] Focus / Maximize Terminal
 [Ctrl+B] Toggle Sidebar Visibility
 [Ctrl+J] Toggle Terminal Visibility
+[Ctrl+Left / Right] Switch Panels
+[Ctrl+Up / Down] Switch Panels
 [Esc] Restore Standard Layout / Close Overlays
+
+--- MOUSE ---
+[Click] Focus Panel / Select Entry
+[Double-Click] Open File / Toggle Folder (Sidebar)
+[Shift+Click] Extend Selection (Editor)
+[Drag] Select Text (Editor / Terminal)
+[Scroll] Scroll Terminal
+
+--- MENUS ---
+[Alt+N/E/F/P/S/C/H] Open Menu
+[Click Menu Label] Open / Close Menu
+[Click Menu Item] Execute Action
 
 --- HELP ---
 [Ctrl+H / Esc] Toggle Help Overlay
@@ -45,6 +69,7 @@ pub const HELP_TEXT: &str = r#"
 [Alt+G, then n] Rename Symbol under Cursor
 [Alt+F] Format Document
 [Alt+Enter] Code Actions / Quick Fix
+[Alt+K] Trigger Hover Info
 "#;
 
 pub mod colors {

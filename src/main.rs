@@ -63,16 +63,9 @@ async fn main() -> Result<()> {
     });
 
     // Bridge: crossterm terminal events → unified channel (runs on blocking thread)
-    // Filter out key Release events to avoid unnecessary redraws
     let term_event_tx = event_tx.clone();
     std::thread::spawn(move || {
-        use crossterm::event::{Event as CEvent, KeyEventKind};
         while let Ok(ev) = event::read() {
-            if let CEvent::Key(ref key) = ev {
-                if key.kind == KeyEventKind::Release {
-                    continue;
-                }
-            }
             if term_event_tx
                 .send(events::klein_event::KleinEvent::Terminal(ev))
                 .is_err()
@@ -127,103 +120,14 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn process_event(
-    app: &mut App,
-    klein_event: events::klein_event::KleinEvent,
-) -> io::Result<()> {
-    match klein_event {
-        events::klein_event::KleinEvent::Terminal(ev) => {
-            events::handle_event(app, ev)?;
-        }
-        events::klein_event::KleinEvent::Lsp(notification) => {
-            events::handle_lsp_notification(app, notification);
-        }
-        events::klein_event::KleinEvent::Timer(kind) => {
-            events::handle_timer_event(app, kind);
-        }
-        events::klein_event::KleinEvent::InitLsp(path) => {
-            log::warn!("LSP: received InitLsp for {}", path.display());
-            if app
-                .lsp_manager
-                .ensure_server_for_file(&path)
-                .await
-                .is_some()
-            {
-                log::warn!("LSP: server confirmed for {}", path.display());
-                app.notify_lsp_did_open_for_path(&path);
-            } else {
-                log::error!(
-                    "LSP: server NOT found or failed to start for {}",
-                    path.display()
-                );
-            }
-        }
-        events::klein_event::KleinEvent::GotoDefinition => {
-            app.trigger_goto_definition();
-        }
-        events::klein_event::KleinEvent::FindReferences => {
-            app.trigger_find_references();
-        }
-        events::klein_event::KleinEvent::FormatDocument => {
-            app.trigger_format_document();
-        }
-        events::klein_event::KleinEvent::Rename => {
-            app.execute_rename();
-        }
-        events::klein_event::KleinEvent::CodeAction => {
-            app.trigger_code_action();
-        }
-        events::klein_event::KleinEvent::CompletionResponse(resp, path, pos) => {
-            app.handle_completion_response(resp, path, pos);
-        }
-        events::klein_event::KleinEvent::HoverResponse(resp, path, pos) => {
-            app.handle_hover_response(resp, path, pos);
-        }
-        events::klein_event::KleinEvent::DefinitionResponse(resp, path) => {
-            app.handle_definition_response(resp, path);
-        }
-        events::klein_event::KleinEvent::ReferencesResponse(resp, path) => {
-            app.handle_references_response(resp, path);
-        }
-        events::klein_event::KleinEvent::FormatResponse(resp, path) => {
-            app.handle_format_response(resp, path);
-        }
-        events::klein_event::KleinEvent::RenameResponse(resp, path, new_name) => {
-            app.handle_rename_response(resp, path, new_name);
-        }
-        events::klein_event::KleinEvent::CodeActionResponse(resp, path, pos) => {
-            app.handle_code_action_response(resp, path, pos);
-        }
-        events::klein_event::KleinEvent::RefreshTheme => {
-            log::info!("Hot-reloading themes...");
-            app.reload_themes();
-        }
-    }
-    Ok(())
-}
-
 async fn run_app<B: io::Write + ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
     mut event_rx: tokio::sync::mpsc::UnboundedReceiver<events::klein_event::KleinEvent>,
 ) -> io::Result<()> {
-    // Initial draw
-    terminal.draw(|f| ui::render(f, app))?;
-
     loop {
-        // Block until at least one event arrives
-        if let Some(first_event) = event_rx.recv().await {
-            process_event(app, first_event).await?;
-        }
+        terminal.draw(|f| ui::render(f, app))?;
 
-        // Give a tiny window for more events to arrive, then drain them all.
-        // This batches rapid key events so we only draw once per batch.
-        tokio::task::yield_now().await;
-        while let Ok(ev) = event_rx.try_recv() {
-            process_event(app, ev).await?;
-        }
-
-        // Check terminal child exit
         if !app.terminal_restarting {
             let mut child_exited = false;
             if let Ok(mut child) = app.terminal.child.lock() {
@@ -243,8 +147,80 @@ async fn run_app<B: io::Write + ratatui::backend::Backend>(
             app.maximized = klein_ide::app::Maximized::None;
         }
 
-        // Single draw after all events are processed
-        terminal.draw(|f| ui::render(f, app))?;
+        // Drain all pending events (non-blocking)
+        while let Ok(klein_event) = event_rx.try_recv() {
+            match klein_event {
+                events::klein_event::KleinEvent::Terminal(ev) => {
+                    events::handle_event(app, ev)?;
+                }
+                events::klein_event::KleinEvent::Lsp(notification) => {
+                    events::handle_lsp_notification(app, notification);
+                }
+                events::klein_event::KleinEvent::Timer(kind) => {
+                    events::handle_timer_event(app, kind);
+                }
+                events::klein_event::KleinEvent::InitLsp(path) => {
+                    log::warn!("LSP: received InitLsp for {}", path.display());
+                    if app
+                        .lsp_manager
+                        .ensure_server_for_file(&path)
+                        .await
+                        .is_some()
+                    {
+                        log::warn!("LSP: server confirmed for {}", path.display());
+                        app.notify_lsp_did_open_for_path(&path);
+                    } else {
+                        log::error!(
+                            "LSP: server NOT found or failed to start for {}",
+                            path.display()
+                        );
+                    }
+                }
+                events::klein_event::KleinEvent::GotoDefinition => {
+                    app.trigger_goto_definition();
+                }
+                events::klein_event::KleinEvent::FindReferences => {
+                    app.trigger_find_references();
+                }
+                events::klein_event::KleinEvent::FormatDocument => {
+                    app.trigger_format_document();
+                }
+                events::klein_event::KleinEvent::Rename => {
+                    app.execute_rename();
+                }
+                events::klein_event::KleinEvent::CodeAction => {
+                    app.trigger_code_action();
+                }
+                events::klein_event::KleinEvent::CompletionResponse(resp, path, pos) => {
+                    app.handle_completion_response(resp, path, pos);
+                }
+                events::klein_event::KleinEvent::HoverResponse(resp, path, pos) => {
+                    app.handle_hover_response(resp, path, pos);
+                }
+                events::klein_event::KleinEvent::DefinitionResponse(resp, path) => {
+                    app.handle_definition_response(resp, path);
+                }
+                events::klein_event::KleinEvent::ReferencesResponse(resp, path) => {
+                    app.handle_references_response(resp, path);
+                }
+                events::klein_event::KleinEvent::FormatResponse(resp, path) => {
+                    app.handle_format_response(resp, path);
+                }
+                events::klein_event::KleinEvent::RenameResponse(resp, path, new_name) => {
+                    app.handle_rename_response(resp, path, new_name);
+                }
+                events::klein_event::KleinEvent::CodeActionResponse(resp, path, pos) => {
+                    app.handle_code_action_response(resp, path, pos);
+                }
+                events::klein_event::KleinEvent::RefreshTheme => {
+                    log::info!("Hot-reloading themes...");
+                    app.reload_themes();
+                }
+            }
+        }
+
+        // Yield briefly so the channel can accumulate events
+        tokio::time::sleep(std::time::Duration::from_millis(8)).await;
 
         if app.should_quit {
             log::info!("Klein shutting down");

@@ -198,11 +198,32 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
                 }
                 app.active_panel = Panel::Sidebar;
                 app.terminal_sel = None;
-                // Calculate which sidebar entry was clicked
-                let clicked_row = (mouse.row - sidebar_area.y) as usize;
+                // Account for top border (+1) when mapping click to entry
+                let clicked_row = (mouse.row.saturating_sub(sidebar_area.y + 1)) as usize;
                 let target_index = app.sidebar.offset + clicked_row;
                 if target_index < app.sidebar.flat_list.len() {
                     app.sidebar.selected_index = target_index;
+
+                    // Detect double-click (same position within 400ms)
+                    let now = std::time::Instant::now();
+                    let is_double_click = app
+                        .last_click
+                        .map(|(t, col, row)| {
+                            now.duration_since(t).as_millis() < 400
+                                && col == mouse.column
+                                && row == mouse.row
+                        })
+                        .unwrap_or(false);
+                    app.last_click = Some((now, mouse.column, mouse.row));
+
+                    if is_double_click {
+                        // Toggle folder or open file (same as Enter)
+                        if let Ok(Some(path)) = app.sidebar.toggle_selected() {
+                            app.preview = None;
+                            open_tab_from_path(app, path);
+                        }
+                        app.last_click = None; // Reset to prevent triple-click
+                    }
                 }
             }
             // Click in editor
