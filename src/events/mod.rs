@@ -86,11 +86,10 @@ fn schedule_hover(app: &mut App) {
 }
 pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
     match event {
-        Event::Key(key) => {
-            if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat {
-                handle_key_event(app, key)?;
-            }
+        Event::Key(key) if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat => {
+            handle_key_event(app, key)?;
         }
+        Event::Key(_) => {} // Ignore other key events
         Event::Mouse(mouse) => {
             handle_mouse_event(app, mouse)?;
         }
@@ -205,10 +204,8 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
                 app.editor_mut().clamp_cursor_x();
             }
         }
-        MouseEventKind::Up(crossterm::event::MouseButton::Left) => {
-            if app.terminal_sel.is_some() {
-                copy_terminal_selection(app);
-            }
+        MouseEventKind::Up(crossterm::event::MouseButton::Left) if app.terminal_sel.is_some() => {
+            copy_terminal_selection(app);
         }
         _ => {}
     }
@@ -520,36 +517,32 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             KeyCode::Tab | KeyCode::Up | KeyCode::Down => {
                 app.save_as_state.focus_filename = !app.save_as_state.focus_filename;
             }
-            KeyCode::Backspace => {
-                if app.save_as_state.focus_filename {
-                    app.save_as_state.filename.pop();
-                    app.save_as_state.is_edited = true;
-                }
+            KeyCode::Backspace if app.save_as_state.focus_filename => {
+                app.save_as_state.filename.pop();
+                app.save_as_state.is_edited = true;
             }
-            KeyCode::Delete => {
+            KeyCode::Delete if app.save_as_state.focus_filename => {
                 // For a simple text field, delete can behave like backspace if we don't track cursor pos
-                if app.save_as_state.focus_filename {
-                    app.save_as_state.filename.pop();
-                    app.save_as_state.is_edited = true;
-                }
+                app.save_as_state.filename.pop();
+                app.save_as_state.is_edited = true;
             }
-            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if app.save_as_state.focus_filename {
+            KeyCode::Char('u')
+                if key.modifiers.contains(KeyModifiers::CONTROL)
+                    && app.save_as_state.focus_filename =>
+            {
+                app.save_as_state.filename.clear();
+                app.save_as_state.is_edited = true;
+            }
+            KeyCode::Char(c)
+                if app.save_as_state.focus_filename
+                    && !key.modifiers.contains(KeyModifiers::CONTROL)
+                    && !key.modifiers.contains(KeyModifiers::ALT) =>
+            {
+                if !app.save_as_state.is_edited {
                     app.save_as_state.filename.clear();
                     app.save_as_state.is_edited = true;
                 }
-            }
-            KeyCode::Char(c) => {
-                if app.save_as_state.focus_filename
-                    && !key.modifiers.contains(KeyModifiers::CONTROL)
-                    && !key.modifiers.contains(KeyModifiers::ALT)
-                {
-                    if !app.save_as_state.is_edited {
-                        app.save_as_state.filename.clear();
-                        app.save_as_state.is_edited = true;
-                    }
-                    app.save_as_state.filename.push(c);
-                }
+                app.save_as_state.filename.push(c);
             }
             _ => {}
         }

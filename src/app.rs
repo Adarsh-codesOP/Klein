@@ -1126,7 +1126,7 @@ impl App {
         }
 
         let mut sorted_edits = edits;
-        sorted_edits.sort_by(|a, b| b.range.start.cmp(&a.range.start));
+        sorted_edits.sort_by_key(|b| std::cmp::Reverse(b.range.start));
 
         if let Some(tab_idx) = self.find_tab_by_path(&path) {
             let editor = &mut self.tabs[tab_idx].editor;
@@ -1285,7 +1285,7 @@ impl App {
         mut edits: Vec<lsp_types::TextEdit>,
     ) {
         // Sort in reverse
-        edits.sort_by(|a, b| b.range.start.cmp(&a.range.start));
+        edits.sort_by_key(|b| std::cmp::Reverse(b.range.start));
 
         if let Some(tab_idx) = self.find_tab_by_path(&path) {
             let editor = &mut self.tabs[tab_idx].editor;
