@@ -225,7 +225,11 @@ pub fn copy_terminal_selection(app: &mut App) {
             sel_start
         };
 
-        let parser_lock = app.terminal.parser.lock().expect("Failed to lock terminal parser");
+        let parser_lock = app
+            .terminal
+            .parser
+            .lock()
+            .expect("Failed to lock terminal parser");
         let mut screen = parser_lock.screen().clone();
         screen.set_scrollback(app.terminal_scroll);
 

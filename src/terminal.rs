@@ -92,14 +92,23 @@ impl Terminal {
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
         cmd.cwd(&cwd);
-        let child = pty_pair.slave.spawn_command(cmd).expect("Failed to spawn shell command in PTY");
+        let child = pty_pair
+            .slave
+            .spawn_command(cmd)
+            .expect("Failed to spawn shell command in PTY");
 
         // Drop slave proactively to ensure EOF reaches master when child exits
         drop(pty_pair.slave);
 
-        let writer = pty_pair.master.take_writer().expect("Failed to take PTY writer");
+        let writer = pty_pair
+            .master
+            .take_writer()
+            .expect("Failed to take PTY writer");
         let writer_arc = Arc::new(Mutex::new(writer));
-        let mut reader = pty_pair.master.try_clone_reader().expect("Failed to clone PTY reader");
+        let mut reader = pty_pair
+            .master
+            .try_clone_reader()
+            .expect("Failed to clone PTY reader");
 
         let parser = Arc::new(Mutex::new(vt100::Parser::new(24, 80, 10000)));
         let parser_clone = Arc::clone(&parser);

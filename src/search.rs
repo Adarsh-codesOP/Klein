@@ -89,7 +89,9 @@ pub fn run_grep(query: &str) -> Vec<SearchResult> {
             );
 
             if !local_results.is_empty() {
-                let mut global = results.lock().expect("Failed to lock global search results");
+                let mut global = results
+                    .lock()
+                    .expect("Failed to lock global search results");
                 global.extend(local_results);
                 if global.len() > 2000 {
                     return WalkState::Quit;
