@@ -22,7 +22,7 @@ impl Terminal {
                 pixel_width: 0,
                 pixel_height: 0,
             })
-            .unwrap();
+            .expect("Failed to open pseudo-terminal");
 
         // Check if preferred shell exists and is usable
         let mut explicit_shell: Option<(String, Vec<&str>)> = None;
@@ -92,14 +92,14 @@ impl Terminal {
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
         cmd.cwd(&cwd);
-        let child = pty_pair.slave.spawn_command(cmd).unwrap();
+        let child = pty_pair.slave.spawn_command(cmd).expect("Failed to spawn shell command in PTY");
 
         // Drop slave proactively to ensure EOF reaches master when child exits
         drop(pty_pair.slave);
 
-        let writer = pty_pair.master.take_writer().unwrap();
+        let writer = pty_pair.master.take_writer().expect("Failed to take PTY writer");
         let writer_arc = Arc::new(Mutex::new(writer));
-        let mut reader = pty_pair.master.try_clone_reader().unwrap();
+        let mut reader = pty_pair.master.try_clone_reader().expect("Failed to clone PTY reader");
 
         let parser = Arc::new(Mutex::new(vt100::Parser::new(24, 80, 10000)));
         let parser_clone = Arc::clone(&parser);
@@ -115,12 +115,12 @@ impl Terminal {
                 let text = String::from_utf8_lossy(&buf[..n]);
                 // DA Query Response for shells like Fish
                 if text.contains("\x1b[c") || text.contains("\x1b[0c") {
-                    let mut w = writer_clone.lock().unwrap();
+                    let mut w = writer_clone.lock().expect("Failed to lock PTY writer");
                     let _ = w.write_all(b"\x1b[?62;1;2;3;4;6;7;8;9c");
                     let _ = w.flush();
                 }
 
-                let mut p = parser_clone.lock().unwrap();
+                let mut p = parser_clone.lock().expect("Failed to lock terminal parser");
 
                 // Many shells on Windows/Portable-PTY fail to emit \r with \n in raw mode.
                 // We inject \r before \n if missing to prevent staircasing in the VT100 grid.

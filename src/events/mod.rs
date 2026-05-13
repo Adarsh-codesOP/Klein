@@ -225,7 +225,7 @@ pub fn copy_terminal_selection(app: &mut App) {
             sel_start
         };
 
-        let parser_lock = app.terminal.parser.lock().unwrap();
+        let parser_lock = app.terminal.parser.lock().expect("Failed to lock terminal parser");
         let mut screen = parser_lock.screen().clone();
         screen.set_scrollback(app.terminal_scroll);
 
@@ -309,49 +309,55 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 return Ok(());
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                let items_len =
-                    crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap(), app).len();
-                app.top_bar.selected_index = (app.top_bar.selected_index + 1) % items_len;
+                if let Some(active) = app.top_bar.active_menu {
+                    let items_len = crate::ui::top_bar::get_menu_items(active, app).len();
+                    app.top_bar.selected_index = (app.top_bar.selected_index + 1) % items_len;
+                }
                 return Ok(());
             }
             KeyCode::Up | KeyCode::Char('k') => {
-                let items_len =
-                    crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap(), app).len();
-                if app.top_bar.selected_index == 0 {
-                    app.top_bar.selected_index = items_len - 1;
-                } else {
-                    app.top_bar.selected_index -= 1;
+                if let Some(active) = app.top_bar.active_menu {
+                    let items_len = crate::ui::top_bar::get_menu_items(active, app).len();
+                    if app.top_bar.selected_index == 0 {
+                        app.top_bar.selected_index = items_len - 1;
+                    } else {
+                        app.top_bar.selected_index -= 1;
+                    }
                 }
                 return Ok(());
             }
             KeyCode::Right | KeyCode::Char('l') => {
-                let next = match app.top_bar.active_menu.unwrap() {
-                    crate::app::TopBarMenu::Navigation => crate::app::TopBarMenu::Edit,
-                    crate::app::TopBarMenu::Edit => crate::app::TopBarMenu::Files,
-                    crate::app::TopBarMenu::Files => crate::app::TopBarMenu::Panels,
-                    crate::app::TopBarMenu::Panels => crate::app::TopBarMenu::Sidebar,
-                    crate::app::TopBarMenu::Sidebar => crate::app::TopBarMenu::Code,
-                    crate::app::TopBarMenu::Code => crate::app::TopBarMenu::Help,
-                    crate::app::TopBarMenu::Help => crate::app::TopBarMenu::Theme,
-                    crate::app::TopBarMenu::Theme => crate::app::TopBarMenu::Navigation,
-                };
-                app.top_bar.active_menu = Some(next);
-                app.top_bar.selected_index = 0;
+                if let Some(active) = app.top_bar.active_menu {
+                    let next = match active {
+                        crate::app::TopBarMenu::Navigation => crate::app::TopBarMenu::Edit,
+                        crate::app::TopBarMenu::Edit => crate::app::TopBarMenu::Files,
+                        crate::app::TopBarMenu::Files => crate::app::TopBarMenu::Panels,
+                        crate::app::TopBarMenu::Panels => crate::app::TopBarMenu::Sidebar,
+                        crate::app::TopBarMenu::Sidebar => crate::app::TopBarMenu::Code,
+                        crate::app::TopBarMenu::Code => crate::app::TopBarMenu::Help,
+                        crate::app::TopBarMenu::Help => crate::app::TopBarMenu::Theme,
+                        crate::app::TopBarMenu::Theme => crate::app::TopBarMenu::Navigation,
+                    };
+                    app.top_bar.active_menu = Some(next);
+                    app.top_bar.selected_index = 0;
+                }
                 return Ok(());
             }
             KeyCode::Left | KeyCode::Char('h') => {
-                let prev = match app.top_bar.active_menu.unwrap() {
-                    crate::app::TopBarMenu::Navigation => crate::app::TopBarMenu::Theme,
-                    crate::app::TopBarMenu::Edit => crate::app::TopBarMenu::Navigation,
-                    crate::app::TopBarMenu::Files => crate::app::TopBarMenu::Edit,
-                    crate::app::TopBarMenu::Panels => crate::app::TopBarMenu::Files,
-                    crate::app::TopBarMenu::Sidebar => crate::app::TopBarMenu::Panels,
-                    crate::app::TopBarMenu::Code => crate::app::TopBarMenu::Sidebar,
-                    crate::app::TopBarMenu::Help => crate::app::TopBarMenu::Code,
-                    crate::app::TopBarMenu::Theme => crate::app::TopBarMenu::Help,
-                };
-                app.top_bar.active_menu = Some(prev);
-                app.top_bar.selected_index = 0;
+                if let Some(active) = app.top_bar.active_menu {
+                    let prev = match active {
+                        crate::app::TopBarMenu::Navigation => crate::app::TopBarMenu::Theme,
+                        crate::app::TopBarMenu::Edit => crate::app::TopBarMenu::Navigation,
+                        crate::app::TopBarMenu::Files => crate::app::TopBarMenu::Edit,
+                        crate::app::TopBarMenu::Panels => crate::app::TopBarMenu::Files,
+                        crate::app::TopBarMenu::Sidebar => crate::app::TopBarMenu::Panels,
+                        crate::app::TopBarMenu::Code => crate::app::TopBarMenu::Sidebar,
+                        crate::app::TopBarMenu::Help => crate::app::TopBarMenu::Code,
+                        crate::app::TopBarMenu::Theme => crate::app::TopBarMenu::Help,
+                    };
+                    app.top_bar.active_menu = Some(prev);
+                    app.top_bar.selected_index = 0;
+                }
                 return Ok(());
             }
             KeyCode::Enter => {
@@ -837,7 +843,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                         .terminal
                         .parser
                         .lock()
-                        .unwrap()
+                        .expect("Failed to lock terminal parser")
                         .screen()
                         .application_cursor();
                     app.terminal
@@ -853,7 +859,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                         .terminal
                         .parser
                         .lock()
-                        .unwrap()
+                        .expect("Failed to lock terminal parser")
                         .screen()
                         .application_cursor();
                     app.terminal
@@ -865,7 +871,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     .terminal
                     .parser
                     .lock()
-                    .unwrap()
+                    .expect("Failed to lock terminal parser")
                     .screen()
                     .application_cursor();
                 app.terminal
@@ -876,7 +882,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     .terminal
                     .parser
                     .lock()
-                    .unwrap()
+                    .expect("Failed to lock terminal parser")
                     .screen()
                     .application_cursor();
                 app.terminal

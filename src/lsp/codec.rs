@@ -85,13 +85,14 @@ mod tests {
     fn test_encode() {
         let msg = serde_json::json!({"jsonrpc": "2.0", "method": "initialized"});
         let encoded = encode(&msg);
-        let s = String::from_utf8(encoded).unwrap();
+        let s = String::from_utf8(encoded).expect("Encoded message should be valid UTF-8");
         assert!(s.starts_with("Content-Length: "));
         assert!(s.contains("\r\n\r\n"));
         // The body after the blank line should be valid JSON
         let parts: Vec<&str> = s.splitn(2, "\r\n\r\n").collect();
         assert_eq!(parts.len(), 2);
-        let body: serde_json::Value = serde_json::from_str(parts[1]).unwrap();
+        let body: serde_json::Value =
+            serde_json::from_str(parts[1]).expect("Body should be valid JSON");
         assert_eq!(body["method"], "initialized");
     }
 
@@ -100,7 +101,9 @@ mod tests {
         let msg = serde_json::json!({"jsonrpc": "2.0", "id": 1, "result": null});
         let encoded = encode(&msg);
         let mut cursor = tokio::io::BufReader::new(&encoded[..]);
-        let decoded = decode(&mut cursor).await.unwrap();
+        let decoded = decode(&mut cursor)
+            .await
+            .expect("Failed to decode valid LSP message");
         assert_eq!(decoded["id"], 1);
     }
 
@@ -114,10 +117,12 @@ mod tests {
     #[tokio::test]
     async fn test_decode_case_insensitive() {
         let msg = serde_json::json!({"jsonrpc": "2.0", "id": 2, "result": null});
-        let body = serde_json::to_string(&msg).unwrap();
+        let body = serde_json::to_string(&msg).expect("Failed to serialize JSON");
         let encoded = format!("content-length: {}\r\n\r\n{}", body.len(), body);
         let mut cursor = tokio::io::BufReader::new(encoded.as_bytes());
-        let decoded = decode(&mut cursor).await.unwrap();
+        let decoded = decode(&mut cursor)
+            .await
+            .expect("Failed to decode case-insensitive length");
         assert_eq!(decoded["id"], 2);
     }
 }
