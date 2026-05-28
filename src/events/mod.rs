@@ -86,11 +86,10 @@ fn schedule_hover(app: &mut App) {
 }
 pub fn handle_event(app: &mut App, event: Event) -> io::Result<()> {
     match event {
-        Event::Key(key) => {
-            if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat {
-                handle_key_event(app, key)?;
-            }
+        Event::Key(key) if key.kind == KeyEventKind::Press || key.kind == KeyEventKind::Repeat => {
+            handle_key_event(app, key)?;
         }
+        Event::Key(_) => {} // Ignore other key events
         Event::Mouse(mouse) => {
             handle_mouse_event(app, mouse)?;
         }
@@ -205,10 +204,8 @@ fn handle_mouse_event(app: &mut App, mouse: MouseEvent) -> io::Result<()> {
                 app.editor_mut().clamp_cursor_x();
             }
         }
-        MouseEventKind::Up(crossterm::event::MouseButton::Left) => {
-            if app.terminal_sel.is_some() {
-                copy_terminal_selection(app);
-            }
+        MouseEventKind::Up(crossterm::event::MouseButton::Left) if app.terminal_sel.is_some() => {
+            copy_terminal_selection(app);
         }
         _ => {}
     }
@@ -228,7 +225,11 @@ pub fn copy_terminal_selection(app: &mut App) {
             sel_start
         };
 
-        let parser_lock = app.terminal.parser.lock().unwrap();
+        let parser_lock = app
+            .terminal
+            .parser
+            .lock()
+            .expect("Failed to lock terminal parser");
         let mut screen = parser_lock.screen().clone();
         screen.set_scrollback(app.terminal_scroll);
 
@@ -312,49 +313,55 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                 return Ok(());
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                let items_len =
-                    crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap(), app).len();
-                app.top_bar.selected_index = (app.top_bar.selected_index + 1) % items_len;
+                if let Some(active) = app.top_bar.active_menu {
+                    let items_len = crate::ui::top_bar::get_menu_items(active, app).len();
+                    app.top_bar.selected_index = (app.top_bar.selected_index + 1) % items_len;
+                }
                 return Ok(());
             }
             KeyCode::Up | KeyCode::Char('k') => {
-                let items_len =
-                    crate::ui::top_bar::get_menu_items(app.top_bar.active_menu.unwrap(), app).len();
-                if app.top_bar.selected_index == 0 {
-                    app.top_bar.selected_index = items_len - 1;
-                } else {
-                    app.top_bar.selected_index -= 1;
+                if let Some(active) = app.top_bar.active_menu {
+                    let items_len = crate::ui::top_bar::get_menu_items(active, app).len();
+                    if app.top_bar.selected_index == 0 {
+                        app.top_bar.selected_index = items_len - 1;
+                    } else {
+                        app.top_bar.selected_index -= 1;
+                    }
                 }
                 return Ok(());
             }
             KeyCode::Right | KeyCode::Char('l') => {
-                let next = match app.top_bar.active_menu.unwrap() {
-                    crate::app::TopBarMenu::Navigation => crate::app::TopBarMenu::Edit,
-                    crate::app::TopBarMenu::Edit => crate::app::TopBarMenu::Files,
-                    crate::app::TopBarMenu::Files => crate::app::TopBarMenu::Panels,
-                    crate::app::TopBarMenu::Panels => crate::app::TopBarMenu::Sidebar,
-                    crate::app::TopBarMenu::Sidebar => crate::app::TopBarMenu::Code,
-                    crate::app::TopBarMenu::Code => crate::app::TopBarMenu::Help,
-                    crate::app::TopBarMenu::Help => crate::app::TopBarMenu::Theme,
-                    crate::app::TopBarMenu::Theme => crate::app::TopBarMenu::Navigation,
-                };
-                app.top_bar.active_menu = Some(next);
-                app.top_bar.selected_index = 0;
+                if let Some(active) = app.top_bar.active_menu {
+                    let next = match active {
+                        crate::app::TopBarMenu::Navigation => crate::app::TopBarMenu::Edit,
+                        crate::app::TopBarMenu::Edit => crate::app::TopBarMenu::Files,
+                        crate::app::TopBarMenu::Files => crate::app::TopBarMenu::Panels,
+                        crate::app::TopBarMenu::Panels => crate::app::TopBarMenu::Sidebar,
+                        crate::app::TopBarMenu::Sidebar => crate::app::TopBarMenu::Code,
+                        crate::app::TopBarMenu::Code => crate::app::TopBarMenu::Help,
+                        crate::app::TopBarMenu::Help => crate::app::TopBarMenu::Theme,
+                        crate::app::TopBarMenu::Theme => crate::app::TopBarMenu::Navigation,
+                    };
+                    app.top_bar.active_menu = Some(next);
+                    app.top_bar.selected_index = 0;
+                }
                 return Ok(());
             }
             KeyCode::Left | KeyCode::Char('h') => {
-                let prev = match app.top_bar.active_menu.unwrap() {
-                    crate::app::TopBarMenu::Navigation => crate::app::TopBarMenu::Theme,
-                    crate::app::TopBarMenu::Edit => crate::app::TopBarMenu::Navigation,
-                    crate::app::TopBarMenu::Files => crate::app::TopBarMenu::Edit,
-                    crate::app::TopBarMenu::Panels => crate::app::TopBarMenu::Files,
-                    crate::app::TopBarMenu::Sidebar => crate::app::TopBarMenu::Panels,
-                    crate::app::TopBarMenu::Code => crate::app::TopBarMenu::Sidebar,
-                    crate::app::TopBarMenu::Help => crate::app::TopBarMenu::Code,
-                    crate::app::TopBarMenu::Theme => crate::app::TopBarMenu::Help,
-                };
-                app.top_bar.active_menu = Some(prev);
-                app.top_bar.selected_index = 0;
+                if let Some(active) = app.top_bar.active_menu {
+                    let prev = match active {
+                        crate::app::TopBarMenu::Navigation => crate::app::TopBarMenu::Theme,
+                        crate::app::TopBarMenu::Edit => crate::app::TopBarMenu::Navigation,
+                        crate::app::TopBarMenu::Files => crate::app::TopBarMenu::Edit,
+                        crate::app::TopBarMenu::Panels => crate::app::TopBarMenu::Files,
+                        crate::app::TopBarMenu::Sidebar => crate::app::TopBarMenu::Panels,
+                        crate::app::TopBarMenu::Code => crate::app::TopBarMenu::Sidebar,
+                        crate::app::TopBarMenu::Help => crate::app::TopBarMenu::Code,
+                        crate::app::TopBarMenu::Theme => crate::app::TopBarMenu::Help,
+                    };
+                    app.top_bar.active_menu = Some(prev);
+                    app.top_bar.selected_index = 0;
+                }
                 return Ok(());
             }
             KeyCode::Enter => {
@@ -520,36 +527,32 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
             KeyCode::Tab | KeyCode::Up | KeyCode::Down => {
                 app.save_as_state.focus_filename = !app.save_as_state.focus_filename;
             }
-            KeyCode::Backspace => {
-                if app.save_as_state.focus_filename {
-                    app.save_as_state.filename.pop();
-                    app.save_as_state.is_edited = true;
-                }
+            KeyCode::Backspace if app.save_as_state.focus_filename => {
+                app.save_as_state.filename.pop();
+                app.save_as_state.is_edited = true;
             }
-            KeyCode::Delete => {
+            KeyCode::Delete if app.save_as_state.focus_filename => {
                 // For a simple text field, delete can behave like backspace if we don't track cursor pos
-                if app.save_as_state.focus_filename {
-                    app.save_as_state.filename.pop();
-                    app.save_as_state.is_edited = true;
-                }
+                app.save_as_state.filename.pop();
+                app.save_as_state.is_edited = true;
             }
-            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if app.save_as_state.focus_filename {
+            KeyCode::Char('u')
+                if key.modifiers.contains(KeyModifiers::CONTROL)
+                    && app.save_as_state.focus_filename =>
+            {
+                app.save_as_state.filename.clear();
+                app.save_as_state.is_edited = true;
+            }
+            KeyCode::Char(c)
+                if app.save_as_state.focus_filename
+                    && !key.modifiers.contains(KeyModifiers::CONTROL)
+                    && !key.modifiers.contains(KeyModifiers::ALT) =>
+            {
+                if !app.save_as_state.is_edited {
                     app.save_as_state.filename.clear();
                     app.save_as_state.is_edited = true;
                 }
-            }
-            KeyCode::Char(c) => {
-                if app.save_as_state.focus_filename
-                    && !key.modifiers.contains(KeyModifiers::CONTROL)
-                    && !key.modifiers.contains(KeyModifiers::ALT)
-                {
-                    if !app.save_as_state.is_edited {
-                        app.save_as_state.filename.clear();
-                        app.save_as_state.is_edited = true;
-                    }
-                    app.save_as_state.filename.push(c);
-                }
+                app.save_as_state.filename.push(c);
             }
             _ => {}
         }
@@ -844,7 +847,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                         .terminal
                         .parser
                         .lock()
-                        .unwrap()
+                        .expect("Failed to lock terminal parser")
                         .screen()
                         .application_cursor();
                     app.terminal
@@ -860,7 +863,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                         .terminal
                         .parser
                         .lock()
-                        .unwrap()
+                        .expect("Failed to lock terminal parser")
                         .screen()
                         .application_cursor();
                     app.terminal
@@ -872,7 +875,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     .terminal
                     .parser
                     .lock()
-                    .unwrap()
+                    .expect("Failed to lock terminal parser")
                     .screen()
                     .application_cursor();
                 app.terminal
@@ -883,7 +886,7 @@ fn handle_key_event(app: &mut App, key: KeyEvent) -> io::Result<()> {
                     .terminal
                     .parser
                     .lock()
-                    .unwrap()
+                    .expect("Failed to lock terminal parser")
                     .screen()
                     .application_cursor();
                 app.terminal

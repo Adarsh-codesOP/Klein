@@ -87,8 +87,17 @@ impl Editor {
         if let Some(path) = &self.path {
             if let Some(mut parser) = ts_manager.create_parser_for_file(path) {
                 self.ts_lang = parser.language();
-                let content = self.buffer.to_string();
-                self.tree = parser.parse(content, self.tree.as_ref());
+                let rope = &self.buffer;
+                self.tree = parser.parse_with(
+                    &mut |offset, _position| {
+                        if offset >= rope.len_bytes() {
+                            return "".as_bytes();
+                        }
+                        let (chunk, chunk_byte_idx, _, _) = rope.chunk_at_byte(offset);
+                        &chunk.as_bytes()[offset - chunk_byte_idx..]
+                    },
+                    self.tree.as_ref(),
+                );
             }
         }
     }
@@ -97,8 +106,17 @@ impl Editor {
         if let Some(lang) = self.ts_lang {
             let mut parser = tree_sitter::Parser::new();
             if parser.set_language(lang).is_ok() {
-                let content = self.buffer.to_string();
-                self.tree = parser.parse(content, self.tree.as_ref());
+                let rope = &self.buffer;
+                self.tree = parser.parse_with(
+                    &mut |offset, _position| {
+                        if offset >= rope.len_bytes() {
+                            return "".as_bytes();
+                        }
+                        let (chunk, chunk_byte_idx, _, _) = rope.chunk_at_byte(offset);
+                        &chunk.as_bytes()[offset - chunk_byte_idx..]
+                    },
+                    self.tree.as_ref(),
+                );
             }
         }
     }

@@ -89,7 +89,9 @@ pub fn run_grep(query: &str) -> Vec<SearchResult> {
             );
 
             if !local_results.is_empty() {
-                let mut global = results.lock().unwrap();
+                let mut global = results
+                    .lock()
+                    .expect("Failed to lock global search results");
                 global.extend(local_results);
                 if global.len() > 2000 {
                     return WalkState::Quit;
@@ -100,7 +102,10 @@ pub fn run_grep(query: &str) -> Vec<SearchResult> {
         })
     });
 
-    let mut final_results = Arc::try_unwrap(results).unwrap().into_inner().unwrap();
+    let mut final_results = Arc::try_unwrap(results)
+        .expect("Failed to unwrap Arc containing search results")
+        .into_inner()
+        .expect("Failed to unwrap Mutex containing search results");
     final_results.truncate(2000);
     final_results
 }
@@ -197,7 +202,7 @@ pub fn fuzzy_filter(
         })
         .collect();
 
-    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.sort_by_key(|b| std::cmp::Reverse(b.0));
     scored.into_iter().map(|(_, item)| item).collect()
 }
 
